@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Product Table by Barcode</title>
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#28a745">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="apple-touch-icon" href="./icons/logo-192.png">
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css"
+    />
+    <!-- Added Bootstrap Icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css"
+    />
+    <style>
+      /* Touch optimization */
+      html {
+        touch-action: manipulation;
+      }
+      
+      .highlight-column {
+        font-weight: bold;
+        font-size: 1.2rem;
+      }
+
+      /* Sidebar styles updated for mobile */
+      #sidebar {
+        height: 100%;
+        width: 250px;
+        position: fixed;
+        top: 0;
+        left: -100%;
+        background: linear-gradient(135deg, #0d6efd, #6610f2);
+        color: white;
+        padding: 20px;
+        transition: left 0.3s ease;
+        z-index: 1050;
+      }
+
+      #sidebar.open {
+        left: 0;
+      }
+
+      /* Mobile-friendly sidebar */
+      @media (max-width: 767px) {
+        #sidebar {
+          width: 80%;
+        }
+        
+        body.sidebar-open {
+          margin-left: 0;
+          overflow: hidden; /* Prevent body scroll when sidebar is open */
+        }
+        
+        /* Overlay when sidebar is open */
+        body.sidebar-open:before {
+          content: '';
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0,0,0,0.5);
+          z-index: 1040;
+        }
+      }
+
+      /* Sidebar header styling */
+      .sidebar-header {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+      }
+
+      /* Collapsible section button styling for full width */
+      #sidebar .mb-3 .btn {
+        text-align: left;
+      }
+
+      /* Sidebar close button style */
+      #closeSidebarButton {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        color: white;
+      }
+
+      /* Tooltip customization if needed */
+      .tooltip-inner {
+        background-color: #333;
+        color: #fff;
+      }
+
+      /* Touch-friendly buttons */
+      button, .btn, input[type="button"], input[type="submit"] {
+        min-height: 48px;
+        min-width: 48px;
+      }
+      
+      /* More touch-friendly form inputs */
+      input, select, textarea {
+        font-size: 16px; /* Prevents iOS zoom on focus */
+        padding: 10px;
+      }
+
+      #openSidebarButton {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        background-color: #343a40;
+        color: white;
+        border: none;
+        padding: 12px 15px;
+        font-size: 20px;
+        cursor: pointer;
+        z-index: 1030;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      }
+
+      body {
+        margin-left: 0;
+        transition: margin-left 0.3s;
+        padding-top: 70px; /* Space for the fixed button */
+      }
+
+      body.sidebar-open {
+        margin-left: 250px;
+      }
+
+      .sidebar {
+        width: 250px;
+        height: 100vh;
+        overflow-y: auto;
+        position: fixed;
+        top: 0;
+        left: 0;
+        background-color: #f4f4f4;
+        padding: 20px;
+        -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+      }
+
+      .sidebar .item {
+        padding: 10px;
+        border-bottom: 1px solid #ddd;
+      }
+
+      .sidebar::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      .sidebar::-webkit-scrollbar-thumb {
+        background-color: darkgray;
+        border-radius: 4px;
+      }
+
+      .sidebar::-webkit-scrollbar-track {
+        background: #f1f1f1;
+      }
+
+      .action-column {
+        display: none;
+      }
+      
+      body.show-action .action-column {
+        display: table-cell;
+      }
+
+      /* Responsive table adjustments */
+      @media (max-width: 767px) {
+        .table-responsive {
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Ensure tables are scrollable on mobile */
+        table {
+          min-width: 100%;
+        }
+      }
+
+      /* Responsive adjustments */
+      @media (max-width: 768px) {
+        #sidebar {
+          width: 80%;
+        }
+        
+        body.sidebar-open {
+          margin-left: 0;
+        }
+        
+        .container {
+          width: 100%;
+          max-width: 100%;
+          padding-left: 10px;
+          padding-right: 10px;
+        }
+        
+        /* Adjust button size for mobile */
+        #columnToggleButtons .btn {
+          margin-bottom: 5px;
+          width: 100%;
+        }
+      }
+
+      /* Mobile Mode: Fix barcode input at bottom */
+      .mobile-input-fixed {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1100;
+        background: #fff;
+        margin: 0;
+        padding: 10px 10px 15px 10px;
+        box-shadow: 0 -2px 8px rgba(0,0,0,0.08);
+        border-top: 1px solid #eee;
+        width: 100vw;
+        max-width: 100vw;
+      }
+      .mobile-input-fixed label {
+        display: none;
+      }
+      .mobile-input-fixed input {
+        font-size: 1.2rem;
+        min-height: 48px;
+      }
+      body.mobile-mode {
+        padding-bottom: 80px !important;
+      }
+    </style>
+  </head>
+
+  <body class="bg-light">
+    <!-- Sidebar with new header and collapsible sections -->
+    <div id="sidebar" class="sidebar">
+      <div
+        class="sidebar-header d-flex justify-content-between align-items-center"
+      >
+        <h4>Inventory Menu</h4>
+        <button
+          id="closeSidebarButton"
+          data-bs-toggle="tooltip"
+          title="Close Sidebar"
+        >
+          <i class="bi bi-x-circle"></i>
+        </button>
+      </div>
+
+      <!-- File Upload Section -->
+      <div class="mb-3">
+        <button
+          class="btn btn-primary w-100"
+          data-bs-toggle="collapse"
+          data-bs-target="#fileUploadSection"
+          aria-expanded="true"
+          title="Upload Excel File"
+        >
+          <i class="bi bi-upload"></i> File Upload
+        </button>
+        <div class="collapse show" id="fileUploadSection">
+          <!-- ...existing file upload code... -->
+          <div class="mt-2">
+            <label for="fileInput" class="form-label">Upload Excel File</label>
+            <input type="file" id="fileInput" class="form-control" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Barcode Editing Section -->
+      <div class="mb-3">
+        <button
+          class="btn btn-primary w-100"
+          data-bs-toggle="collapse"
+          data-bs-target="#barcodeEditSection"
+          aria-expanded="false"
+          title="Edit Barcodes"
+        >
+          <i class="bi bi-pencil-square"></i> Barcode Editing
+        </button>
+        <div class="collapse" id="barcodeEditSection">
+          <div class="mt-2">
+            <h5 class="text-center">Edit Barcodes</h5>
+            <div class="input-group mb-2">
+              <input
+                type="text"
+                id="barcodeEditInput"
+                class="form-control"
+                placeholder="Enter Edited Barcode"
+              />
+            </div>
+            <div class="input-group mb-2">
+              <input
+                type="text"
+                id="editedBarcodeInput"
+                class="form-control"
+                placeholder="Enter Original Barcode"
+              />
+            </div>
+            <button
+              id="saveEditedBarcodeButton"
+              class="btn btn-primary w-100"
+              data-bs-toggle="tooltip"
+              title="Save Edited Barcode"
+            >
+              <i class="bi bi-save"></i> Save
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Column Visibility Section -->
+      <div class="mb-3">
+        <button
+          class="btn btn-secondary w-100"
+          data-bs-toggle="collapse"
+          data-bs-target="#columnVisibilitySection"
+          aria-expanded="false"
+          title="Toggle Column Visibility"
+        >
+          <i class="bi bi-grid"></i> Column Visibility
+        </button>
+        <div class="collapse" id="columnVisibilitySection">
+          <div class="mt-2">
+            <h5 class="text-center">Column Visibility</h5>
+            <div
+              id="columnToggleButtons"
+              class="d-flex flex-wrap justify-content-center gap-2"
+            ></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Column Section -->
+      <div class="mb-3">
+        <button
+          class="btn btn-warning w-100"
+          data-bs-toggle="collapse"
+          data-bs-target="#actionColumnSection"
+          aria-expanded="false"
+          title="Toggle Action Column"
+        >
+          <i class="bi bi-check-circle"></i> Action Column
+        </button>
+        <div class="collapse" id="actionColumnSection">
+          <div class="mt-2">
+            <h5 class="text-center">Show Action Column</h5>
+            <button
+              id="toggleActionColumnButton"
+              class="btn btn-primary w-100"
+              data-bs-toggle="tooltip"
+              title="Toggle Action"
+            >
+              <i class="bi bi-eye"></i> Toggle Action Column
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Auto-Confirm Barcode Section -->
+      <div class="mb-3">
+        <button
+          id="toggleAutoConfirmButton"
+          class="btn btn-info w-100"
+          data-bs-toggle="tooltip"
+          title="Enable/Disable Auto-Confirm Barcode"
+        >
+          <i class="bi bi-lightning-charge"></i> Enable Auto-Confirm Barcode
+        </button>
+      </div>
+
+      <!-- Other sidebar functionalities (e.g. export, clear storage, toggle remaining) -->
+      <div class="mb-3">
+        <button
+          id="toggleRemainingButton"
+          class="btn btn-primary w-100"
+          data-bs-toggle="tooltip"
+          title="Show/Hide Remaining Products"
+        >
+          <i class="bi bi-arrow-repeat"></i> Remaining Products
+        </button>
+      </div>
+      <div class="mb-3">
+        <button
+          id="clearStorageButton"
+          class="btn btn-danger w-100"
+          data-bs-toggle="tooltip"
+          title="Clear Local Storage"
+        >
+          <i class="bi bi-trash"></i> Clear Storage
+        </button>
+      </div>
+      <div class="mb-3">
+        <button
+          id="exportButton"
+          class="btn btn-success w-100"
+          data-bs-toggle="tooltip"
+          title="Export Scanned Products"
+        >
+          <i class="bi bi-file-earmark-spreadsheet"></i> Export Products
+        </button>
+      </div>
+      <!-- Mobile Mode Section -->
+      <div class="mb-3">
+        <button
+          id="toggleMobileModeButton"
+          class="btn btn-dark w-100"
+          data-bs-toggle="tooltip"
+          title="Enable/Disable Mobile Mode (Input Fixed at Bottom)"
+        >
+          <i class="bi bi-phone"></i> Enable Mobile Mode
+        </button>
+      </div>
+    </div>
+
+    <!-- Open Sidebar Button -->
+    <button id="openSidebarButton" data-bs-toggle="tooltip" title="Open Sidebar">☰</button>
+
+    <!-- Make container fluid for better mobile layout -->
+    <div class="container-fluid pt-3 mt-5">
+      <h1 class="text-center" id="pageHeader">Product Inventory</h1>
+
+      <div id="barcodeInputContainer" class="mb-3">
+        <label for="barcodeInput" class="form-label">Enter Barcode</label>
+        <input
+          type="text"
+          id="barcodeInput"
+          class="form-control"
+          placeholder="Enter Barcode"
+        />
+      </div>
+      <h3 class="text-center">Scanned Products</h3>
+      <div class="table-responsive"> <!-- Wrap tables in responsive container -->
+        <table class="table table-bordered table-striped mt-3">
+          <thead class="table-dark">
+            <tr id="tableHeaders"></tr>
+          </thead>
+          <tbody id="productTableBody"></tbody>
+        </table>
+      </div>
+      <div id="remainingProductsSection" class="mt-5 d-none">
+        <h3 class="text-center">Remaining Products</h3>
+        <div class="table-responsive">
+          <table class="table table-bordered table-striped mt-3">
+            <thead class="table-dark">
+              <tr id="remainingTableHeaders"></tr>
+            </thead>
+            <tbody id="remainingTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Bootstrap Bundle for collapse & tooltip -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      // Add PWA service worker registration at the beginning of your script
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker
+            .register("./service-worker.js")
+            .then(() => console.log("Service Worker registered successfully"))
+            .catch((err) => console.error("Service Worker registration failed:", err));
+        });
+      }
+      
+      let excelData = [];
+      const scannedBarcodes = new Map();
+      let remainingProducts = [];
+      let fileName = "Product Inventory"; // Default file name
+      let focusEnabled = true; // State variable to track focus mode
+      let hiddenColumns = []; // Track hidden columns
+      let editedBarcodes = new Map(); // Store edited barcodes
+      let autoConfirmEnabled = false; // State for auto-confirm barcode
+
+      // Load edited barcodes from local storage
+      function loadEditedBarcodes() {
+        const savedEditedBarcodes =
+          JSON.parse(localStorage.getItem("editedBarcodes")) || [];
+        editedBarcodes = new Map(savedEditedBarcodes);
+      }
+
+      // Save edited barcodes to local storage
+      function saveEditedBarcodes() {
+        localStorage.setItem(
+          "editedBarcodes",
+          JSON.stringify([...editedBarcodes.entries()])
+        );
+      }
+
+      // Optimize scroll performance with requestAnimationFrame
+      function optimizedScroll(element, options) {
+        if (!element) return;
+        
+        return window.requestAnimationFrame(() => {
+          element.scrollIntoView(options);
+        });
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const barcodeInput = document.getElementById("barcodeInput");
+
+        // Initialize Bootstrap Tooltips
+        const tooltipTriggerList = [].slice.call(
+          document.querySelectorAll('[data-bs-toggle="tooltip"]')
+        );
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+          return new bootstrap.Tooltip(tooltipTriggerEl, {
+            trigger: 'hover' // Better for mobile - don't require click to dismiss
+          });
+        });
+
+        // Focus the barcode input when Enter key is pressed anywhere
+        document.addEventListener("keypress", (event) => {
+          if (
+            event.key === "Enter" &&
+            document.activeElement !== barcodeInput
+          ) {
+            event.preventDefault();
+            barcodeInput.focus();
+          }
+        });
+
+        // Event listeners
+        document
+          .getElementById("fileInput")
+          .addEventListener("change", handleFileUpload);
+        barcodeInput.addEventListener("keypress", function (event) {
+          if (event.key === "Enter") {
+            handleBarcodeSearch(event);
+          }
+        });
+        document
+          .getElementById("toggleRemainingButton")
+          .addEventListener("click", toggleRemainingProducts);
+        document
+          .getElementById("clearStorageButton")
+          .addEventListener("click", clearLocalStorage);
+        document
+          .getElementById("exportButton")
+          .addEventListener("click", exportScannedProducts);
+        document
+          .getElementById("toggleFocusButton")
+          ?.addEventListener("click", () => {
+            focusEnabled = !focusEnabled;
+            const button = document.getElementById("toggleFocusButton");
+            button.textContent = focusEnabled
+              ? "Disable Focus on Product Added"
+              : "Enable Focus on Product Added";
+          });
+        document
+          .getElementById("saveEditedBarcodeButton")
+          .addEventListener("click", () => {
+            const editedBarcode = document
+              .getElementById("barcodeEditInput")
+              .value.trim();
+            const originalBarcode = document
+              .getElementById("editedBarcodeInput")
+              .value.trim();
+
+            if (editedBarcode && originalBarcode) {
+              editedBarcodes.set(editedBarcode, originalBarcode); // Map edited barcode to original barcode
+              saveEditedBarcodes();
+              alert("Barcode edited and saved!");
+            } else {
+              alert("Please enter both the edited and original barcodes.");
+            }
+          });
+
+        // Close/open the sidebar using the ESC key
+        document.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") {
+            const sidebar = document.getElementById("sidebar");
+            const body = document.body;
+            sidebar.classList.toggle("open");
+            body.classList.toggle("sidebar-open");
+          }
+        });
+
+        // Load edited barcodes
+        loadEditedBarcodes();
+
+        // Load previous progress if available
+        loadProgress();
+
+        // Mobile-optimized sidebar toggle
+        document.getElementById("openSidebarButton").addEventListener("click", () => {
+          document.getElementById("sidebar").classList.add("open");
+          document.body.classList.add("sidebar-open");
+        });
+        
+        document.getElementById("closeSidebarButton").addEventListener("click", () => {
+          document.getElementById("sidebar").classList.remove("open");
+          document.body.classList.remove("sidebar-open");
+        });
+        
+        // Close sidebar when clicking the overlay (for mobile)
+        document.addEventListener("click", (event) => {
+          const sidebar = document.getElementById("sidebar");
+          if (document.body.classList.contains("sidebar-open") && 
+              !sidebar.contains(event.target) && 
+              event.target.id !== "openSidebarButton") {
+            sidebar.classList.remove("open");
+            document.body.classList.remove("sidebar-open");
+          }
+        });
+
+        // Auto-confirm barcode input logic
+        let autoConfirmDebounce;
+        barcodeInput.addEventListener("input", function (event) {
+          if (!autoConfirmEnabled) return;
+          clearTimeout(autoConfirmDebounce);
+          if (barcodeInput.value.trim() !== "") {
+            autoConfirmDebounce = setTimeout(() => {
+              handleBarcodeSearch({ target: barcodeInput });
+            }, 300); // 300ms debounce after typing stops
+          }
+        });
+
+        // Sidebar toggle for auto-confirm barcode
+        const toggleAutoConfirmButton = document.getElementById("toggleAutoConfirmButton");
+        function updateAutoConfirmButton() {
+          toggleAutoConfirmButton.textContent =
+            (autoConfirmEnabled ? "Disable" : "Enable") + " Auto-Confirm Barcode";
+        }
+        toggleAutoConfirmButton.addEventListener("click", () => {
+          autoConfirmEnabled = !autoConfirmEnabled;
+          localStorage.setItem("autoConfirmEnabled", autoConfirmEnabled);
+          updateAutoConfirmButton();
+        });
+        // Load auto-confirm state from localStorage
+        autoConfirmEnabled = localStorage.getItem("autoConfirmEnabled") === "true";
+        updateAutoConfirmButton();
+
+        // Mobile Mode toggle logic
+        const barcodeInputContainer = document.getElementById("barcodeInputContainer");
+        const toggleMobileModeButton = document.getElementById("toggleMobileModeButton");
+        function updateMobileModeButton() {
+          toggleMobileModeButton.textContent =
+            (mobileModeEnabled ? "Disable" : "Enable") + " Mobile Mode";
+        }
+        let mobileModeEnabled = false;
+        toggleMobileModeButton.addEventListener("click", () => {
+          mobileModeEnabled = !mobileModeEnabled;
+          localStorage.setItem("mobileModeEnabled", mobileModeEnabled);
+          if (mobileModeEnabled) {
+            barcodeInputContainer.classList.add("mobile-input-fixed");
+            document.body.classList.add("mobile-mode");
+          } else {
+            barcodeInputContainer.classList.remove("mobile-input-fixed");
+            document.body.classList.remove("mobile-mode");
+          }
+          updateMobileModeButton();
+        });
+        // Load mobile mode state from localStorage
+        mobileModeEnabled = localStorage.getItem("mobileModeEnabled") === "true";
+        if (mobileModeEnabled) {
+          barcodeInputContainer.classList.add("mobile-input-fixed");
+          document.body.classList.add("mobile-mode");
+        }
+        updateMobileModeButton();
+      });
+
+      function handleFileUpload(event) {
+        const file = event.target.files[0];
+        const reader = new FileReader();
+
+        // Update page header with the Excel file name
+        fileName = file.name;
+        document.getElementById("pageHeader").textContent = fileName;
+
+        reader.onload = (e) => {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: "array" });
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          excelData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+          remainingProducts = [...excelData.slice(1)];
+
+          // Save excelData to local storage
+          localStorage.setItem("excelData", JSON.stringify(excelData));
+
+          renderTableHeaders();
+          showRemainingProducts();
+          saveProgress();
+        };
+
+        reader.readAsArrayBuffer(file);
+      }
+
+      function renderTableHeaders() {
+        const headers = excelData[0];
+        const tableHeaders = document.getElementById("tableHeaders");
+        const remainingTableHeaders = document.getElementById(
+          "remainingTableHeaders"
+        );
+        const columnToggleButtons = document.getElementById(
+          "columnToggleButtons"
+        );
+
+        tableHeaders.innerHTML = "";
+        remainingTableHeaders.innerHTML = "";
+        columnToggleButtons.innerHTML = "";
+
+        headers.forEach((header, index) => {
+          // Add header cells to both tables
+          const th = document.createElement("th");
+          th.textContent = header;
+          tableHeaders.appendChild(th);
+
+          const thRemaining = document.createElement("th");
+          thRemaining.textContent = header;
+          remainingTableHeaders.appendChild(thRemaining);
+
+          // Create toggle buttons for columns
+          const button = document.createElement("button");
+          button.textContent = `Toggle ${header}`;
+          button.className = "btn btn-secondary btn-sm";
+          button.addEventListener("click", () => toggleColumnVisibility(index));
+          columnToggleButtons.appendChild(button);
+        });
+
+        const thAction = document.createElement("th");
+        thAction.textContent = "Action";
+        thAction.classList.add("action-column");
+        tableHeaders.appendChild(thAction);
+
+        const thActionRemaining = document.createElement("th");
+        thActionRemaining.textContent = "Action";
+        thActionRemaining.classList.add("action-column");
+        remainingTableHeaders.appendChild(thActionRemaining);
+      }
+
+      function toggleColumnVisibility(columnIndex) {
+        const tables = [
+          document.getElementById("productTableBody"),
+          document.getElementById("remainingTableBody"),
+        ];
+        const headers = [
+          document.getElementById("tableHeaders"),
+          document.getElementById("remainingTableHeaders"),
+        ];
+
+        tables.forEach((table) => {
+          Array.from(table.rows).forEach((row) => {
+            if (row.cells[columnIndex]) {
+              row.cells[columnIndex].classList.toggle("d-none");
+            }
+          });
+        });
+
+        headers.forEach((headerRow) => {
+          if (headerRow.cells[columnIndex]) {
+            headerRow.cells[columnIndex].classList.toggle("d-none");
+          }
+        });
+
+        // Update the hidden columns array
+        if (hiddenColumns.includes(columnIndex)) {
+          hiddenColumns = hiddenColumns.filter(
+            (index) => index !== columnIndex
+          );
+        } else {
+          hiddenColumns.push(columnIndex);
+        }
+      }
+
+      function applyHiddenColumns(row) {
+        hiddenColumns.forEach((columnIndex) => {
+          if (row.cells[columnIndex]) {
+            row.cells[columnIndex].classList.add("d-none");
+          }
+        });
+      }
+
+      function handleBarcodeSearch(event) {
+        let barcode = event.target.value.trim();
+
+        if (barcode === "") return;
+
+        console.log("Entered barcode:", barcode);
+
+        // Check if the barcode is an edited barcode
+        if (editedBarcodes.has(barcode)) {
+          barcode = editedBarcodes.get(barcode); // Replace with the original barcode
+          console.log("Original barcode:", barcode);
+        }
+
+        // Check if the barcode is already scanned
+        if (scannedBarcodes.has(barcode)) {
+          const row = scannedBarcodes.get(barcode);
+          row.classList.add("bg-warning");
+          row.scrollIntoView({ behavior: "smooth", block: "center" });
+          setTimeout(() => {
+            row.classList.remove("bg-warning");
+          }, 1000);
+        } else {
+          // Search for the barcode in the remaining products
+          const rowIndex = remainingProducts.findIndex((row) =>
+            row.some((cell) =>
+              cell
+                .toString()
+                .split("-")
+                .map((c) => c.trim())
+                .includes(barcode)
+            )
+          );
+
+          console.log("Row index found:", rowIndex);
+
+          if (rowIndex >= 0) {
+            const productRow = remainingProducts[rowIndex];
+            addRowToScannedTable(productRow, barcode);
+            remainingProducts.splice(rowIndex, 1);
+            showRemainingProducts();
+          } else {
+            alert("Barcode not found!");
+          }
+        }
+
+        event.target.value = ""; // Clear the input field
+      }
+
+      function addRowToScannedTable(row, barcode) {
+        const tableBody = document.getElementById("productTableBody");
+        const tr = document.createElement("tr");
+
+        row.forEach((cell, index) => {
+          const td = document.createElement("td");
+          td.textContent = cell;
+
+          if (index === 2) {
+            td.classList.add("highlight-column");
+          }
+
+          tr.appendChild(td);
+        });
+
+        const tdAction = document.createElement("td");
+        const returnButton = document.createElement("button");
+        returnButton.textContent = "Return";
+        returnButton.className = "btn btn-danger btn-sm action-column";
+
+        returnButton.addEventListener("click", () => {
+          const confirmation = confirm(
+            "Are you sure you want to return this product?"
+          );
+          if (confirmation) {
+            moveToRemainingTable(tr, row, barcode);
+          }
+        });
+
+        tdAction.appendChild(returnButton);
+        tr.appendChild(tdAction);
+
+        // Apply hidden columns to the new row
+        applyHiddenColumns(tr);
+
+        tableBody.appendChild(tr);
+
+        // Replace with optimized scrolling using requestAnimationFrame
+        if (focusEnabled) {
+          optimizedScroll(tr, { behavior: "smooth", block: "center" });
+          tr.classList.add("bg-success");
+          setTimeout(() => {
+            tr.classList.remove("bg-success");
+          }, 1000);
+        }
+
+        scannedBarcodes.set(barcode, tr);
+
+        saveProgress();
+      }
+
+      function moveToRemainingTable(row, dataRow, barcode) {
+        remainingProducts.push(dataRow);
+        showRemainingProducts();
+
+        scannedBarcodes.delete(barcode);
+        row.parentElement.removeChild(row);
+
+        saveProgress();
+      }
+
+      function toggleRemainingProducts() {
+        const remainingSection = document.getElementById(
+          "remainingProductsSection"
+        );
+        const button = document.getElementById("toggleRemainingButton");
+
+        if (remainingSection.classList.contains("d-none")) {
+          remainingSection.classList.remove("d-none");
+          button.textContent = "Hide Remaining Products";
+        } else {
+          remainingSection.classList.add("d-none");
+          button.textContent = "Show Remaining Products";
+        }
+      }
+
+      function showRemainingProducts() {
+        const remainingTableBody =
+          document.getElementById("remainingTableBody");
+        remainingTableBody.innerHTML = "";
+
+        remainingProducts.forEach((row) => {
+          const tr = document.createElement("tr");
+          row.forEach((cell, i) => {
+            const td = document.createElement("td");
+            td.textContent = cell;
+
+            if (i === 2) {
+              td.classList.add("highlight-column");
+            }
+
+            tr.appendChild(td);
+          });
+
+          const tdAction = document.createElement("td");
+          const moveToScannedButton = document.createElement("button");
+          moveToScannedButton.textContent = "Move";
+          moveToScannedButton.className = "btn btn-success btn-sm action-column";
+          moveToScannedButton.addEventListener("click", () => {
+            addRowToScannedTable(row, row[0]);
+            const index = remainingProducts.indexOf(row);
+            remainingProducts.splice(index, 1);
+            showRemainingProducts();
+          });
+          tdAction.appendChild(moveToScannedButton);
+          tr.appendChild(tdAction);
+
+          // Apply hidden columns to the new row
+          applyHiddenColumns(tr);
+
+          remainingTableBody.appendChild(tr);
+        });
+      }
+
+      function saveProgress() {
+        const scannedRows = [...scannedBarcodes.entries()].map(
+          ([barcode, row]) => {
+            const rowData = [];
+            row.querySelectorAll("td").forEach((cell, index) => {
+              if (index < row.children.length - 1) {
+                rowData.push(cell.textContent);
+              }
+            });
+            return { barcode, data: rowData };
+          }
+        );
+
+        localStorage.setItem("scannedProducts", JSON.stringify(scannedRows));
+        localStorage.setItem(
+          "remainingProducts",
+          JSON.stringify(remainingProducts)
+        );
+      }
+
+      function loadProgress() {
+        // Load excelData from local storage
+        const savedExcelData =
+          JSON.parse(localStorage.getItem("excelData")) || [];
+        if (savedExcelData.length > 0) {
+          excelData = savedExcelData;
+          remainingProducts = [...excelData.slice(1)]; // Initialize remainingProducts with all products
+          renderTableHeaders(); // Render table headers
+        }
+
+        const savedScannedProducts =
+          JSON.parse(localStorage.getItem("scannedProducts")) || [];
+
+        // Restore scanned products
+        savedScannedProducts.forEach(({ barcode, data }) => {
+          addRowToScannedTable(data, barcode);
+
+          // Remove the scanned product from remainingProducts
+          const rowIndex = remainingProducts.findIndex((row) =>
+            row.some((cell) =>
+              cell
+                .toString()
+                .split("-")
+                .map((c) => c.trim())
+                .includes(barcode)
+            )
+          );
+
+          if (rowIndex >= 0) {
+            remainingProducts.splice(rowIndex, 1); // Remove the product from remainingProducts
+          }
+        });
+
+        // Restore remaining products
+        showRemainingProducts(); // Render the remaining products table
+      }
+
+      function clearLocalStorage() {
+        const confirmation = confirm(
+          "Are you sure you want to clear all scanned and remaining products?"
+        );
+        if (confirmation) {
+          // Clear only the scanned and remaining products
+          localStorage.removeItem("scannedProducts");
+          localStorage.removeItem("remainingProducts");
+
+          // Reload the page to reset the tables
+          location.reload();
+        }
+      }
+
+      function exportScannedProducts() {
+        const scannerName = prompt("Please enter the scanner's name:");
+        if (!scannerName) {
+          alert("Scanner name is required!");
+          return;
+        }
+
+        const scannedData = [];
+
+        // Add the scanner's name as the first row
+        scannedData.push([`Scanner: ${scannerName}`]);
+
+        // Add an empty row for separation
+        scannedData.push([]);
+
+        // Add the headers row
+        const headers = excelData[0]; // The first row of the uploaded Excel
+        scannedData.push(headers);
+
+        // Add scanned products data
+        [...scannedBarcodes.values()].forEach((row) => {
+          const rowData = [];
+          row.querySelectorAll("td").forEach((cell, index) => {
+            if (index < row.children.length - 1) {
+              rowData.push(cell.textContent);
+            }
+          });
+          scannedData.push(rowData);
+        });
+
+        // Create a worksheet and workbook
+        const ws = XLSX.utils.aoa_to_sheet(scannedData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Scanned Products");
+
+        // Export the Excel file with the same name as the uploaded file
+        XLSX.writeFile(wb, fileName || "Product_Inventory.xlsx");
+      }
+
+      // Warn users when they try to refresh or leave the page
+      window.addEventListener("beforeunload", (event) => {
+        event.preventDefault();
+        event.returnValue = "";
+      });
+
+      // Remove password logic for action column toggle
+      document
+        .getElementById("toggleActionColumnButton")
+        .addEventListener("click", function () {
+          document.body.classList.toggle("show-action");
+          localStorage.setItem(
+            "actionColumnVisible",
+            document.body.classList.contains("show-action")
+          );
+        });
+      const actionColumnVisible =
+        localStorage.getItem("actionColumnVisible") === "true";
+      if (actionColumnVisible) {
+        document.body.classList.add("show-action");
+      }
+
+      // Sidebar open/close functionality
+      document.getElementById("openSidebarButton").addEventListener("click", () => {
+        document.getElementById("sidebar").classList.add("open");
+        document.body.classList.add("sidebar-open");
+      });
+      document.getElementById("closeSidebarButton").addEventListener("click", () => {
+        document.getElementById("sidebar").classList.remove("open");
+        document.body.classList.remove("sidebar-open");
+      });
+    </script>
+  </body>
+</html>
