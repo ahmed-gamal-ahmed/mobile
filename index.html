@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+      <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -209,32 +209,6 @@
           width: 100%;
         }
       }
-
-      /* Mobile Mode: Fix barcode input at bottom */
-      .mobile-input-fixed {
-        position: fixed;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        z-index: 1100;
-        background: #fff;
-        margin: 0;
-        padding: 10px 10px 15px 10px;
-        box-shadow: 0 -2px 8px rgba(0,0,0,0.08);
-        border-top: 1px solid #eee;
-        width: 100vw;
-        max-width: 100vw;
-      }
-      .mobile-input-fixed label {
-        display: none;
-      }
-      .mobile-input-fixed input {
-        font-size: 1.2rem;
-        min-height: 48px;
-      }
-      body.mobile-mode {
-        padding-bottom: 80px !important;
-      }
     </style>
   </head>
 
@@ -352,28 +326,24 @@
         <div class="collapse" id="actionColumnSection">
           <div class="mt-2">
             <h5 class="text-center">Show Action Column</h5>
-            <button
-              id="toggleActionColumnButton"
-              class="btn btn-primary w-100"
-              data-bs-toggle="tooltip"
-              title="Toggle Action"
-            >
-              <i class="bi bi-eye"></i> Toggle Action Column
-            </button>
+            <div class="input-group">
+              <input
+                type="password"
+                id="actionPasswordInput"
+                class="form-control"
+                placeholder="Enter Password"
+              />
+              <button
+                id="toggleActionColumnButton"
+                class="btn btn-primary"
+                data-bs-toggle="tooltip"
+                title="Toggle Action"
+              >
+                <i class="bi bi-eye"></i> Toggle
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-
-      <!-- Auto-Confirm Barcode Section -->
-      <div class="mb-3">
-        <button
-          id="toggleAutoConfirmButton"
-          class="btn btn-info w-100"
-          data-bs-toggle="tooltip"
-          title="Enable/Disable Auto-Confirm Barcode"
-        >
-          <i class="bi bi-lightning-charge"></i> Enable Auto-Confirm Barcode
-        </button>
       </div>
 
       <!-- Other sidebar functionalities (e.g. export, clear storage, toggle remaining) -->
@@ -407,15 +377,15 @@
           <i class="bi bi-file-earmark-spreadsheet"></i> Export Products
         </button>
       </div>
-      <!-- Mobile Mode Section -->
+      <!-- Voice Settings Section -->
       <div class="mb-3">
         <button
-          id="toggleMobileModeButton"
-          class="btn btn-dark w-100"
+          id="voiceToggleButton"
+          class="btn btn-secondary w-100"
           data-bs-toggle="tooltip"
-          title="Enable/Disable Mobile Mode (Input Fixed at Bottom)"
+          title="Toggle quantity voice (off / English / Arabic)"
         >
-          <i class="bi bi-phone"></i> Enable Mobile Mode
+          Voice: Off
         </button>
       </div>
     </div>
@@ -427,7 +397,7 @@
     <div class="container-fluid pt-3 mt-5">
       <h1 class="text-center" id="pageHeader">Product Inventory</h1>
 
-      <div id="barcodeInputContainer" class="mb-3">
+      <div class="mb-3">
         <label for="barcodeInput" class="form-label">Enter Barcode</label>
         <input
           type="text"
@@ -479,7 +449,69 @@
       let focusEnabled = true; // State variable to track focus mode
       let hiddenColumns = []; // Track hidden columns
       let editedBarcodes = new Map(); // Store edited barcodes
-      let autoConfirmEnabled = false; // State for auto-confirm barcode
+      let voiceMode = localStorage.getItem("voiceMode") || "off"; // off, en, ar
+      let speechInitialized = false;
+
+      function updateVoiceButtonText() {
+        const button = document.getElementById("voiceToggleButton");
+        if (!button) return;
+
+        if (voiceMode === "off") {
+          button.textContent = "Voice: Off";
+          button.classList.remove("btn-primary", "btn-success");
+          button.classList.add("btn-secondary");
+        } else if (voiceMode === "en") {
+          button.textContent = "Voice: English";
+          button.classList.remove("btn-secondary", "btn-success");
+          button.classList.add("btn-primary");
+        } else if (voiceMode === "ar") {
+          button.textContent = "Voice: Arabic";
+          button.classList.remove("btn-secondary", "btn-primary");
+          button.classList.add("btn-success");
+        }
+      }
+
+      function initSpeech() {
+        if (!("speechSynthesis" in window)) return;
+        // Touch voices once so the engine is ready
+        const voices = window.speechSynthesis.getVoices();
+        if (voices.length > 0) {
+          speechInitialized = true;
+        } else {
+          window.speechSynthesis.onvoiceschanged = () => {
+            speechInitialized = true;
+          };
+        }
+      }
+
+      function speakQuantity(quantity) {
+        if (!("speechSynthesis" in window)) return;
+        if (voiceMode === "off") return;
+        if (quantity === undefined || quantity === null) return;
+
+        const text = quantity.toString();
+
+        const doSpeak = () => {
+          const utterance = new SpeechSynthesisUtterance(text);
+
+          if (voiceMode === "ar") {
+            utterance.lang = "ar-SA";
+          } else {
+            utterance.lang = "en-US";
+          }
+
+          window.speechSynthesis.cancel();
+          window.speechSynthesis.speak(utterance);
+        };
+
+        // On the very first use, give the engine a short moment to initialize
+        if (!speechInitialized) {
+          initSpeech();
+          setTimeout(doSpeak, 300);
+        } else {
+          doSpeak();
+        }
+      }
 
       // Load edited barcodes from local storage
       function loadEditedBarcodes() {
@@ -557,6 +589,19 @@
               : "Enable Focus on Product Added";
           });
         document
+          .getElementById("voiceToggleButton")
+          .addEventListener("click", () => {
+            if (voiceMode === "off") {
+              voiceMode = "en";
+            } else if (voiceMode === "en") {
+              voiceMode = "ar";
+            } else {
+              voiceMode = "off";
+            }
+            localStorage.setItem("voiceMode", voiceMode);
+            updateVoiceButtonText();
+          });
+        document
           .getElementById("saveEditedBarcodeButton")
           .addEventListener("click", () => {
             const editedBarcode = document
@@ -591,6 +636,9 @@
         // Load previous progress if available
         loadProgress();
 
+        // Initialize voice button state
+        updateVoiceButtonText();
+
         // Mobile-optimized sidebar toggle
         document.getElementById("openSidebarButton").addEventListener("click", () => {
           document.getElementById("sidebar").classList.add("open");
@@ -612,61 +660,6 @@
             document.body.classList.remove("sidebar-open");
           }
         });
-
-        // Auto-confirm barcode input logic
-        let autoConfirmDebounce;
-        barcodeInput.addEventListener("input", function (event) {
-          if (!autoConfirmEnabled) return;
-          clearTimeout(autoConfirmDebounce);
-          if (barcodeInput.value.trim() !== "") {
-            autoConfirmDebounce = setTimeout(() => {
-              handleBarcodeSearch({ target: barcodeInput });
-            }, 300); // 300ms debounce after typing stops
-          }
-        });
-
-        // Sidebar toggle for auto-confirm barcode
-        const toggleAutoConfirmButton = document.getElementById("toggleAutoConfirmButton");
-        function updateAutoConfirmButton() {
-          toggleAutoConfirmButton.textContent =
-            (autoConfirmEnabled ? "Disable" : "Enable") + " Auto-Confirm Barcode";
-        }
-        toggleAutoConfirmButton.addEventListener("click", () => {
-          autoConfirmEnabled = !autoConfirmEnabled;
-          localStorage.setItem("autoConfirmEnabled", autoConfirmEnabled);
-          updateAutoConfirmButton();
-        });
-        // Load auto-confirm state from localStorage
-        autoConfirmEnabled = localStorage.getItem("autoConfirmEnabled") === "true";
-        updateAutoConfirmButton();
-
-        // Mobile Mode toggle logic
-        const barcodeInputContainer = document.getElementById("barcodeInputContainer");
-        const toggleMobileModeButton = document.getElementById("toggleMobileModeButton");
-        function updateMobileModeButton() {
-          toggleMobileModeButton.textContent =
-            (mobileModeEnabled ? "Disable" : "Enable") + " Mobile Mode";
-        }
-        let mobileModeEnabled = false;
-        toggleMobileModeButton.addEventListener("click", () => {
-          mobileModeEnabled = !mobileModeEnabled;
-          localStorage.setItem("mobileModeEnabled", mobileModeEnabled);
-          if (mobileModeEnabled) {
-            barcodeInputContainer.classList.add("mobile-input-fixed");
-            document.body.classList.add("mobile-mode");
-          } else {
-            barcodeInputContainer.classList.remove("mobile-input-fixed");
-            document.body.classList.remove("mobile-mode");
-          }
-          updateMobileModeButton();
-        });
-        // Load mobile mode state from localStorage
-        mobileModeEnabled = localStorage.getItem("mobileModeEnabled") === "true";
-        if (mobileModeEnabled) {
-          barcodeInputContainer.classList.add("mobile-input-fixed");
-          document.body.classList.add("mobile-mode");
-        }
-        updateMobileModeButton();
       });
 
       function handleFileUpload(event) {
@@ -802,6 +795,11 @@
           setTimeout(() => {
             row.classList.remove("bg-warning");
           }, 1000);
+        // Speak the quantity again when the same code is entered
+        const quantityCell = row.querySelector("td:nth-child(3)");
+        if (quantityCell) {
+          speakQuantity(quantityCell.textContent);
+        }
         } else {
           // Search for the barcode in the remaining products
           const rowIndex = remainingProducts.findIndex((row) =>
@@ -829,7 +827,7 @@
         event.target.value = ""; // Clear the input field
       }
 
-      function addRowToScannedTable(row, barcode) {
+      function addRowToScannedTable(row, barcode, speak = true) {
         const tableBody = document.getElementById("productTableBody");
         const tr = document.createElement("tr");
 
@@ -876,6 +874,11 @@
         }
 
         scannedBarcodes.set(barcode, tr);
+
+        if (speak) {
+          const quantity = row[2];
+          speakQuantity(quantity);
+        }
 
         saveProgress();
       }
@@ -928,7 +931,7 @@
           moveToScannedButton.textContent = "Move";
           moveToScannedButton.className = "btn btn-success btn-sm action-column";
           moveToScannedButton.addEventListener("click", () => {
-            addRowToScannedTable(row, row[0]);
+            addRowToScannedTable(row, row[0], false);
             const index = remainingProducts.indexOf(row);
             remainingProducts.splice(index, 1);
             showRemainingProducts();
@@ -978,7 +981,7 @@
 
         // Restore scanned products
         savedScannedProducts.forEach(({ barcode, data }) => {
-          addRowToScannedTable(data, barcode);
+          addRowToScannedTable(data, barcode, false);
 
           // Remove the scanned product from remainingProducts
           const rowIndex = remainingProducts.findIndex((row) =>
@@ -1059,15 +1062,21 @@
         event.returnValue = "";
       });
 
-      // Remove password logic for action column toggle
+      // NEW: Password toggle for Action column in mainVersion.html
       document
         .getElementById("toggleActionColumnButton")
         .addEventListener("click", function () {
-          document.body.classList.toggle("show-action");
-          localStorage.setItem(
-            "actionColumnVisible",
-            document.body.classList.contains("show-action")
-          );
+          const password = document.getElementById("actionPasswordInput").value;
+          if (password === "Ahmed6834") {
+            document.body.classList.toggle("show-action");
+            localStorage.setItem(
+              "actionColumnVisible",
+              document.body.classList.contains("show-action")
+            );
+            document.getElementById("actionPasswordInput").value = "";
+          } else {
+            alert("Incorrect password!");
+          }
         });
       const actionColumnVisible =
         localStorage.getItem("actionColumnVisible") === "true";
