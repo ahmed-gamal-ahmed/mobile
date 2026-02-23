@@ -359,6 +359,16 @@
       </div>
       <div class="mb-3">
         <button
+          id="toggleFocusButton"
+          class="btn btn-secondary w-100"
+          data-bs-toggle="tooltip"
+          title="Toggle focus on row after adding product"
+        >
+          <i class="bi bi-bullseye"></i> Focus on Added: On
+        </button>
+      </div>
+      <div class="mb-3">
+        <button
           id="clearStorageButton"
           class="btn btn-danger w-100"
           data-bs-toggle="tooltip"
@@ -446,11 +456,19 @@
       const scannedBarcodes = new Map();
       let remainingProducts = [];
       let fileName = "Product Inventory"; // Default file name
-      let focusEnabled = true; // State variable to track focus mode
+      let focusEnabled = localStorage.getItem("focusEnabled") !== "false"; // State variable to track focus mode
       let hiddenColumns = []; // Track hidden columns
       let editedBarcodes = new Map(); // Store edited barcodes
       let voiceMode = localStorage.getItem("voiceMode") || "off"; // off, en, ar
       let speechInitialized = false;
+
+      function updateFocusButtonText() {
+        const button = document.getElementById("toggleFocusButton");
+        if (!button) return;
+        button.innerHTML = focusEnabled
+          ? '<i class="bi bi-bullseye"></i> Focus on Added: On'
+          : '<i class="bi bi-bullseye"></i> Focus on Added: Off';
+      }
 
       function updateVoiceButtonText() {
         const button = document.getElementById("voiceToggleButton");
@@ -581,12 +599,10 @@
           .addEventListener("click", exportScannedProducts);
         document
           .getElementById("toggleFocusButton")
-          ?.addEventListener("click", () => {
+          .addEventListener("click", () => {
             focusEnabled = !focusEnabled;
-            const button = document.getElementById("toggleFocusButton");
-            button.textContent = focusEnabled
-              ? "Disable Focus on Product Added"
-              : "Enable Focus on Product Added";
+            localStorage.setItem("focusEnabled", focusEnabled);
+            updateFocusButtonText();
           });
         document
           .getElementById("voiceToggleButton")
@@ -638,6 +654,7 @@
 
         // Initialize voice button state
         updateVoiceButtonText();
+        updateFocusButtonText();
 
         // Mobile-optimized sidebar toggle
         document.getElementById("openSidebarButton").addEventListener("click", () => {
