@@ -308,6 +308,16 @@
               id="columnToggleButtons"
               class="d-flex flex-wrap justify-content-center gap-2"
             ></div>
+            <div class="mt-2">
+              <button
+                id="toggleEmptyColumnButton"
+                class="btn btn-info btn-sm w-100"
+                data-bs-toggle="tooltip"
+                title="Add/remove writable empty column in Remaining table only"
+              >
+                <i class="bi bi-plus-square"></i> Add Empty Column (Remaining)
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -458,6 +468,8 @@
       let fileName = "Product Inventory"; // Default file name
       let focusEnabled = localStorage.getItem("focusEnabled") !== "false"; // State variable to track focus mode
       let hiddenColumns = []; // Track hidden columns
+      let remainingNotesColumnVisible = localStorage.getItem("remainingNotesColumnVisible") === "true";
+      let remainingNotes = {}; // row key (barcode) -> note text for remaining table only
       let editedBarcodes = new Map(); // Store edited barcodes
       let voiceMode = localStorage.getItem("voiceMode") || "off"; // off, en, ar
       let speechInitialized = false;
@@ -618,6 +630,21 @@
             updateVoiceButtonText();
           });
         document
+          .getElementById("toggleEmptyColumnButton")
+          .addEventListener("click", () => {
+            remainingNotesColumnVisible = !remainingNotesColumnVisible;
+            localStorage.setItem("remainingNotesColumnVisible", remainingNotesColumnVisible);
+            const btn = document.getElementById("toggleEmptyColumnButton");
+            btn.innerHTML = remainingNotesColumnVisible
+              ? '<i class="bi bi-dash-square"></i> Remove Empty Column (Remaining)'
+              : '<i class="bi bi-plus-square"></i> Add Empty Column (Remaining)';
+            if (excelData.length > 0) {
+              renderTableHeaders();
+              showRemainingProducts();
+            }
+          });
+
+        document
           .getElementById("saveEditedBarcodeButton")
           .addEventListener("click", () => {
             const editedBarcode = document
@@ -655,6 +682,12 @@
         // Initialize voice button state
         updateVoiceButtonText();
         updateFocusButtonText();
+        const emptyColBtn = document.getElementById("toggleEmptyColumnButton");
+        if (emptyColBtn) {
+          emptyColBtn.innerHTML = remainingNotesColumnVisible
+            ? '<i class="bi bi-dash-square"></i> Remove Empty Column (Remaining)'
+            : '<i class="bi bi-plus-square"></i> Add Empty Column (Remaining)';
+        }
 
         // Mobile-optimized sidebar toggle
         document.getElementById("openSidebarButton").addEventListener("click", () => {
@@ -743,6 +776,12 @@
         thAction.classList.add("action-column");
         tableHeaders.appendChild(thAction);
 
+        if (remainingNotesColumnVisible) {
+          const thNotes = document.createElement("th");
+          thNotes.textContent = "Notes";
+          thNotes.classList.add("notes-column-remaining");
+          remainingTableHeaders.appendChild(thNotes);
+        }
         const thActionRemaining = document.createElement("th");
         thActionRemaining.textContent = "Action";
         thActionRemaining.classList.add("action-column");
@@ -925,6 +964,10 @@
         }
       }
 
+      function getRowKey(row) {
+        return String(row[0] || "");
+      }
+
       function showRemainingProducts() {
         const remainingTableBody =
           document.getElementById("remainingTableBody");
@@ -942,6 +985,27 @@
 
             tr.appendChild(td);
           });
+
+          if (remainingNotesColumnVisible) {
+            const tdNotes = document.createElement("td");
+            tdNotes.classList.add("notes-column-remaining");
+            const input = document.createElement("input");
+            input.type = "text";
+            input.className = "form-control form-control-sm";
+            input.placeholder = "Write here...";
+            const rowKey = getRowKey(row);
+            input.value = remainingNotes[rowKey] || "";
+            input.addEventListener("input", () => {
+              remainingNotes[rowKey] = input.value;
+              saveProgress();
+            });
+            input.addEventListener("blur", () => {
+              remainingNotes[rowKey] = input.value;
+              saveProgress();
+            });
+            tdNotes.appendChild(input);
+            tr.appendChild(tdNotes);
+          }
 
           const tdAction = document.createElement("td");
           const moveToScannedButton = document.createElement("button");
@@ -981,6 +1045,7 @@
           "remainingProducts",
           JSON.stringify(remainingProducts)
         );
+        localStorage.setItem("remainingNotes", JSON.stringify(remainingNotes));
       }
 
       function loadProgress() {
@@ -995,6 +1060,7 @@
 
         const savedScannedProducts =
           JSON.parse(localStorage.getItem("scannedProducts")) || [];
+        remainingNotes = JSON.parse(localStorage.getItem("remainingNotes")) || {};
 
         // Restore scanned products
         savedScannedProducts.forEach(({ barcode, data }) => {
@@ -1028,6 +1094,7 @@
           // Clear only the scanned and remaining products
           localStorage.removeItem("scannedProducts");
           localStorage.removeItem("remainingProducts");
+          localStorage.removeItem("remainingNotes");
 
           // Reload the page to reset the tables
           location.reload();
