@@ -19,6 +19,9 @@
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css"
     />
+    <!-- Firebase (App + Firestore, compat builds for simplicity) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <style>
       /* Touch optimization */
       html {
@@ -248,6 +251,29 @@
         </div>
       </div>
 
+      <!-- Statistics Section -->
+      <div class="mb-3">
+        <h5 class="text-center">Statistics</h5>
+        <div class="small">
+          <div class="mb-2">
+            <span class="badge bg-info me-2">File Name</span>
+            <span id="statsFileName" class="text-break">No file uploaded</span>
+          </div>
+          <div class="mb-1">
+            <span class="badge bg-primary me-2">Total</span>
+            <span id="statsTotalProducts">0</span>
+          </div>
+          <div class="mb-1">
+            <span class="badge bg-warning text-dark me-2">Remaining</span>
+            <span id="statsRemainingProducts">0</span>
+          </div>
+          <div class="mb-1">
+            <span class="badge bg-success me-2">Scanned</span>
+            <span id="statsScannedProducts">0</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Barcode Editing Section -->
       <div class="mb-3">
         <button
@@ -267,7 +293,7 @@
                 type="text"
                 id="barcodeEditInput"
                 class="form-control"
-                placeholder="Enter Edited Barcode"
+                placeholder="Enter Original Barcode"
               />
             </div>
             <div class="input-group mb-2">
@@ -275,7 +301,7 @@
                 type="text"
                 id="editedBarcodeInput"
                 class="form-control"
-                placeholder="Enter Original Barcode"
+                placeholder="Enter Edited Barcode"
               />
             </div>
             <button
@@ -316,6 +342,16 @@
                 title="Add/remove writable empty column in Remaining table only"
               >
                 <i class="bi bi-plus-square"></i> Add Empty Column (Remaining)
+              </button>
+            </div>
+            <div class="mt-2">
+              <button
+                id="toggleSearchColumnButton"
+                class="btn btn-outline-info btn-sm w-100"
+                data-bs-toggle="tooltip"
+                title="Show/hide Search column in Remaining table only"
+              >
+                Toggle Search Column (Remaining)
               </button>
             </div>
           </div>
@@ -425,6 +461,13 @@
           class="form-control"
           placeholder="Enter Barcode"
         />
+        <div
+          id="barcodeNotFoundAlert"
+          class="alert alert-danger mt-2 py-2 d-none"
+          role="alert"
+        >
+          Barcode not found
+        </div>
       </div>
       <h3 class="text-center">Scanned Products</h3>
       <div class="table-responsive"> <!-- Wrap tables in responsive container -->
@@ -444,6 +487,13 @@
             </thead>
             <tbody id="remainingTableBody"></tbody>
           </table>
+        </div>
+        <div
+          id="descriptionWarningAlert"
+          class="alert alert-warning mt-2 py-2 d-none"
+          role="alert"
+        >
+          No description available for search.
         </div>
       </div>
     </div>
@@ -473,6 +523,63 @@
       let editedBarcodes = new Map(); // Store edited barcodes
       let voiceMode = localStorage.getItem("voiceMode") || "off"; // off, en, ar
       let speechInitialized = false;
+      let barcodeNotFoundHideTimeoutId = null;
+      let descriptionWarningHideTimeoutId = null;
+      let searchColumnVisible = localStorage.getItem("searchColumnVisible") !== "false"; // default visible
+      let firestoreDb = null;
+
+      function updateStatistics() {
+        const fileNameEl = document.getElementById("statsFileName");
+        const totalEl = document.getElementById("statsTotalProducts");
+        const remainingEl = document.getElementById("statsRemainingProducts");
+        const scannedEl = document.getElementById("statsScannedProducts");
+
+        if (!fileNameEl || !totalEl || !remainingEl || !scannedEl) return;
+
+        const hasProducts = Array.isArray(excelData) && excelData.length > 1;
+
+        // File name
+        if (hasProducts && fileName) {
+          fileNameEl.textContent = fileName;
+        } else {
+          fileNameEl.textContent = "No file uploaded";
+        }
+
+        // Counts
+        const totalCount = hasProducts ? excelData.length - 1 : 0;
+        const remainingCount = hasProducts ? remainingProducts.length : 0;
+        const scannedCount = hasProducts ? scannedBarcodes.size : 0;
+
+        totalEl.textContent = totalCount;
+        remainingEl.textContent = remainingCount;
+        scannedEl.textContent = scannedCount;
+      }
+
+      // Firebase / Firestore initialization
+      const firebaseConfig = {
+        apiKey: "AIzaSyDRE4VFqnr5Y_1AlaPUDcGoZ7njAOmL0T0",
+        authDomain: "productinventorypwa.firebaseapp.com",
+        projectId: "productinventorypwa",
+        storageBucket: "productinventorypwa.firebasestorage.app",
+        messagingSenderId: "87116351333",
+        appId: "1:87116351333:web:88a611c8352c0103d1038c",
+      };
+
+      function initFirebase() {
+        try {
+          if (window.firebase) {
+            if (!firebase.apps || !firebase.apps.length) {
+              firebase.initializeApp(firebaseConfig);
+            }
+            firestoreDb = firebase.firestore();
+          } else {
+            console.warn("Firebase SDK not loaded; barcode mappings will use local storage only.");
+          }
+        } catch (err) {
+          console.error("Failed to initialize Firebase:", err);
+          firestoreDb = null;
+        }
+      }
 
       function updateFocusButtonText() {
         const button = document.getElementById("toggleFocusButton");
@@ -543,19 +650,146 @@
         }
       }
 
-      // Load edited barcodes from local storage
-      function loadEditedBarcodes() {
+      function speakBarcodeNotFound() {
+        if (!("speechSynthesis" in window)) return;
+        if (voiceMode === "off") return;
+
+        const text =
+          voiceMode === "ar" ? "الباركود غير موجود" : "Barcode not found";
+
+        const doSpeak = () => {
+          const utterance = new SpeechSynthesisUtterance(text);
+
+          if (voiceMode === "ar") {
+            utterance.lang = "ar-SA";
+          } else {
+            utterance.lang = "en-US";
+          }
+
+          window.speechSynthesis.cancel();
+          window.speechSynthesis.speak(utterance);
+        };
+
+        if (!speechInitialized) {
+          initSpeech();
+          setTimeout(doSpeak, 300);
+        } else {
+          doSpeak();
+        }
+      }
+
+      function showBarcodeNotFoundAlert() {
+        const alertEl = document.getElementById("barcodeNotFoundAlert");
+        if (!alertEl) return;
+
+        // Clear any previous hide timer
+        if (barcodeNotFoundHideTimeoutId !== null) {
+          clearTimeout(barcodeNotFoundHideTimeoutId);
+          barcodeNotFoundHideTimeoutId = null;
+        }
+
+        alertEl.classList.remove("d-none");
+
+        // Auto-hide after a short delay so UX stays clean
+        barcodeNotFoundHideTimeoutId = setTimeout(() => {
+          alertEl.classList.add("d-none");
+          barcodeNotFoundHideTimeoutId = null;
+        }, 1500);
+      }
+
+      function hideBarcodeNotFoundAlert() {
+        const alertEl = document.getElementById("barcodeNotFoundAlert");
+        if (!alertEl) return;
+        alertEl.classList.add("d-none");
+        if (barcodeNotFoundHideTimeoutId !== null) {
+          clearTimeout(barcodeNotFoundHideTimeoutId);
+          barcodeNotFoundHideTimeoutId = null;
+        }
+      }
+
+      function showDescriptionWarning() {
+        const alertEl = document.getElementById("descriptionWarningAlert");
+        if (!alertEl) return;
+
+        if (descriptionWarningHideTimeoutId !== null) {
+          clearTimeout(descriptionWarningHideTimeoutId);
+          descriptionWarningHideTimeoutId = null;
+        }
+
+        alertEl.classList.remove("d-none");
+
+        descriptionWarningHideTimeoutId = setTimeout(() => {
+          alertEl.classList.add("d-none");
+          descriptionWarningHideTimeoutId = null;
+        }, 1500);
+      }
+
+      // Load edited barcodes from local storage (fallback)
+      function loadEditedBarcodesFromLocal() {
         const savedEditedBarcodes =
           JSON.parse(localStorage.getItem("editedBarcodes")) || [];
         editedBarcodes = new Map(savedEditedBarcodes);
       }
 
-      // Save edited barcodes to local storage
-      function saveEditedBarcodes() {
+      // Save edited barcodes to local storage (fallback cache)
+      function saveEditedBarcodesToLocal() {
         localStorage.setItem(
           "editedBarcodes",
           JSON.stringify([...editedBarcodes.entries()])
         );
+      }
+
+      async function loadBarcodeMappingsFromFirestore() {
+        if (!firestoreDb) {
+          loadEditedBarcodesFromLocal();
+          return;
+        }
+
+        try {
+          const snapshot = await firestoreDb.collection("barcodeMappings").get();
+          const newMap = new Map();
+          snapshot.forEach((doc) => {
+            const data = doc.data() || {};
+            const original = (data.originalBarcode || doc.id || "").toString().trim();
+            const edited = (data.editedBarcode || "").toString().trim();
+            if (original && edited) {
+              newMap.set(original, edited);
+            }
+          });
+          editedBarcodes = newMap;
+          saveEditedBarcodesToLocal();
+        } catch (err) {
+          console.error("Failed to load barcode mappings from Firestore:", err);
+          // Fallback to local cache so scanning still works
+          loadEditedBarcodesFromLocal();
+        }
+      }
+
+      function subscribeToBarcodeMappings() {
+        if (!firestoreDb) return;
+
+        try {
+          firestoreDb.collection("barcodeMappings").onSnapshot(
+            (snapshot) => {
+              const newMap = new Map();
+              snapshot.forEach((doc) => {
+                const data = doc.data() || {};
+                const original = (data.originalBarcode || doc.id || "").toString().trim();
+                const edited = (data.editedBarcode || "").toString().trim();
+                if (original && edited) {
+                  newMap.set(original, edited);
+                }
+              });
+              editedBarcodes = newMap;
+              saveEditedBarcodesToLocal();
+            },
+            (err) => {
+              console.error("Realtime barcode mapping subscription error:", err);
+            }
+          );
+        } catch (err) {
+          console.error("Failed to subscribe to barcode mappings:", err);
+        }
       }
 
       // Optimize scroll performance with requestAnimationFrame
@@ -643,23 +877,65 @@
               showRemainingProducts();
             }
           });
+        document
+          .getElementById("toggleSearchColumnButton")
+          .addEventListener("click", () => {
+            searchColumnVisible = !searchColumnVisible;
+            localStorage.setItem("searchColumnVisible", searchColumnVisible);
+            const btn = document.getElementById("toggleSearchColumnButton");
+            if (btn) {
+              btn.innerHTML = searchColumnVisible
+                ? '<i class="bi bi-search"></i> Hide Search Column (Remaining)'
+                : '<i class="bi bi-search"></i> Show Search Column (Remaining)';
+            }
+            applySearchColumnVisibility();
+          });
 
         document
           .getElementById("saveEditedBarcodeButton")
-          .addEventListener("click", () => {
-            const editedBarcode = document
+          .addEventListener("click", async () => {
+            const originalBarcode = document
               .getElementById("barcodeEditInput")
               .value.trim();
-            const originalBarcode = document
+            const editedBarcode = document
               .getElementById("editedBarcodeInput")
               .value.trim();
 
-            if (editedBarcode && originalBarcode) {
-              editedBarcodes.set(editedBarcode, originalBarcode); // Map edited barcode to original barcode
-              saveEditedBarcodes();
-              alert("Barcode edited and saved!");
+            if (!originalBarcode || !editedBarcode) {
+              alert("Please enter both the original and edited barcodes.");
+              return;
+            }
+
+            const barcodeRegex = /^[A-Za-z0-9\-_\s]+$/;
+            if (
+              !barcodeRegex.test(originalBarcode) ||
+              !barcodeRegex.test(editedBarcode)
+            ) {
+              alert("Invalid barcode format. Use letters, numbers, spaces, '-' or '_' only.");
+              return;
+            }
+
+            // Update in-memory map and local cache
+            editedBarcodes.set(originalBarcode, editedBarcode);
+            saveEditedBarcodesToLocal();
+
+            // Save online in Firestore
+            if (firestoreDb) {
+              try {
+                await firestoreDb
+                  .collection("barcodeMappings")
+                  .doc(originalBarcode)
+                  .set({
+                    originalBarcode,
+                    editedBarcode,
+                  });
+                alert("Barcode mapping saved online.");
+              } catch (err) {
+                console.error("Failed to save barcode mapping to Firestore:", err);
+                alert("Barcode mapping saved locally, but online sync failed.");
+              }
             } else {
-              alert("Please enter both the edited and original barcodes.");
+              alert("Barcode mapping saved locally. Online sync is unavailable.");
             }
           });
 
@@ -673,8 +949,10 @@
           }
         });
 
-        // Load edited barcodes
-        loadEditedBarcodes();
+        // Initialize Firebase / Firestore and load barcode mappings
+        initFirebase();
+        loadBarcodeMappingsFromFirestore();
+        subscribeToBarcodeMappings();
 
         // Load previous progress if available
         loadProgress();
@@ -687,6 +965,12 @@
           emptyColBtn.innerHTML = remainingNotesColumnVisible
             ? '<i class="bi bi-dash-square"></i> Remove Empty Column (Remaining)'
             : '<i class="bi bi-plus-square"></i> Add Empty Column (Remaining)';
+        }
+        const searchColBtn = document.getElementById("toggleSearchColumnButton");
+        if (searchColBtn) {
+          searchColBtn.innerHTML = searchColumnVisible
+            ? '<i class="bi bi-search"></i> Hide Search Column (Remaining)'
+            : '<i class="bi bi-search"></i> Show Search Column (Remaining)';
         }
 
         // Mobile-optimized sidebar toggle
@@ -717,8 +1001,11 @@
         const reader = new FileReader();
 
         // Update page header with the Excel file name
-        fileName = file.name;
-        document.getElementById("pageHeader").textContent = fileName;
+        if (file && file.name) {
+          fileName = file.name;
+          document.getElementById("pageHeader").textContent = fileName;
+          localStorage.setItem("fileName", fileName);
+        }
 
         reader.onload = (e) => {
           const data = new Uint8Array(e.target.result);
@@ -734,6 +1021,7 @@
           renderTableHeaders();
           showRemainingProducts();
           saveProgress();
+          updateStatistics();
         };
 
         reader.readAsArrayBuffer(file);
@@ -782,10 +1070,18 @@
           thNotes.classList.add("notes-column-remaining");
           remainingTableHeaders.appendChild(thNotes);
         }
+
+        const thSearch = document.createElement("th");
+        thSearch.textContent = "Search";
+        thSearch.classList.add("search-column-remaining");
+        remainingTableHeaders.appendChild(thSearch);
+
         const thActionRemaining = document.createElement("th");
         thActionRemaining.textContent = "Action";
         thActionRemaining.classList.add("action-column");
         remainingTableHeaders.appendChild(thActionRemaining);
+
+        applySearchColumnVisibility();
       }
 
       function toggleColumnVisibility(columnIndex) {
@@ -830,17 +1126,32 @@
         });
       }
 
+      function applySearchColumnVisibility() {
+        const elements = document.querySelectorAll(".search-column-remaining");
+        elements.forEach((el) => {
+          if (searchColumnVisible) {
+            el.classList.remove("d-none");
+          } else {
+            el.classList.add("d-none");
+          }
+        });
+      }
+
       function handleBarcodeSearch(event) {
         let barcode = event.target.value.trim();
 
         if (barcode === "") return;
 
+        // Clear any previous "not found" alert
+        hideBarcodeNotFoundAlert();
+
         console.log("Entered barcode:", barcode);
 
-        // Check if the barcode is an edited barcode
+        // Check if there is an edited mapping for this barcode
         if (editedBarcodes.has(barcode)) {
-          barcode = editedBarcodes.get(barcode); // Replace with the original barcode
-          console.log("Original barcode:", barcode);
+          const mapped = editedBarcodes.get(barcode);
+          console.log("Using edited barcode mapping:", mapped);
+          barcode = mapped;
         }
 
         // Check if the barcode is already scanned
@@ -876,11 +1187,17 @@
             remainingProducts.splice(rowIndex, 1);
             showRemainingProducts();
           } else {
-            alert("Barcode not found!");
+            showBarcodeNotFoundAlert();
+            speakBarcodeNotFound();
+            const input = document.getElementById("barcodeInput");
+            if (input) {
+              input.value = "";
+              input.focus();
+            }
           }
         }
 
-        event.target.value = ""; // Clear the input field
+        event.target.value = ""; // Clear the input field for next scan
       }
 
       function addRowToScannedTable(row, barcode, speak = true) {
@@ -937,6 +1254,7 @@
         }
 
         saveProgress();
+        updateStatistics();
       }
 
       function moveToRemainingTable(row, dataRow, barcode) {
@@ -947,6 +1265,7 @@
         row.parentElement.removeChild(row);
 
         saveProgress();
+        updateStatistics();
       }
 
       function toggleRemainingProducts() {
@@ -1007,6 +1326,25 @@
             tr.appendChild(tdNotes);
           }
 
+          const tdSearch = document.createElement("td");
+          tdSearch.classList.add("search-column-remaining");
+          const searchButton = document.createElement("button");
+          searchButton.type = "button";
+          searchButton.className = "btn btn-outline-secondary btn-sm";
+          searchButton.innerHTML = '<i class="bi bi-search"></i>';
+          searchButton.addEventListener("click", () => {
+            const descriptionText = (row[0] || "").toString().trim();
+            if (!descriptionText) {
+              showDescriptionWarning();
+              return;
+            }
+            const encoded = encodeURIComponent(descriptionText);
+            const url = `https://www.google.com/search?q=${encoded}`;
+            window.open(url, "_blank");
+          });
+          tdSearch.appendChild(searchButton);
+          tr.appendChild(tdSearch);
+
           const tdAction = document.createElement("td");
           const moveToScannedButton = document.createElement("button");
           moveToScannedButton.textContent = "Move";
@@ -1025,6 +1363,9 @@
 
           remainingTableBody.appendChild(tr);
         });
+
+        applySearchColumnVisibility();
+        updateStatistics();
       }
 
       function saveProgress() {
@@ -1046,16 +1387,23 @@
           JSON.stringify(remainingProducts)
         );
         localStorage.setItem("remainingNotes", JSON.stringify(remainingNotes));
+        localStorage.setItem("fileName", fileName);
       }
 
       function loadProgress() {
         // Load excelData from local storage
         const savedExcelData =
           JSON.parse(localStorage.getItem("excelData")) || [];
+        const savedFileName = localStorage.getItem("fileName");
         if (savedExcelData.length > 0) {
           excelData = savedExcelData;
           remainingProducts = [...excelData.slice(1)]; // Initialize remainingProducts with all products
           renderTableHeaders(); // Render table headers
+
+          if (savedFileName) {
+            fileName = savedFileName;
+            document.getElementById("pageHeader").textContent = fileName;
+          }
         }
 
         const savedScannedProducts =
@@ -1084,6 +1432,9 @@
 
         // Restore remaining products
         showRemainingProducts(); // Render the remaining products table
+
+        // Ensure statistics reflect the loaded state
+        updateStatistics();
       }
 
       function clearLocalStorage() {
