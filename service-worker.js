@@ -46,9 +46,22 @@ self.addEventListener("fetch", (event) => {
   // Don't handle non-GET requests
   if (event.request.method !== 'GET') return;
   
-  // For API requests or AJAX calls - try network first
-  if (event.request.url.includes('/api/') || 
-      event.request.headers.get('accept')?.includes('application/json')) {
+  const url = new URL(event.request.url);
+
+  // Bypass cache for unsupported schemes (like chrome-extension://)
+  if (!url.protocol.startsWith('http')) return;
+
+  // Bypass service worker for external APIs to prevent CORS and interceptor errors
+  if (
+    url.hostname.includes('firestore.googleapis.com') ||
+    url.hostname.includes('docs.google.com') ||
+    url.pathname.includes('/api/')
+  ) {
+    return; // Let the browser handle it entirely
+  }
+  
+  // For other API requests or AJAX calls - try network first
+  if (event.request.headers.get('accept')?.includes('application/json')) {
     return event.respondWith(
       fetch(event.request)
         .catch(() => {
@@ -56,7 +69,7 @@ self.addEventListener("fetch", (event) => {
         })
     );
   }
-  
+
   // For HTML requests - network first with quick cache fallback
   if (event.request.headers.get('accept')?.includes('text/html')) {
     event.respondWith(
