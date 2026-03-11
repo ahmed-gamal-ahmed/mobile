@@ -245,9 +245,17 @@
           <label for="googleSheetUrl" class="form-label">Import from Google Sheets</label>
           <input type="text" id="googleSheetUrl" class="form-control" placeholder="Paste public link" />
         </div>
-        <button id="loadGoogleSheetBtn" class="btn btn-success w-100" title="Load Google Sheet">
-          <i class="bi bi-cloud-arrow-down"></i> Load Sheet
+        <button id="loadGoogleSheetBtn" class="btn btn-info w-100 mb-2" title="Load Sheets from URL">
+          <i class="bi bi-cloud-arrow-down"></i> Load Sheets
         </button>
+
+        <div id="sheetSelectionContainer" class="d-none mt-2 mb-2">
+          <label for="sheetSelect" class="form-label">Select Sheet</label>
+          <select id="sheetSelect" class="form-select mb-2"></select>
+          <button id="importSelectedSheetBtn" class="btn btn-success w-100" title="Import Selected Sheet">
+            <i class="bi bi-file-earmark-spreadsheet"></i> Import Sheet
+          </button>
+        </div>
       </div>
     </div>
 
@@ -480,6 +488,7 @@
     const scannedBarcodes = new Map();
     let remainingProducts = [];
     let fileName = "Product Inventory"; // Default file name
+    let currentGoogleWorkbook = null;
     let focusEnabled = localStorage.getItem("focusEnabled") !== "false"; // State variable to track focus mode
     let hiddenColumns = []; // Track hidden columns
     let remainingNotesColumnVisible = localStorage.getItem("remainingNotesColumnVisible") === "true";
@@ -926,31 +935,78 @@
         }
 
         const sheetId = match[1];
-        const csvExportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+        const xlsxExportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=xlsx`;
 
-        fetch(csvExportUrl)
+        // Switch button state to loading
+        const loadBtn = document.getElementById("loadGoogleSheetBtn");
+        const originalBtnHtml = loadBtn.innerHTML;
+        loadBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...';
+        loadBtn.disabled = true;
+        document.getElementById("sheetSelectionContainer").classList.add("d-none");
+
+        fetch(xlsxExportUrl)
           .then(response => {
             if (!response.ok) throw new Error("Network error. Ensure sheet is accessible.");
-            return response.text();
+            return response.arrayBuffer();
           })
-          .then(csvText => {
-            Papa.parse(csvText, {
-              complete: function (results) {
-                fileName = "Google Sheet Import";
-                document.getElementById("pageHeader").textContent = fileName;
-                localStorage.setItem("fileName", fileName);
-                processImportedData(results.data);
-                document.getElementById("sidebar").classList.remove("open");
-                document.body.classList.remove("sidebar-open");
-                alert("Google Sheet loaded successfully!");
-              },
-              skipEmptyLines: true
+          .then(buffer => {
+            const data = new Uint8Array(buffer);
+            currentGoogleWorkbook = XLSX.read(data, { type: "array" });
+
+            const sheetNames = currentGoogleWorkbook.SheetNames;
+            if (!sheetNames || sheetNames.length === 0) {
+              alert("No sheets found in this Google Sheet.");
+              return;
+            }
+
+            const sheetSelect = document.getElementById("sheetSelect");
+            sheetSelect.innerHTML = "";
+            sheetNames.forEach(name => {
+              const option = document.createElement("option");
+              option.value = name;
+              option.textContent = name;
+              sheetSelect.appendChild(option);
             });
+
+            document.getElementById("sheetSelectionContainer").classList.remove("d-none");
           })
           .catch(err => {
             console.error("Fetch error details:", err);
             alert("Error fetching Google Sheet.\n\nPlease ensure your Google Sheet's sharing settings are set to 'Anyone with the link can view' (Public).\n\nTechnical details: " + err.message);
+          })
+          .finally(() => {
+            loadBtn.innerHTML = originalBtnHtml;
+            loadBtn.disabled = false;
           });
+      });
+
+      document.getElementById("importSelectedSheetBtn").addEventListener("click", () => {
+        const sheetSelect = document.getElementById("sheetSelect");
+        const selectedSheetName = sheetSelect.value;
+        if (!selectedSheetName || !currentGoogleWorkbook) {
+          alert("Please load a Google Sheet first and select a sheet.");
+          return;
+        }
+
+        const sheet = currentGoogleWorkbook.Sheets[selectedSheetName];
+        if (!sheet) {
+          alert("Selected sheet not found.");
+          return;
+        }
+
+        const parsedData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+        // sheet_to_json returns an empty array if there is no data
+        if (!parsedData || parsedData.length === 0) {
+          alert("The selected sheet is empty.");
+          return;
+        }
+
+        fileName = "Google Sheet: " + selectedSheetName;
+        document.getElementById("pageHeader").textContent = fileName;
+        localStorage.setItem("fileName", fileName);
+        processImportedData(parsedData);
+        document.getElementById("sidebar").classList.remove("open");
+        document.body.classList.remove("sidebar-open");
       });
 
       // Close/open the sidebar using the ESC key
