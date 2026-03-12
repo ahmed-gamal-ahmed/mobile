@@ -250,10 +250,11 @@
         </button>
 
         <div id="sheetSelectionContainer" class="d-none mt-2 mb-2">
-          <label for="sheetSelect" class="form-label">Select Sheet</label>
-          <select id="sheetSelect" class="form-select mb-2"></select>
+          <input type="text" id="sheetSearch" class="form-control mb-2" placeholder="Search sheets..." />
+          <select id="sheetSelect" class="form-select mb-2" size="5"></select>
+          <div id="noSheetsMessage" class="d-none text-danger mb-2 small fw-bold">No sheets found.</div>
           <button id="importSelectedSheetBtn" class="btn btn-success w-100" title="Import Selected Sheet">
-            <i class="bi bi-file-earmark-spreadsheet"></i> Import Sheet
+            <i class="bi bi-file-earmark-spreadsheet"></i> Import Selected Sheet
           </button>
         </div>
       </div>
@@ -324,13 +325,10 @@
       <div class="collapse" id="actionColumnSection">
         <div class="mt-2">
           <h5 class="text-center">Show Action Column</h5>
-          <div class="input-group">
-            <input type="password" id="actionPasswordInput" class="form-control" placeholder="Enter Password" />
-            <button id="toggleActionColumnButton" class="btn btn-primary" data-bs-toggle="tooltip"
-              title="Toggle Action">
-              <i class="bi bi-eye"></i> Toggle
-            </button>
-          </div>
+          <button id="toggleActionColumnButton" class="btn btn-primary w-100" data-bs-toggle="tooltip"
+            title="Toggle Action">
+            <i class="bi bi-eye"></i> Toggle Action Column
+          </button>
         </div>
       </div>
     </div>
@@ -371,6 +369,15 @@
         <input type="file" id="importSessionInput" accept=".json"
           class="position-absolute w-100 h-100 start-0 top-0 opacity-0" style="cursor: pointer;">
       </div>
+    </div>
+    <!-- Online Review Operations Section -->
+    <div class="mb-3">
+      <button id="saveReviewOperationBtn" class="btn btn-primary w-100 mb-2" title="Save Review Operation">
+        <i class="bi bi-cloud-upload"></i> Save Review Operation
+      </button>
+      <button id="navSavedOperationsBtn" class="btn btn-secondary w-100" title="Saved Operations">
+        <i class="bi bi-cloud-check"></i> Saved Operations
+      </button>
     </div>
     <!-- Voice Settings Section -->
     <div class="mb-3">
@@ -463,6 +470,49 @@
           </tr>
         </thead>
         <tbody id="bmTableBody">
+          <!-- Populated via JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Saved Operations Page Component -->
+  <div class="container-fluid pt-3 mt-5 d-none" id="savedOperationsContainer">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h2>Saved Operations</h2>
+      <button id="navMainAppFromOpsBtn" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Inventory
+      </button>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+      <div>
+        <span class="badge bg-primary fs-6 me-2 mb-1">Total Operations: <span id="soTotalOperations">0</span></span>
+        <span class="badge bg-success fs-6 mb-1">Total Scanned: <span id="soTotalScanned">0</span></span>
+      </div>
+      <button id="exportAllOperationsBtn" class="btn btn-success">
+        <i class="bi bi-file-earmark-excel"></i> Export All Operations
+      </button>
+    </div>
+
+    <div class="mb-3">
+      <input type="text" id="soSearchInput" class="form-control form-control-lg"
+        placeholder="Search operations...">
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-bordered table-hover mt-3">
+        <thead class="table-dark">
+          <tr>
+            <th>Operation Name</th>
+            <th>Date & Time</th>
+            <th>Total Products</th>
+            <th>Scanned</th>
+            <th>Remaining</th>
+            <th style="min-width: 250px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="soTableBody">
           <!-- Populated via JS -->
         </tbody>
       </table>
@@ -920,6 +970,32 @@
       document.getElementById("bmSearchInput").addEventListener("input", (e) => {
         renderBarcodeManagerTable(e.target.value);
       });
+      function renderSheetList(sheets) {
+        const sheetSelect = document.getElementById("sheetSelect");
+        const noSheetsMsg = document.getElementById("noSheetsMessage");
+        sheetSelect.innerHTML = "";
+        if (sheets.length === 0) {
+          sheetSelect.classList.add("d-none");
+          noSheetsMsg.classList.remove("d-none");
+        } else {
+          sheetSelect.classList.remove("d-none");
+          noSheetsMsg.classList.add("d-none");
+          sheets.forEach(name => {
+            const option = document.createElement("option");
+            option.value = name;
+            option.textContent = name;
+            sheetSelect.appendChild(option);
+          });
+        }
+      }
+
+      document.getElementById("sheetSearch").addEventListener("input", (e) => {
+        if (!currentGoogleWorkbook) return;
+        const term = e.target.value.toLowerCase();
+        const allSheets = currentGoogleWorkbook.SheetNames;
+        const filtered = allSheets.filter(name => name.toLowerCase().includes(term));
+        renderSheetList(filtered);
+      });
 
       document.getElementById("loadGoogleSheetBtn").addEventListener("click", () => {
         const urlStr = document.getElementById("googleSheetUrl").value.trim();
@@ -959,14 +1035,9 @@
               return;
             }
 
-            const sheetSelect = document.getElementById("sheetSelect");
-            sheetSelect.innerHTML = "";
-            sheetNames.forEach(name => {
-              const option = document.createElement("option");
-              option.value = name;
-              option.textContent = name;
-              sheetSelect.appendChild(option);
-            });
+            const sheetSearch = document.getElementById("sheetSearch");
+            if (sheetSearch) sheetSearch.value = "";
+            renderSheetList(sheetNames);
 
             document.getElementById("sheetSelectionContainer").classList.remove("d-none");
           })
@@ -1690,21 +1761,15 @@
       event.returnValue = "";
     });
 
-    // NEW: Password toggle for Action column in mainVersion.html
+    // Toggle for Action column
     document
       .getElementById("toggleActionColumnButton")
       .addEventListener("click", function () {
-        const password = document.getElementById("actionPasswordInput").value;
-        if (password === "Ahmed6834") {
-          document.body.classList.toggle("show-action");
-          localStorage.setItem(
-            "actionColumnVisible",
-            document.body.classList.contains("show-action")
-          );
-          document.getElementById("actionPasswordInput").value = "";
-        } else {
-          alert("Incorrect password!");
-        }
+        document.body.classList.toggle("show-action");
+        localStorage.setItem(
+          "actionColumnVisible",
+          document.body.classList.contains("show-action")
+        );
       });
     const actionColumnVisible =
       localStorage.getItem("actionColumnVisible") === "true";
@@ -1809,6 +1874,276 @@
       };
 
       reader.readAsText(file);
+    });
+
+    // Online Review Operations logic
+    let savedOperations = [];
+
+    document.getElementById("saveReviewOperationBtn").addEventListener("click", async () => {
+      if (!firestoreDb) {
+        alert("Firestore is not initialized. Cannot save online.");
+        return;
+      }
+      if (!excelData || excelData.length === 0) {
+        alert("No operation active to save.");
+        return;
+      }
+
+      const operationName = fileName || "Unknown Operation";
+      const btn = document.getElementById("saveReviewOperationBtn");
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
+      btn.disabled = true;
+
+      const sessionDataStr = localStorage.getItem("scannedProducts") || "[]";
+      try {
+        await firestoreDb.collection("savedOperations").add({
+          operationName,
+          timestamp: Date.now(),
+          totalProducts: excelData.length > 1 ? excelData.length - 1 : 0,
+          scannedCount: scannedBarcodes.size,
+          remainingCount: remainingProducts.length,
+          // Payload
+          excelData: JSON.stringify(excelData),
+          scannedProducts: sessionDataStr,
+          remainingProducts: JSON.stringify(remainingProducts),
+          remainingNotes: JSON.stringify(remainingNotes)
+        });
+        alert("Review Operation saved online successfully.");
+      } catch (err) {
+        console.error("Error saving operation:", err);
+        alert("Failed to save operation online. See console for details.");
+      } finally {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+        document.getElementById("sidebar").classList.remove("open");
+        document.body.classList.remove("sidebar-open");
+      }
+    });
+
+    document.getElementById("navSavedOperationsBtn").addEventListener("click", () => {
+      document.getElementById("mainAppContainer").classList.add("d-none");
+      document.getElementById("barcodeManagerContainer").classList.add("d-none");
+      document.getElementById("savedOperationsContainer").classList.remove("d-none");
+      document.getElementById("sidebar").classList.remove("open");
+      document.body.classList.remove("sidebar-open");
+      loadSavedOperations();
+    });
+
+    document.getElementById("navMainAppFromOpsBtn").addEventListener("click", () => {
+      document.getElementById("savedOperationsContainer").classList.add("d-none");
+      document.getElementById("mainAppContainer").classList.remove("d-none");
+    });
+
+    async function loadSavedOperations() {
+      if (!firestoreDb) {
+        alert("Firestore is not initialized.");
+        return;
+      }
+      const tbody = document.getElementById("soTableBody");
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center">Loading operations...</td></tr>';
+      try {
+        const snapshot = await firestoreDb.collection("savedOperations").orderBy("timestamp", "desc").get();
+        savedOperations = [];
+        snapshot.forEach(doc => {
+          savedOperations.push({ id: doc.id, ...doc.data() });
+        });
+        renderSavedOperationsTable();
+      } catch (err) {
+        console.error("Error loading operations:", err);
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Failed to load operations.</td></tr>';
+      }
+    }
+
+    function renderSavedOperationsTable() {
+      const tbody = document.getElementById("soTableBody");
+      const term = document.getElementById("soSearchInput").value.toLowerCase();
+      tbody.innerHTML = "";
+      
+      let totalOps = 0;
+      let totalScanned = 0;
+
+      savedOperations.forEach(op => {
+        if (term && !op.operationName.toLowerCase().includes(term)) return;
+
+        totalOps++;
+        totalScanned += (op.scannedCount || 0);
+
+        const tr = document.createElement("tr");
+        const dateStr = new Date(op.timestamp).toLocaleString();
+
+        const tdName = document.createElement("td");
+        tdName.textContent = op.operationName;
+
+        const tdDate = document.createElement("td");
+        tdDate.textContent = dateStr;
+
+        const tdTotal = document.createElement("td");
+        tdTotal.textContent = op.totalProducts || 0;
+
+        const tdScanned = document.createElement("td");
+        tdScanned.textContent = op.scannedCount || 0;
+
+        const tdRemaining = document.createElement("td");
+        tdRemaining.textContent = op.remainingCount || 0;
+
+        const tdActions = document.createElement("td");
+        
+        const loadBtn = document.createElement("button");
+        loadBtn.className = "btn btn-sm btn-primary me-1 my-1";
+        loadBtn.innerHTML = '<i class="bi bi-cloud-arrow-down"></i> Load';
+        loadBtn.addEventListener("click", () => loadOperation(op));
+
+        const exportBtn = document.createElement("button");
+        exportBtn.className = "btn btn-sm btn-success me-1 my-1";
+        exportBtn.innerHTML = '<i class="bi bi-file-earmark-excel"></i> Export';
+        exportBtn.addEventListener("click", () => exportSingleOperation(op));
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "btn btn-sm btn-danger my-1";
+        delBtn.innerHTML = '<i class="bi bi-trash"></i> Delete';
+        delBtn.addEventListener("click", () => deleteOperation(op.id));
+
+        tdActions.appendChild(loadBtn);
+        tdActions.appendChild(exportBtn);
+        tdActions.appendChild(delBtn);
+
+        tr.appendChild(tdName);
+        tr.appendChild(tdDate);
+        tr.appendChild(tdTotal);
+        tr.appendChild(tdScanned);
+        tr.appendChild(tdRemaining);
+        tr.appendChild(tdActions);
+
+        tbody.appendChild(tr);
+      });
+
+      if (totalOps === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center">No operations found.</td></tr>';
+      }
+
+      document.getElementById("soTotalOperations").textContent = totalOps;
+      document.getElementById("soTotalScanned").textContent = totalScanned;
+    }
+
+    document.getElementById("soSearchInput").addEventListener("input", renderSavedOperationsTable);
+
+    function loadOperation(op) {
+      if (!confirm(`Are you sure you want to load "${op.operationName}"? Current unsaved progress will be replaced.`)) return;
+
+      try {
+        localStorage.clear();
+        localStorage.setItem("excelData", op.excelData || "[]");
+        localStorage.setItem("fileName", op.operationName);
+        localStorage.setItem("remainingProducts", op.remainingProducts || "[]");
+        localStorage.setItem("scannedProducts", op.scannedProducts || "[]");
+        localStorage.setItem("remainingNotes", op.remainingNotes || "{}");
+        
+        // Let Settings be default or as per device
+        alert("Operation loaded successfully! Reloading application...");
+        location.reload();
+      } catch(err) {
+        console.error(err);
+        alert("Failed to load operation.");
+      }
+    }
+
+    async function deleteOperation(id) {
+      if (!confirm("Are you sure you want to delete this operation permanently?")) return;
+      try {
+        await firestoreDb.collection("savedOperations").doc(id).delete();
+        savedOperations = savedOperations.filter(op => op.id !== id);
+        renderSavedOperationsTable();
+      } catch(err) {
+        console.error(err);
+        alert("Failed to delete operation.");
+      }
+    }
+
+    function exportSingleOperation(op) {
+      const parsedExcelData = JSON.parse(op.excelData || "[]");
+      const parsedScannedProducts = JSON.parse(op.scannedProducts || "[]");
+      const parsedRemainingProducts = JSON.parse(op.remainingProducts || "[]");
+      const parsedNotes = JSON.parse(op.remainingNotes || "{}");
+
+      const wb = XLSX.utils.book_new();
+
+      // Scanned
+      const scannedData = [];
+      const headers = parsedExcelData[0] || [];
+      scannedData.push([...headers]);
+      parsedScannedProducts.forEach(sp => {
+        scannedData.push(sp.data ? sp.data.slice(0, headers.length) : []);
+      });
+      const wsScanned = XLSX.utils.aoa_to_sheet(scannedData);
+      XLSX.utils.book_append_sheet(wb, wsScanned, "Scanned Products");
+
+      // Remaining
+      const remainingData = [];
+      remainingData.push([...headers, "Notes"]);
+      parsedRemainingProducts.forEach(row => {
+        const key = String(row[0] || "");
+        remainingData.push([...row, parsedNotes[key] || ""]);
+      });
+      const wsRemaining = XLSX.utils.aoa_to_sheet(remainingData);
+      XLSX.utils.book_append_sheet(wb, wsRemaining, "Remaining Products");
+
+      let exportName = op.operationName;
+      if (exportName.lastIndexOf(".") !== -1) {
+        exportName = exportName.substring(0, exportName.lastIndexOf("."));
+      }
+      exportName = `${exportName}_Export.xlsx`;
+
+      XLSX.writeFile(wb, exportName);
+    }
+
+    document.getElementById("exportAllOperationsBtn").addEventListener("click", () => {
+      if (savedOperations.length === 0) {
+        alert("No operations to export.");
+        return;
+      }
+      const wb = XLSX.utils.book_new();
+
+      savedOperations.forEach(op => {
+        const parsedExcelData = JSON.parse(op.excelData || "[]");
+        const parsedScannedProducts = JSON.parse(op.scannedProducts || "[]");
+        const parsedRemainingProducts = JSON.parse(op.remainingProducts || "[]");
+        const parsedNotes = JSON.parse(op.remainingNotes || "{}");
+
+        const sheetData = [];
+        
+        // Add Scanned Header + Rows
+        sheetData.push(["--- SCANNED PRODUCTS ---"]);
+        const headers = parsedExcelData[0] || [];
+        sheetData.push([...headers]);
+        parsedScannedProducts.forEach(sp => {
+          sheetData.push(sp.data ? sp.data.slice(0, headers.length) : []);
+        });
+
+        sheetData.push([]);
+        sheetData.push(["--- REMAINING PRODUCTS ---"]);
+        sheetData.push([...headers, "Notes"]);
+        parsedRemainingProducts.forEach(row => {
+           const key = String(row[0] || "");
+           sheetData.push([...row, parsedNotes[key] || ""]);
+        });
+
+        // Sheet name should be op name, max 31 chars constraint by Excel
+        let sheetName = op.operationName.substring(0, 31).replace(/[\\/*?:\[\]]/g, "_");
+        
+        // If sheet name exists, handle uniqueness
+        let count = 1;
+        let originalName = sheetName;
+        while (wb.SheetNames.includes(sheetName)) {
+           sheetName = originalName.substring(0, 27) + `_${count}`;
+           count++;
+        }
+
+        const ws = XLSX.utils.aoa_to_sheet(sheetData);
+        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+      });
+
+      XLSX.writeFile(wb, "Inventory_Operations_Report.xlsx");
     });
   </script>
 </body>
