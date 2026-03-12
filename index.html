@@ -180,6 +180,26 @@
       display: table-cell;
     }
 
+    /* Centered responsive container to limit stretching */
+    .responsive-container {
+      max-width: 1350px;
+      margin: 0 auto;
+    }
+
+    /* Table Responsive Formatting */
+    .table td, .table th {
+      padding: 14px 16px;
+      vertical-align: middle;
+      max-width: 350px;
+      word-wrap: break-word;
+      white-space: normal;
+    }
+    
+    /* Ensure action buttons wrap predictably */
+    .table .btn-group, .table .btn-sm {
+      white-space: nowrap;
+    }
+
     /* Responsive table adjustments */
     @media (max-width: 767px) {
       .table-responsive {
@@ -368,7 +388,7 @@
   <button id="openSidebarButton" data-bs-toggle="tooltip" title="Open Sidebar">☰</button>
 
   <!-- Make container fluid for better mobile layout -->
-  <div class="container-fluid pt-3 mt-5" id="mainAppContainer">
+  <div class="container responsive-container pt-3 mt-5" id="mainAppContainer">
     <h1 class="text-center" id="pageHeader">Product Inventory</h1>
 
     <div class="mb-3">
@@ -404,7 +424,7 @@
   </div>
 
   <!-- Barcode Manager Page Component -->
-  <div class="container-fluid pt-3 mt-5 d-none" id="barcodeManagerContainer">
+  <div class="container responsive-container pt-3 mt-5 d-none" id="barcodeManagerContainer">
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h2>Barcode Manager</h2>
       <button id="navMainAppBtn" class="btn btn-secondary">
@@ -453,7 +473,7 @@
   </div>
 
   <!-- Data Import Page Component -->
-  <div class="container-fluid pt-3 mt-5 d-none" id="dataImportContainer">
+  <div class="container responsive-container pt-3 mt-5 d-none" id="dataImportContainer">
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h2>Data Import</h2>
       <button id="navMainAppFromDataImportBtn" class="btn btn-secondary">
@@ -509,7 +529,7 @@
   </div>
 
   <!-- Saved Operations Page Component -->
-  <div class="container-fluid pt-3 mt-5 d-none" id="savedOperationsContainer">
+  <div class="container responsive-container pt-3 mt-5 d-none" id="savedOperationsContainer">
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h2>Saved Operations</h2>
       <button id="navMainAppFromOpsBtn" class="btn btn-secondary">
