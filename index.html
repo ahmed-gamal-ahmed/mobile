@@ -187,16 +187,18 @@
     }
 
     /* Table Responsive Formatting */
-    .table td, .table th {
+    .table td,
+    .table th {
       padding: 14px 16px;
       vertical-align: middle;
       max-width: 350px;
       word-wrap: break-word;
       white-space: normal;
     }
-    
+
     /* Ensure action buttons wrap predictably */
-    .table .btn-group, .table .btn-sm {
+    .table .btn-group,
+    .table .btn-sm {
       white-space: nowrap;
     }
 
@@ -348,6 +350,12 @@
       </button>
     </div>
     <div class="mb-3">
+      <button id="fixDuplicatesBtn" class="btn btn-warning w-100" data-bs-toggle="tooltip"
+        title="Clean Remaining Table">
+        <i class="bi bi-tools"></i> Fix Duplicates
+      </button>
+    </div>
+    <div class="mb-3">
       <button id="exportButton" class="btn btn-success w-100" data-bs-toggle="tooltip" title="Export Scanned Products">
         <i class="bi bi-file-earmark-spreadsheet"></i> Export Products
       </button>
@@ -474,11 +482,20 @@
 
   <!-- Data Import Page Component -->
   <div class="container responsive-container pt-3 mt-5 d-none" id="dataImportContainer">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
       <h2>Data Import</h2>
       <button id="navMainAppFromDataImportBtn" class="btn btn-secondary">
         <i class="bi bi-arrow-left"></i> Back to Inventory
       </button>
+    </div>
+
+    <div class="alert alert-warning py-2 mb-4 d-flex align-items-center shadow-sm">
+      <div class="form-check mb-0">
+        <input class="form-check-input" type="checkbox" id="ignoreFirstRowsCheckbox">
+        <label class="form-check-label fw-bold" for="ignoreFirstRowsCheckbox">
+          Ignore first 3 rows of the file
+        </label>
+      </div>
     </div>
 
     <!-- Offline Import Section -->
@@ -542,21 +559,27 @@
         <span class="badge bg-primary fs-6 me-2 mb-1">Total Operations: <span id="soTotalOperations">0</span></span>
         <span class="badge bg-success fs-6 mb-1">Total Scanned: <span id="soTotalScanned">0</span></span>
       </div>
-      <button id="exportAllOperationsBtn" class="btn btn-success">
-        <i class="bi bi-file-earmark-excel"></i> Export All Operations
-      </button>
+      <div>
+        <button id="mergeSelectedOperationsBtn" class="btn btn-warning me-2">
+          <i class="bi bi-intersect"></i> Merge Selected
+        </button>
+        <button id="exportAllOperationsBtn" class="btn btn-success">
+          <i class="bi bi-file-earmark-excel"></i> Export All Operations
+        </button>
+      </div>
     </div>
 
     <div class="mb-3">
-      <input type="text" id="soSearchInput" class="form-control form-control-lg"
-        placeholder="Search operations...">
+      <input type="text" id="soSearchInput" class="form-control form-control-lg" placeholder="Search operations...">
     </div>
 
     <div class="table-responsive">
       <table class="table table-bordered table-hover mt-3">
         <thead class="table-dark">
           <tr>
+            <th style="width: 50px;"><input type="checkbox" id="selectAllOps"></th>
             <th>Operation Name</th>
+            <th>Auditors</th>
             <th>Date & Time</th>
             <th>Total Products</th>
             <th>Scanned</th>
@@ -916,6 +939,9 @@
         .getElementById("clearStorageButton")
         .addEventListener("click", clearLocalStorage);
       document
+        .getElementById("fixDuplicatesBtn")
+        .addEventListener("click", fixDuplicates);
+      document
         .getElementById("exportButton")
         .addEventListener("click", exportScannedProducts);
       document
@@ -1192,6 +1218,14 @@
       // Initialize voice button state
       updateVoiceButtonText();
       updateFocusButtonText();
+
+      const ignoreFirstRowsCheckbox = document.getElementById("ignoreFirstRowsCheckbox");
+      if (ignoreFirstRowsCheckbox) {
+        ignoreFirstRowsCheckbox.checked = localStorage.getItem("ignoreFirstRows") === "true";
+        ignoreFirstRowsCheckbox.addEventListener("change", (e) => {
+          localStorage.setItem("ignoreFirstRows", e.target.checked);
+        });
+      }
       const emptyColBtn = document.getElementById("toggleEmptyColumnButton");
       if (emptyColBtn) {
         emptyColBtn.innerHTML = remainingNotesColumnVisible
@@ -1270,6 +1304,11 @@
     }
 
     function processImportedData(parsedData) {
+      const ignoreCheckbox = document.getElementById("ignoreFirstRowsCheckbox");
+      if (ignoreCheckbox && ignoreCheckbox.checked) {
+        parsedData = parsedData.slice(3);
+      }
+
       parsedData = parsedData.filter(row => row.some(cell => cell !== null && cell !== undefined && cell !== ''));
       if (parsedData.length < 1) {
         alert("The file appears to be empty.");
@@ -1447,7 +1486,7 @@
     }
 
     function handleBarcodeSearch(event) {
-      let barcode = event.target.value.trim();
+      let barcode = event.target.value.toString().trim();
 
       if (barcode === "") return;
 
@@ -1479,13 +1518,14 @@
       } else {
         // Search for the barcode in the remaining products
         const rowIndex = remainingProducts.findIndex((row) =>
-          row.some((cell) =>
-            cell
+          row.some((cell) => {
+            if (cell === null || cell === undefined) return false;
+            return cell
               .toString()
               .split("-")
               .map((c) => c.trim())
-              .includes(barcode)
-          )
+              .includes(barcode);
+          })
         );
 
         console.log("Row index found:", rowIndex);
@@ -1668,10 +1708,21 @@
         moveToScannedButton.textContent = "Move";
         moveToScannedButton.className = "btn btn-success btn-sm action-column";
         moveToScannedButton.addEventListener("click", () => {
-          addRowToScannedTable(row, row[0], false, 'move');
-          const index = remainingProducts.indexOf(row);
-          remainingProducts.splice(index, 1);
-          showRemainingProducts();
+          let primaryBarcode = String(row[0] || "").split("-")[0].trim();
+          if (primaryBarcode) {
+            const input = document.getElementById("barcodeInput");
+            if (input) {
+              const oldVal = input.value;
+              input.value = primaryBarcode;
+              // Mock a keypress event if needed, but we can just call handleBarcodeSearch directly
+              // We'll pass a mock event representing the Enter key
+              handleBarcodeSearch({ target: input, key: "Enter" });
+              // We can restore the input later if desired, handleBarcodeSearch clears it
+            } else {
+              // Fallback just in case
+              processBarcode(primaryBarcode, 'move');
+            }
+          }
         });
         tdAction.appendChild(moveToScannedButton);
         tr.appendChild(tdAction);
@@ -1713,9 +1764,9 @@
       const savedExcelData =
         JSON.parse(localStorage.getItem("excelData")) || [];
       const savedFileName = localStorage.getItem("fileName");
+
       if (savedExcelData.length > 0) {
         excelData = savedExcelData;
-        remainingProducts = [...excelData.slice(1)]; // Initialize remainingProducts with all products
         renderTableHeaders(); // Render table headers
 
         if (savedFileName) {
@@ -1726,30 +1777,49 @@
 
       const savedScannedProducts =
         JSON.parse(localStorage.getItem("scannedProducts")) || [];
+      const savedRemainingProducts = JSON.parse(localStorage.getItem("remainingProducts"));
       remainingNotes = JSON.parse(localStorage.getItem("remainingNotes")) || {};
+
+      // Clear current state safely before restoration
+      scannedBarcodes.clear();
+      const productTableBody = document.getElementById("productTableBody");
+      if (productTableBody) productTableBody.innerHTML = "";
+
+      // Load remaining products natively if they exist, to ensure restored sessions use the explicit remainingProducts
+      if (savedRemainingProducts) {
+        remainingProducts = savedRemainingProducts.map(row =>
+          row.map(cell => (cell !== null && cell !== undefined) ? cell.toString().trim() : "")
+        );
+      } else if (savedExcelData.length > 0) {
+        remainingProducts = [...excelData.slice(1)].map(row =>
+          row.map(cell => (cell !== null && cell !== undefined) ? cell.toString().trim() : "")
+        );
+      } else {
+        remainingProducts = [];
+      }
 
       // Restore scanned products
       savedScannedProducts.forEach(({ barcode, data, source }) => {
         addRowToScannedTable(data, barcode, false, source || 'scan');
 
-        // Remove the scanned product from remainingProducts
-        const rowIndex = remainingProducts.findIndex((row) =>
-          row.some((cell) =>
-            cell
-              .toString()
-              .split("-")
-              .map((c) => c.trim())
-              .includes(barcode)
-          )
-        );
+        // Only remove from remainingProducts if we did NOT explicitly restore remainingProducts.
+        // If remainingProducts was restored from JSON in a session load, it is already correct.
+        if (!savedRemainingProducts) {
+          const rowIndex = remainingProducts.findIndex((row) =>
+            row.some((cell) => {
+              if (cell === null || cell === undefined) return false;
+              return cell.toString().split("-").map((c) => c.trim()).includes(barcode);
+            })
+          );
 
-        if (rowIndex >= 0) {
-          remainingProducts.splice(rowIndex, 1); // Remove the product from remainingProducts
+          if (rowIndex >= 0) {
+            remainingProducts.splice(rowIndex, 1); // Remove the product from remainingProducts
+          }
         }
       });
 
-      // Restore remaining products
-      showRemainingProducts(); // Render the remaining products table
+      // Restore remaining products UI
+      showRemainingProducts();
 
       // Ensure statistics reflect the loaded state
       updateStatistics();
@@ -1767,6 +1837,38 @@
 
         // Reload the page to reset the tables
         location.reload();
+      }
+    }
+
+    function fixDuplicates() {
+      // Get all barcodes currently in the Scanned Products table
+      const scannedList = [...scannedBarcodes.keys()].map(barcode => String(barcode).trim());
+
+      let removedCount = 0;
+
+      // For every scanned barcode, find exactly ONE match in the Remaining table and remove it
+      scannedList.forEach(barcode => {
+        const rowIndex = remainingProducts.findIndex((row) =>
+          row.some((cell) => {
+            if (cell === null || cell === undefined) return false;
+            const cellParts = String(cell).split("-").map((c) => c.trim());
+            return cellParts.includes(barcode);
+          })
+        );
+
+        if (rowIndex >= 0) {
+          remainingProducts.splice(rowIndex, 1);
+          removedCount++;
+        }
+      });
+
+      if (removedCount > 0) {
+        showRemainingProducts();
+        saveProgress();
+        updateStatistics();
+        alert(`${removedCount} duplicate product(s) were removed from Remaining Products.`);
+      } else {
+        alert("No duplicates found in Remaining Products.");
       }
     }
 
@@ -1985,6 +2087,8 @@
       }
 
       const operationName = fileName || "Unknown Operation";
+      const auditorName = prompt("Enter Auditor Name (optional):", "Auditor") || "Unknown";
+
       const btn = document.getElementById("saveReviewOperationBtn");
       const originalHtml = btn.innerHTML;
       btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
@@ -1998,11 +2102,13 @@
           totalProducts: excelData.length > 1 ? excelData.length - 1 : 0,
           scannedCount: scannedBarcodes.size,
           remainingCount: remainingProducts.length,
+          auditors: [auditorName],
           // Payload
           excelData: JSON.stringify(excelData),
           scannedProducts: sessionDataStr,
           remainingProducts: JSON.stringify(remainingProducts),
-          remainingNotes: JSON.stringify(remainingNotes)
+          remainingNotes: JSON.stringify(remainingNotes),
+          editedBarcodes: JSON.stringify(Array.from(editedBarcodes.entries()))
         });
         alert("Review Operation saved online successfully.");
       } catch (err) {
@@ -2054,7 +2160,7 @@
       const tbody = document.getElementById("soTableBody");
       const term = document.getElementById("soSearchInput").value.toLowerCase();
       tbody.innerHTML = "";
-      
+
       let totalOps = 0;
       let totalScanned = 0;
 
@@ -2067,8 +2173,18 @@
         const tr = document.createElement("tr");
         const dateStr = new Date(op.timestamp).toLocaleString();
 
+        const tdSelect = document.createElement("td");
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.className = "form-check-input op-select-checkbox";
+        checkbox.value = op.id;
+        tdSelect.appendChild(checkbox);
+
         const tdName = document.createElement("td");
         tdName.textContent = op.operationName;
+
+        const tdAuditors = document.createElement("td");
+        tdAuditors.textContent = (op.auditors && op.auditors.length > 0) ? op.auditors.join(", ") : "Unknown";
 
         const tdDate = document.createElement("td");
         tdDate.textContent = dateStr;
@@ -2083,7 +2199,7 @@
         tdRemaining.textContent = op.remainingCount || 0;
 
         const tdActions = document.createElement("td");
-        
+
         const loadBtn = document.createElement("button");
         loadBtn.className = "btn btn-sm btn-primary me-1 my-1";
         loadBtn.innerHTML = '<i class="bi bi-cloud-arrow-down"></i> Load';
@@ -2103,7 +2219,9 @@
         tdActions.appendChild(exportBtn);
         tdActions.appendChild(delBtn);
 
+        tr.appendChild(tdSelect);
         tr.appendChild(tdName);
+        tr.appendChild(tdAuditors);
         tr.appendChild(tdDate);
         tr.appendChild(tdTotal);
         tr.appendChild(tdScanned);
@@ -2131,13 +2249,25 @@
         localStorage.setItem("excelData", op.excelData || "[]");
         localStorage.setItem("fileName", op.operationName);
         localStorage.setItem("remainingProducts", op.remainingProducts || "[]");
-        localStorage.setItem("scannedProducts", op.scannedProducts || "[]");
-        localStorage.setItem("remainingNotes", op.remainingNotes || "{}");
         
+        // Ensure older payloads default to 'scan' source dynamically
+        let scannedPayload = [];
+        try {
+          scannedPayload = JSON.parse(op.scannedProducts || "[]");
+          scannedPayload.forEach(item => { item.source = item.source || 'scan'; });
+        } catch(e) {}
+        localStorage.setItem("scannedProducts", JSON.stringify(scannedPayload));
+        
+        localStorage.setItem("remainingNotes", op.remainingNotes || "{}");
+
+        if (op.editedBarcodes) {
+          localStorage.setItem("editedBarcodes", op.editedBarcodes);
+        }
+
         // Let Settings be default or as per device
         alert("Operation loaded successfully! Reloading application...");
         location.reload();
-      } catch(err) {
+      } catch (err) {
         console.error(err);
         alert("Failed to load operation.");
       }
@@ -2149,7 +2279,7 @@
         await firestoreDb.collection("savedOperations").doc(id).delete();
         savedOperations = savedOperations.filter(op => op.id !== id);
         renderSavedOperationsTable();
-      } catch(err) {
+      } catch (err) {
         console.error(err);
         alert("Failed to delete operation.");
       }
@@ -2166,9 +2296,11 @@
       // Scanned
       const scannedData = [];
       const headers = parsedExcelData[0] || [];
-      scannedData.push([...headers]);
+      scannedData.push([...headers, "Source"]);
       parsedScannedProducts.forEach(sp => {
-        scannedData.push(sp.data ? sp.data.slice(0, headers.length) : []);
+        const rowData = sp.data ? sp.data.slice(0, headers.length) : [];
+        rowData.push(sp.source || 'scan');
+        scannedData.push(rowData);
       });
       const wsScanned = XLSX.utils.aoa_to_sheet(scannedData);
       XLSX.utils.book_append_sheet(wb, wsScanned, "Scanned Products");
@@ -2206,32 +2338,34 @@
         const parsedNotes = JSON.parse(op.remainingNotes || "{}");
 
         const sheetData = [];
-        
+
         // Add Scanned Header + Rows
         sheetData.push(["--- SCANNED PRODUCTS ---"]);
         const headers = parsedExcelData[0] || [];
-        sheetData.push([...headers]);
+        sheetData.push([...headers, "Source"]);
         parsedScannedProducts.forEach(sp => {
-          sheetData.push(sp.data ? sp.data.slice(0, headers.length) : []);
+          const rowData = sp.data ? sp.data.slice(0, headers.length) : [];
+          rowData.push(sp.source || 'scan');
+          sheetData.push(rowData);
         });
 
         sheetData.push([]);
         sheetData.push(["--- REMAINING PRODUCTS ---"]);
         sheetData.push([...headers, "Notes"]);
         parsedRemainingProducts.forEach(row => {
-           const key = String(row[0] || "");
-           sheetData.push([...row, parsedNotes[key] || ""]);
+          const key = String(row[0] || "");
+          sheetData.push([...row, parsedNotes[key] || ""]);
         });
 
         // Sheet name should be op name, max 31 chars constraint by Excel
         let sheetName = op.operationName.substring(0, 31).replace(/[\\/*?:\[\]]/g, "_");
-        
+
         // If sheet name exists, handle uniqueness
         let count = 1;
         let originalName = sheetName;
         while (wb.SheetNames.includes(sheetName)) {
-           sheetName = originalName.substring(0, 27) + `_${count}`;
-           count++;
+          sheetName = originalName.substring(0, 27) + `_${count}`;
+          count++;
         }
 
         const ws = XLSX.utils.aoa_to_sheet(sheetData);
@@ -2239,6 +2373,172 @@
       });
 
       XLSX.writeFile(wb, "Inventory_Operations_Report.xlsx");
+    });
+
+    // Select all Logic
+    document.addEventListener("change", (e) => {
+      if (e.target.id === "selectAllOps") {
+        const checked = e.target.checked;
+        document.querySelectorAll(".op-select-checkbox").forEach(cb => {
+          cb.checked = checked;
+        });
+      }
+    });
+
+    // Merge Operations Logic
+    document.getElementById("mergeSelectedOperationsBtn").addEventListener("click", async () => {
+      const checkboxes = document.querySelectorAll(".op-select-checkbox:checked");
+      if (checkboxes.length < 2) {
+        alert("Please select at least two operations to merge!");
+        return;
+      }
+
+      const selectedOps = [];
+      checkboxes.forEach(cb => {
+        const op = savedOperations.find(o => o.id === cb.value);
+        if (op) selectedOps.push(op);
+      });
+
+      const baseOpName = selectedOps[0].operationName;
+      let allSameOrder = true;
+      selectedOps.forEach(op => {
+        if (op.operationName !== baseOpName) {
+          allSameOrder = false;
+        }
+      });
+
+      if (!allSameOrder) {
+        if (!confirm("The selected operations appear to have different names. Are you sure you want to merge them? The merged operation will be based on the FIRST operation's base products.")) {
+          return;
+        }
+      }
+
+      const newOperationName = prompt("Enter a name for the merged operation:", `${baseOpName}_Merged`);
+      if (!newOperationName) {
+        return;
+      }
+
+      const btn = document.getElementById("mergeSelectedOperationsBtn");
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Merging...';
+      btn.disabled = true;
+
+      try {
+        const baseExcelData = JSON.parse(selectedOps[0].excelData || "[]");
+        const uniqueBarcodes = new Set();
+        const finalScannedArray = [];
+        const mergedAuditors = new Set();
+        const mergedNotes = {};
+
+        // Merge Scanned Products and Notes
+        selectedOps.forEach(op => {
+          if (op.auditors && Array.isArray(op.auditors)) {
+            op.auditors.forEach(a => mergedAuditors.add(a));
+          } else {
+            mergedAuditors.add("Unknown");
+          }
+
+          const opScanned = JSON.parse(op.scannedProducts || "[]");
+          opScanned.forEach(item => {
+            const normalizedBarcode = String(item.barcode).trim();
+            if (!uniqueBarcodes.has(normalizedBarcode)) {
+              uniqueBarcodes.add(normalizedBarcode);
+              item.barcode = normalizedBarcode; // Normalize it dynamically
+              item.source = item.source || 'scan'; // Default legacy elements dynamically
+              finalScannedArray.push(item);
+            }
+          });
+
+          const opNotes = JSON.parse(op.remainingNotes || "{}");
+          Object.keys(opNotes).forEach(k => {
+            if (opNotes[k]) {
+              if (mergedNotes[k] && !mergedNotes[k].includes(opNotes[k])) {
+                mergedNotes[k] += " | " + opNotes[k];
+              } else {
+                mergedNotes[k] = opNotes[k];
+              }
+            }
+          });
+        });
+
+        // Recalculate remaining products
+        let mergedRemainingProducts = [];
+        let originalProductsLength = 0;
+
+        if (baseExcelData.length > 0) {
+          mergedRemainingProducts = baseExcelData.slice(1).map(row =>
+            row.map(cell => (cell !== null && cell !== undefined) ? String(cell).trim() : "")
+          );
+          originalProductsLength = mergedRemainingProducts.length;
+        }
+
+        // Drain the remaining products dynamically using precise logic
+        finalScannedArray.forEach(({ barcode }) => {
+          const searchBarcode = String(barcode).trim();
+          const rowIndex = mergedRemainingProducts.findIndex((row) =>
+            row.some((cell) => {
+              if (cell === null || cell === undefined) return false;
+              const cellParts = String(cell).split("-").map((c) => c.trim());
+              return cellParts.includes(searchBarcode);
+            })
+          );
+
+          if (rowIndex >= 0) {
+            mergedRemainingProducts.splice(rowIndex, 1);
+          }
+        });
+
+        // Validation Rule
+        if (originalProductsLength !== finalScannedArray.length + mergedRemainingProducts.length) {
+          console.error(`Validation Failed: originalProducts(${originalProductsLength}) !== scannedProducts(${finalScannedArray.length}) + remainingProducts(${mergedRemainingProducts.length})`);
+
+          // Rebuild the remainingProducts list rigorously by rigidly removing ANY row that matches a scanned item
+          if (baseExcelData.length > 0) {
+            mergedRemainingProducts = baseExcelData.slice(1).map(row =>
+              row.map(cell => (cell !== null && cell !== undefined) ? String(cell).trim() : "")
+            ).filter(row => {
+              const hasScannedMatch = row.some((cell) => {
+                if (cell === null || cell === undefined) return false;
+                const cellParts = String(cell).split("-").map((c) => c.trim());
+                return cellParts.some(part => uniqueBarcodes.has(part));
+              });
+              return !hasScannedMatch;
+            });
+          }
+        }
+
+        const newOp = {
+          operationName: newOperationName,
+          timestamp: Date.now(),
+          totalProducts: baseExcelData.length > 1 ? baseExcelData.length - 1 : 0,
+          scannedCount: finalScannedArray.length,
+          remainingCount: mergedRemainingProducts.length,
+          auditors: Array.from(mergedAuditors),
+          excelData: JSON.stringify(baseExcelData),
+          scannedProducts: JSON.stringify(finalScannedArray),
+          remainingProducts: JSON.stringify(mergedRemainingProducts),
+          remainingNotes: JSON.stringify(mergedNotes),
+          editedBarcodes: selectedOps[0].editedBarcodes || "[]"
+        };
+
+        if (firestoreDb) {
+          await firestoreDb.collection("savedOperations").add(newOp);
+          alert("Merge successfully completed and saved.");
+          // Clear selections
+          document.querySelectorAll(".op-select-checkbox:checked").forEach(cb => cb.checked = false);
+          const selectAll = document.getElementById("selectAllOps");
+          if (selectAll) selectAll.checked = false;
+          loadSavedOperations();
+        } else {
+          alert("Firestore is not initiated. Merge failed.");
+        }
+      } catch (err) {
+        console.error("Merging failed: ", err);
+        alert("An error occurred during merging. Check console for details.");
+      } finally {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+      }
     });
   </script>
 </body>
