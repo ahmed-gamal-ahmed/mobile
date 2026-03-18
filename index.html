@@ -202,6 +202,18 @@
       white-space: nowrap;
     }
 
+    /* Compact table mode */
+    .compact-table td,
+    .compact-table th {
+      padding: 2px 4px !important;
+      font-size: 0.8rem;
+    }
+    
+    .compact-table .btn {
+      padding: 0.1rem 0.3rem;
+      font-size: 0.75rem;
+    }
+
     /* Responsive table adjustments */
     @media (max-width: 767px) {
       .table-responsive {
@@ -310,7 +322,33 @@
               Toggle Search Column (Remaining)
             </button>
           </div>
+          <div class="mt-2">
+            <button id="toggleTimestampColumnButton" class="btn btn-outline-info btn-sm w-100" data-bs-toggle="tooltip"
+              title="Show/hide Scan Time column in Scanned table">
+              <i class="bi bi-clock"></i> Toggle Scan Time
+            </button>
+          </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Compact View Button -->
+    <div class="mb-3">
+      <button id="toggleCompactViewButton" class="btn btn-secondary w-100" data-bs-toggle="tooltip"
+        title="Toggle Compact Table View">
+        <i class="bi bi-arrows-collapse"></i> Compact Table View
+      </button>
+    </div>
+
+    <!-- Input Mode Switch -->
+    <div class="mb-3">
+      <h5 class="text-center">Input Mode</h5>
+      <div class="btn-group w-100" role="group">
+        <input type="radio" class="btn-check" name="inputMode" id="modeScan" autocomplete="off" checked>
+        <label class="btn btn-outline-primary" for="modeScan">Scan Mode</label>
+
+        <input type="radio" class="btn-check" name="inputMode" id="modeSearch" autocomplete="off">
+        <label class="btn btn-outline-primary" for="modeSearch">Search by Item Number</label>
       </div>
     </div>
 
@@ -624,7 +662,48 @@
     let barcodeNotFoundHideTimeoutId = null;
     let descriptionWarningHideTimeoutId = null;
     let searchColumnVisible = localStorage.getItem("searchColumnVisible") !== "false"; // default visible
+    let timestampColumnVisible = localStorage.getItem("timestampColumnVisible") !== "false"; // default true
+    let compactView = localStorage.getItem("compactView") === "true";
+    let inputMode = "scan"; // scan or search
     let firestoreDb = null;
+
+    function getFormattedTimestamp() {
+      const now = new Date();
+      const pad = (n) => n.toString().padStart(2, '0');
+      return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    }
+
+    function applyTimestampColumnVisibility() {
+      const elements = document.querySelectorAll(".timestamp-column-scanned");
+      elements.forEach(el => {
+        if (timestampColumnVisible) {
+          el.classList.remove("d-none");
+        } else {
+          el.classList.add("d-none");
+        }
+      });
+    }
+
+    function applyCompactView() {
+      const tables = document.querySelectorAll(".table");
+      tables.forEach(table => {
+         if (compactView) {
+            table.classList.add("compact-table");
+         } else {
+            table.classList.remove("compact-table");
+         }
+      });
+      const btn = document.getElementById("toggleCompactViewButton");
+      if (btn) {
+         if (compactView) {
+            btn.classList.add("btn-primary");
+            btn.classList.remove("btn-secondary");
+         } else {
+            btn.classList.remove("btn-primary");
+            btn.classList.add("btn-secondary");
+         }
+      }
+    }
 
     function updateStatistics() {
       const fileNameEl = document.getElementById("statsFileName");
@@ -992,6 +1071,25 @@
           applySearchColumnVisibility();
         });
 
+      document.getElementById("toggleTimestampColumnButton").addEventListener("click", () => {
+        timestampColumnVisible = !timestampColumnVisible;
+        localStorage.setItem("timestampColumnVisible", timestampColumnVisible);
+        applyTimestampColumnVisibility();
+      });
+
+      document.getElementById("toggleCompactViewButton").addEventListener("click", () => {
+        compactView = !compactView;
+        localStorage.setItem("compactView", compactView);
+        applyCompactView();
+      });
+
+      document.getElementById("modeScan").addEventListener("change", (e) => { 
+        if(e.target.checked) inputMode = "scan"; 
+      });
+      document.getElementById("modeSearch").addEventListener("change", (e) => { 
+        if(e.target.checked) inputMode = "search"; 
+      });
+
       document.getElementById("navBarcodeManagerBtn").addEventListener("click", () => {
         document.getElementById("mainAppContainer").classList.add("d-none");
         document.getElementById("dataImportContainer").classList.add("d-none");
@@ -1239,6 +1337,9 @@
           : '<i class="bi bi-search"></i> Show Search Column (Remaining)';
       }
 
+      applyCompactView();
+      applyTimestampColumnVisibility();
+
       // Mobile-optimized sidebar toggle
       document.getElementById("openSidebarButton").addEventListener("click", () => {
         document.getElementById("sidebar").classList.add("open");
@@ -1403,6 +1504,14 @@
         columnToggleButtons.appendChild(button);
       });
 
+      const thTimestamp = document.createElement("th");
+      thTimestamp.textContent = "Scan Time";
+      thTimestamp.classList.add("timestamp-column-scanned");
+      if (!timestampColumnVisible) {
+        thTimestamp.classList.add("d-none");
+      }
+      tableHeaders.appendChild(thTimestamp);
+
       const thSource = document.createElement("th");
       thSource.textContent = "Source";
       tableHeaders.appendChild(thSource);
@@ -1485,7 +1594,7 @@
       });
     }
 
-    function handleBarcodeSearch(event) {
+    function handleBarcodeSearch(event, forceSource = null) {
       let barcode = event.target.value.toString().trim();
 
       if (barcode === "") return;
@@ -1494,6 +1603,45 @@
       hideBarcodeNotFoundAlert();
 
       console.log("Entered barcode:", barcode);
+
+      if (inputMode === "search" && !forceSource) {
+        let found = false;
+        const normalizedSearch = barcode.toLowerCase();
+        
+        // Search scanned table first
+        for (let [key, row] of scannedBarcodes.entries()) {
+          const itemNumberCell = row.cells[3] || row.cells[2] || row.cells[0]; // fallback
+          if (itemNumberCell && itemNumberCell.textContent.trim().toLowerCase() === normalizedSearch) {
+            row.scrollIntoView({ behavior: "smooth", block: "center" });
+            row.classList.add("bg-info");
+            setTimeout(() => row.classList.remove("bg-info"), 2000);
+            found = true;
+            break;
+          }
+        }
+        
+        // Search remaining
+        if (!found) {
+          const tableBody = document.getElementById("remainingTableBody");
+          Array.from(tableBody.rows).forEach(row => {
+            if (found) return;
+            const itemNumberCell = row.cells[3] || row.cells[2] || row.cells[0]; // fallback
+            if (itemNumberCell && itemNumberCell.textContent.trim().toLowerCase() === normalizedSearch) {
+              row.scrollIntoView({ behavior: "smooth", block: "center" });
+              row.classList.add("bg-info");
+              setTimeout(() => row.classList.remove("bg-info"), 2000);
+              found = true;
+            }
+          });
+        }
+        
+        if (!found) {
+          showBarcodeNotFoundAlert();
+          speakBarcodeNotFound();
+        }
+        event.target.value = "";
+        return;
+      }
 
       // Check if there is an edited mapping for this barcode
       if (editedBarcodes.has(barcode)) {
@@ -1532,7 +1680,7 @@
 
         if (rowIndex >= 0) {
           const productRow = remainingProducts[rowIndex];
-          addRowToScannedTable(productRow, barcode);
+          addRowToScannedTable(productRow, barcode, true, forceSource || 'scan');
           remainingProducts.splice(rowIndex, 1);
           showRemainingProducts();
         } else {
@@ -1549,7 +1697,7 @@
       event.target.value = ""; // Clear the input field for next scan
     }
 
-    function addRowToScannedTable(row, barcode, speak = true, source = 'scan') {
+    function addRowToScannedTable(row, barcode, speak = true, source = 'scan', timestamp = null) {
       const tableBody = document.getElementById("productTableBody");
       const tr = document.createElement("tr");
 
@@ -1564,7 +1712,18 @@
         tr.appendChild(td);
       });
 
+      if (!timestamp) timestamp = getFormattedTimestamp();
+      tr.dataset.timestamp = timestamp;
       tr.dataset.source = source;
+
+      const tdTimestamp = document.createElement("td");
+      tdTimestamp.textContent = timestamp;
+      tdTimestamp.classList.add("timestamp-column-scanned");
+      if (!timestampColumnVisible) {
+        tdTimestamp.classList.add("d-none");
+      }
+      tr.appendChild(tdTimestamp);
+
       const tdSource = document.createElement("td");
       if (source === 'scan') {
         tdSource.innerHTML = '<span class="badge bg-success"><i class="bi bi-upc-scan"></i> Scan</span>';
@@ -1715,8 +1874,8 @@
               const oldVal = input.value;
               input.value = primaryBarcode;
               // Mock a keypress event if needed, but we can just call handleBarcodeSearch directly
-              // We'll pass a mock event representing the Enter key
-              handleBarcodeSearch({ target: input, key: "Enter" });
+              // We'll pass a mock event representing the Enter key and force 'move' source
+              handleBarcodeSearch({ target: input, key: "Enter" }, 'move');
               // We can restore the input later if desired, handleBarcodeSearch clears it
             } else {
               // Fallback just in case
@@ -1746,7 +1905,7 @@
               rowData.push(cell.textContent);
             }
           });
-          return { barcode, data: rowData, source: row.dataset.source || 'scan' };
+          return { barcode, data: rowData, source: row.dataset.source || 'scan', timestamp: row.dataset.timestamp || "" };
         }
       );
 
@@ -1799,8 +1958,8 @@
       }
 
       // Restore scanned products
-      savedScannedProducts.forEach(({ barcode, data, source }) => {
-        addRowToScannedTable(data, barcode, false, source || 'scan');
+      savedScannedProducts.forEach(({ barcode, data, source, timestamp }) => {
+        addRowToScannedTable(data, barcode, false, source || 'scan', timestamp);
 
         // Only remove from remainingProducts if we did NOT explicitly restore remainingProducts.
         // If remainingProducts was restored from JSON in a session load, it is already correct.
@@ -1889,17 +2048,19 @@
       scannedData.push([]);
 
       // Add the headers row
-      const exportHeaders = [...excelData[0], "Source"];
+      const exportHeaders = [...excelData[0], "Scan Time", "Source"];
       scannedData.push(exportHeaders);
 
       // Add scanned products data
       [...scannedBarcodes.values()].forEach((row) => {
         const rowData = [];
         row.querySelectorAll("td").forEach((cell, index) => {
-          if (index <= excelData[0].length) {
+          if (index < excelData[0].length) {
             rowData.push(cell.textContent);
           }
         });
+        rowData.push(row.dataset.timestamp || "");
+        rowData.push(row.dataset.source || "scan");
         scannedData.push(rowData);
       });
 
@@ -2296,9 +2457,10 @@
       // Scanned
       const scannedData = [];
       const headers = parsedExcelData[0] || [];
-      scannedData.push([...headers, "Source"]);
+      scannedData.push([...headers, "Scan Time", "Source"]);
       parsedScannedProducts.forEach(sp => {
         const rowData = sp.data ? sp.data.slice(0, headers.length) : [];
+        rowData.push(sp.timestamp || "");
         rowData.push(sp.source || 'scan');
         scannedData.push(rowData);
       });
@@ -2342,9 +2504,10 @@
         // Add Scanned Header + Rows
         sheetData.push(["--- SCANNED PRODUCTS ---"]);
         const headers = parsedExcelData[0] || [];
-        sheetData.push([...headers, "Source"]);
+        sheetData.push([...headers, "Scan Time", "Source"]);
         parsedScannedProducts.forEach(sp => {
           const rowData = sp.data ? sp.data.slice(0, headers.length) : [];
+          rowData.push(sp.timestamp || "");
           rowData.push(sp.source || 'scan');
           sheetData.push(rowData);
         });
