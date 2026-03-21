@@ -435,7 +435,33 @@
 
   <!-- Make container fluid for better mobile layout -->
   <div class="container responsive-container pt-3 mt-5" id="mainAppContainer">
-    <h1 class="text-center" id="pageHeader">Product Inventory</h1>
+    <h1 class="text-center mb-4" id="pageHeader">Product Inventory</h1>
+
+    <!-- Dashboard Statistics Cards -->
+    <div class="d-flex flex-wrap gap-2 gap-md-3 mb-4" id="mainDashboardStats">
+      <div class="status-card shadow-sm flex-fill text-center p-2 p-md-3 bg-white" style="border-radius: 12px; border: 1px solid #eee;">
+        <span class="d-block text-uppercase fw-bold text-muted mb-1" style="font-size: 0.7rem;">Total Items</span>
+        <h3 id="mainStatsTotalProducts" class="mb-0 fw-bold">0</h3>
+      </div>
+      <div class="status-card shadow-sm flex-fill text-center p-2 p-md-3 bg-white" style="border-radius: 12px; border: 1px solid #eee; border-bottom: 4px solid #28a745;">
+        <span class="d-block text-uppercase fw-bold text-muted mb-1" style="font-size: 0.7rem;">Scanned</span>
+        <h3 id="mainStatsScannedProducts" class="text-success mb-0 fw-bold">0</h3>
+      </div>
+      <div class="status-card shadow-sm flex-fill text-center p-2 p-md-3 bg-white" style="border-radius: 12px; border: 1px solid #eee; border-bottom: 4px solid var(--talabat-orange);">
+        <span class="d-block text-uppercase fw-bold text-muted mb-1" style="font-size: 0.7rem;">Remaining</span>
+        <h3 id="mainStatsRemainingProducts" class="text-warning mb-0 fw-bold" style="color: var(--talabat-orange) !important;">0</h3>
+      </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="mb-4">
+      <div class="d-flex justify-content-between mb-1 small fw-bold">
+        <span class="text-success">Progress: <span id="progressPercentScanned">0%</span></span>
+      </div>
+      <div class="progress" style="height: 12px; border-radius: 50px; background-color: #eee;">
+        <div id="mainProgressBarScanned" class="progress-bar bg-success" role="progressbar" style="width: 0%; border-radius: 50px;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+      </div>
+    </div>
 
     <div class="mb-3">
       <label for="barcodeInput" class="form-label">Enter Barcode</label>
@@ -711,6 +737,13 @@
       const remainingEl = document.getElementById("statsRemainingProducts");
       const scannedEl = document.getElementById("statsScannedProducts");
 
+      // Main Screen Elements
+      const mainTotalEl = document.getElementById("mainStatsTotalProducts");
+      const mainRemainingEl = document.getElementById("mainStatsRemainingProducts");
+      const mainScannedEl = document.getElementById("mainStatsScannedProducts");
+      const barScanned = document.getElementById("mainProgressBarScanned");
+      const textPercentScanned = document.getElementById("progressPercentScanned");
+
       if (!fileNameEl || !totalEl || !remainingEl || !scannedEl) return;
 
       const hasProducts = Array.isArray(excelData) && excelData.length > 1;
@@ -730,6 +763,23 @@
       totalEl.textContent = totalCount;
       remainingEl.textContent = remainingCount;
       scannedEl.textContent = scannedCount;
+
+      // Update Main Screen
+      if (mainTotalEl) mainTotalEl.textContent = totalCount;
+      if (mainRemainingEl) mainRemainingEl.textContent = remainingCount;
+      if (mainScannedEl) mainScannedEl.textContent = scannedCount;
+
+      // Update Progress Bar
+      if (barScanned && totalCount > 0) {
+        const scannedPercent = (scannedCount / totalCount) * 100;
+        barScanned.style.width = `${scannedPercent}%`;
+        barScanned.setAttribute("aria-valuenow", Math.round(scannedPercent));
+        if (textPercentScanned) textPercentScanned.textContent = `${Math.round(scannedPercent)}%`;
+      } else if (barScanned) {
+        barScanned.style.width = "0%";
+        barScanned.setAttribute("aria-valuenow", 0);
+        if (textPercentScanned) textPercentScanned.textContent = "0%";
+      }
     }
 
     // Firebase / Firestore initialization
