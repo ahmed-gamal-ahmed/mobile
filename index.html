@@ -646,6 +646,17 @@
           <input class="form-check-input" type="checkbox" id="settingsZebra" checked>
           <label class="form-check-label fw-bold" for="settingsZebra">Zebra Striped Tables</label>
         </div>
+        <hr>
+        <div class="mb-4">
+          <label class="form-label d-flex justify-content-between">
+            <span class="fw-bold">Language</span>
+            <span id="languageDisplay" class="badge bg-primary">English</span>
+          </label>
+          <select class="form-select" id="settingsLanguage">
+            <option value="en">English (LTR)</option>
+            <option value="ar">Arabic (RTL)</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -745,8 +756,185 @@
       fontSize: "medium", // small, medium, large
       tableDensity: "normal", // compact, normal, large
       scale: 1, // 0.8 to 1.5
-      zebra: true
+      zebra: true,
+      language: "en"
     };
+
+    const baseTranslations = {
+      "Product Inventory": "جرد المنتجات",
+      "Settings": "الإعدادات",
+      "Barcode Manager": "إدارة الباركود",
+      "Saved Operations": "العمليات المحفوظة",
+      "Data Import": "استيراد البيانات",
+      "Inventory Menu": "قائمة الجرد",
+      "Statistics": "الإحصائيات",
+      "File Name": "اسم الملف",
+      "No file uploaded": "لم يتم رفع ملف",
+      "Total": "الإجمالي",
+      "Remaining": "المتبقي",
+      "Scanned": "الممسوح",
+      "Total Items": "إجمالي العناصر",
+      "Progress:": "التقدم:",
+      "Enter Barcode": "أدخل الباركود",
+      "Barcode not found": "الباركود غير موجود",
+      "Scanned Products": "المنتجات الممسوحة",
+      "Remaining Products": "المنتجات المتبقية",
+      "Clear Storage": "مسح التخزين",
+      "Export Products": "تصدير المنتجات",
+      "Save JSON": "حفظ كـ JSON",
+      "Load JSON": "تحميل JSON",
+      "Save Review Operation": "حفظ عملية المراجعة",
+      "No description available for search.": "لا يوجد وصف متاح للبحث.",
+      "Add New Mapping": "إضافة تعيين جديد",
+      "Original Barcode (correct)": "الباركود الأصلي (الصحيح)",
+      "Edited Barcode (scanned)": "الباركود المعدل (الممسوح)",
+      "Save": "حفظ",
+      "Search mappings by barcode...": "بحث في التعيينات بالباركود...",
+      "Original Barcode": "الباركود الأصلي",
+      "Edited Barcode": "الباركود المعدل",
+      "Actions": "إجراءات",
+      "Ignore first 3 rows of the file": "تجاهل أول 3 صفوف من الملف",
+      "Offline Import (Excel / CSV)": "استيراد بدون اتصال (Excel / CSV)",
+      "Upload Excel or CSV File": "رفع ملف Excel أو CSV",
+      "Online Import (Google Sheets)": "استيراد متصل (جداول جوجل)",
+      "Import from Google Sheets": "استيراد من جداول جوجل",
+      "Paste public link": "ضع الرابط العام هنا",
+      "Load Worksheets": "تحميل أوراق العمل",
+      "Search worksheets...": "البحث في أوراق العمل...",
+      "No sheets found.": "لا توجد أوراق عمل.",
+      "Worksheet Name": "اسم ورقة العمل",
+      "Number of Items": "عدد العناصر",
+      "Total Operations:": "إجمالي العمليات:",
+      "Total Scanned:": "إجمالي الممسوح:",
+      "Delete Selected": "حذف المحدد",
+      "Merge Selected": "دمج المحدد",
+      "Extract Selected": "استخراج المحدد",
+      "Search operations...": "بحث في العمليات...",
+      "Operation Name": "اسم العملية",
+      "Auditors": "المراجعون",
+      "Date & Time": "التاريخ والوقت",
+      "Total Products": "إجمالي المنتجات",
+      "Back to Inventory": "العودة للجرد",
+      "Appearance Settings": "إعدادات المظهر",
+      "Font Size": "حجم الخط",
+      "Table Density": "كثافة الجدول",
+      "Global UI Scale": "حجم واجهة المستخدم",
+      "Zebra Striped Tables": "الجداول المخططة",
+      "Language": "اللغة",
+      "Feature Toggles & UI Elements": "إعدادات ميزات واجهة المستخدم",
+      "Column Visibility": "عرض الأعمدة",
+      "Add Empty Column (Remaining)": "إضافة عمود فارغ (المتبقي)",
+      "Toggle Search Column (Remaining)": "تبديل عمود البحث (المتبقي)",
+      "Toggle Action Column": "تبديل عمود الإجراءات",
+      "Toggle Scan Time": "تبديل وقت المسح",
+      "Behavioral Settings": "إعدادات السلوك",
+      "Input Mode": "وضع الإدخال",
+      "Scan Mode": "وضع المسح",
+      "Search": "بحث",
+      "Misc Toggles": "مفاتيح متنوعة",
+      "Focus on Added: On": "التركيز التلقائي: قيد التشغيل",
+      "Voice: Off": "الصوت: معطل",
+      "Reset to Default Settings": "إعادة تعيين للافتراضي",
+      "Close Sidebar": "إغلاق القائمة الجانبية",
+      "Open Data Import": "استيراد البيانات",
+      "Open Barcode Manager": "إدارة الباركود",
+      "Open Settings": "الإعدادات",
+      "Show/Hide Remaining Products": "إظهار/إخفاء المتبقي",
+      "Clear Local Storage": "مسح مساحة التخزين المحلية",
+      "Export Scanned Products": "تصدير المنتجات الممسوحة",
+      "Export Session (JSON)": "تصدير الجلسة (JSON)",
+      "Import Session (JSON)": "استيراد الجلسة (JSON)",
+      "Open Sidebar": "فتح القائمة الجانبية",
+      "Small": "صغير",
+      "Medium": "متوسط",
+      "Large": "كبير",
+      "Compact": "مضغوط",
+      "Normal": "طبيعي",
+      "Import": "استيراد",
+      "Delete": "حذف",
+      "Move": "نقل",
+      "Return": "استرجاع",
+      "Scan": "مسح",
+      "English (LTR)": "الإنجليزية (LTR)",
+      "Arabic (RTL)": "العربية (RTL)",
+      "English": "الإنجليزية",
+      "Arabic": "العربية",
+      "Source": "المصدر",
+      "Scan Time": "وقت المسح",
+      "Action": "إجراء",
+      "Notes": "ملاحظات",
+      "Write here...": "اكتب هنا...",
+      "Remove Empty Column (Remaining)": "إزالة عمود فارغ (المتبقي)",
+      "Show Search Column (Remaining)": "إظهار عمود البحث (المتبقي)",
+      "Hide Search Column (Remaining)": "إخفاء عمود البحث (المتبقي)"
+    };
+
+    const translations = {
+      ar: baseTranslations,
+      en: Object.fromEntries(Object.entries(baseTranslations).map(([k, v]) => [v, k]))
+    };
+
+    let translationObserver = null;
+    
+    function applyTranslations() {
+      if (!appSettings.language) return;
+      const isAr = appSettings.language === "ar";
+      document.documentElement.dir = isAr ? "rtl" : "ltr";
+      document.documentElement.lang = isAr ? "ar" : "en";
+      const dict = isAr ? translations.ar : translations.en;
+
+      if (translationObserver) {
+        translationObserver.disconnect();
+      }
+
+      function walkTextNodes(node) {
+        if (node.nodeType === 3) {
+           let text = node.nodeValue.trim();
+           if (text && dict[text]) {
+             node.nodeValue = node.nodeValue.replace(text, dict[text]);
+           }
+        } else if (node.nodeType === 1 && node.nodeName !== 'SCRIPT' && node.nodeName !== 'STYLE') {
+           if (node.hasAttribute && node.hasAttribute('placeholder')) {
+             let holder = node.getAttribute('placeholder').trim();
+             if (dict[holder]) node.setAttribute('placeholder', dict[holder]);
+           }
+           if (node.hasAttribute && node.hasAttribute('title')) {
+             let titleAttr = node.getAttribute('title').trim();
+             if (dict[titleAttr]) node.setAttribute('title', dict[titleAttr]);
+           }
+           if (node.tagName === 'INPUT' && (node.type === 'button' || node.type === 'submit')) {
+             let val = node.value.trim();
+             if (dict[val]) node.value = dict[val];
+           }
+           // Use array snapshot to avoid infinite loops when iterating
+           let children = Array.from(node.childNodes);
+           for (let i = 0; i < children.length; i++) {
+             walkTextNodes(children[i]);
+           }
+        }
+      }
+      
+      walkTextNodes(document.body);
+
+      translationObserver = new MutationObserver((mutations) => {
+        translationObserver.disconnect();
+        mutations.forEach(m => {
+          m.addedNodes.forEach(added => {
+            if (added.nodeType === 1 || added.nodeType === 3) {
+              walkTextNodes(added);
+            }
+          });
+          if (m.type === 'characterData') {
+             let text = m.target.nodeValue.trim();
+             if (text && dict[text]) {
+               m.target.nodeValue = m.target.nodeValue.replace(text, dict[text]);
+             }
+          }
+        });
+        translationObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+      });
+      translationObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+    }
 
     function loadSettings() {
       const fontSizeMap = { "small": 1, "medium": 2, "large": 3 };
@@ -762,6 +950,12 @@
       
       document.getElementById("settingsZebra").checked = appSettings.zebra;
       
+      if (!appSettings.language) appSettings.language = "en";
+      const langElem = document.getElementById("settingsLanguage");
+      if (langElem) langElem.value = appSettings.language;
+      const langDisp = document.getElementById("languageDisplay");
+      if (langDisp) langDisp.textContent = appSettings.language === "ar" ? "Arabic" : "English";
+      
       applySettings();
     }
 
@@ -772,6 +966,8 @@
 
     function applySettings() {
       const root = document.documentElement;
+      
+      applyTranslations();
       
       // Font Size
       let fsValue = "16px";
@@ -805,7 +1001,8 @@
           fontSize: "medium",
           tableDensity: "normal",
           scale: 1,
-          zebra: true
+          zebra: true,
+          language: "en"
         };
         saveSettings();
         loadSettings();
@@ -1284,6 +1481,12 @@
 
       document.getElementById("settingsZebra").addEventListener("change", (e) => {
         appSettings.zebra = e.target.checked;
+        saveSettings();
+      });
+
+      document.getElementById("settingsLanguage").addEventListener("change", (e) => {
+        appSettings.language = e.target.value;
+        document.getElementById("languageDisplay").textContent = appSettings.language === "ar" ? "Arabic" : "English";
         saveSettings();
       });
 
