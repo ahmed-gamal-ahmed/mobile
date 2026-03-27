@@ -1799,6 +1799,10 @@
       }
     }
 
+    function normalizeRow(row) {
+      return row.map(cell => (cell === null || cell === undefined ? "" : cell.toString().trim()));
+    }
+
     function processImportedData(parsedData) {
       const ignoreCheckbox = document.getElementById("ignoreFirstRowsCheckbox");
       if (ignoreCheckbox && ignoreCheckbox.checked) {
@@ -1812,6 +1816,7 @@
       }
 
       excelData = parsedData;
+      excelData = excelData.map(normalizeRow);
       remainingProducts = [...excelData.slice(1)];
 
       localStorage.setItem("excelData", JSON.stringify(excelData));
@@ -2063,11 +2068,7 @@
         const rowIndex = remainingProducts.findIndex((row) =>
           row.some((cell) => {
             if (cell === null || cell === undefined) return false;
-            return cell
-              .toString()
-              .split("-")
-              .map((c) => c.trim())
-              .includes(barcode);
+            return cell.toString().trim().split("-").map((c) => c.trim()).includes(barcode.toString().trim());
           })
         );
 
@@ -2092,7 +2093,7 @@
       event.target.value = ""; // Clear the input field for next scan
     }
 
-    function addRowToScannedTable(row, barcode, speak = true, source = 'scan', timestamp = null) {
+    function addRowToScannedTable(row, barcode, speak = true, source = 'scan', timestamp = null, skipSave = false) {
       const tableBody = document.getElementById("productTableBody");
       const tr = document.createElement("tr");
 
@@ -2165,8 +2166,10 @@
         speakQuantity(quantity);
       }
 
-      saveProgress();
-      updateStatistics();
+      if (!skipSave) {
+        saveProgress();
+        updateStatistics();
+      }
     }
 
     function moveToRemainingTable(row, dataRow, barcode) {
@@ -2305,77 +2308,44 @@
       );
 
       localStorage.setItem("scannedProducts", JSON.stringify(scannedRows));
-      localStorage.setItem(
-        "remainingProducts",
-        JSON.stringify(remainingProducts)
-      );
       localStorage.setItem("remainingNotes", JSON.stringify(remainingNotes));
       localStorage.setItem("fileName", fileName);
     }
 
     function loadProgress() {
-      // Load excelData from local storage
-      const savedExcelData =
-        JSON.parse(localStorage.getItem("excelData")) || [];
+      const savedExcelData = JSON.parse(localStorage.getItem("excelData")) || [];
       const savedFileName = localStorage.getItem("fileName");
 
       if (savedExcelData.length > 0) {
         excelData = savedExcelData;
-        renderTableHeaders(); // Render table headers
-
+        renderTableHeaders();
         if (savedFileName) {
           fileName = savedFileName;
           document.getElementById("pageHeader").textContent = fileName;
         }
       }
 
-      const savedScannedProducts =
-        JSON.parse(localStorage.getItem("scannedProducts")) || [];
-      const savedRemainingProducts = JSON.parse(localStorage.getItem("remainingProducts"));
+      const savedScannedProducts = JSON.parse(localStorage.getItem("scannedProducts")) || [];
       remainingNotes = JSON.parse(localStorage.getItem("remainingNotes")) || {};
 
-      // Clear current state safely before restoration
       scannedBarcodes.clear();
       const productTableBody = document.getElementById("productTableBody");
       if (productTableBody) productTableBody.innerHTML = "";
 
-      // Load remaining products natively if they exist, to ensure restored sessions use the explicit remainingProducts
-      if (savedRemainingProducts) {
-        remainingProducts = savedRemainingProducts.map(row =>
-          row.map(cell => (cell !== null && cell !== undefined) ? cell.toString().trim() : "")
-        );
-      } else if (savedExcelData.length > 0) {
-        remainingProducts = [...excelData.slice(1)].map(row =>
-          row.map(cell => (cell !== null && cell !== undefined) ? cell.toString().trim() : "")
-        );
+      // Restore scanned rows WITHOUT triggering saveProgress() or updateStatistics() on each row
+      savedScannedProducts.forEach(({ barcode, data: scannedRowData, source, timestamp }) => {
+        addRowToScannedTable(scannedRowData, barcode, false, source || 'scan', timestamp, true); // true = skipSave
+      });
+
+      // Dynamically derive remainingProducts from master list directly to completely avoid state fragmentation
+      if (excelData && excelData.length > 0) {
+        const scannedSet = new Set(savedScannedProducts.map(sp => JSON.stringify(normalizeRow(sp.data))));
+        remainingProducts = excelData.slice(1).map(normalizeRow).filter(row => !scannedSet.has(JSON.stringify(row)));
       } else {
         remainingProducts = [];
       }
 
-      // Restore scanned products
-      savedScannedProducts.forEach(({ barcode, data, source, timestamp }) => {
-        addRowToScannedTable(data, barcode, false, source || 'scan', timestamp);
-
-        // Only remove from remainingProducts if we did NOT explicitly restore remainingProducts.
-        // If remainingProducts was restored from JSON in a session load, it is already correct.
-        if (!savedRemainingProducts) {
-          const rowIndex = remainingProducts.findIndex((row) =>
-            row.some((cell) => {
-              if (cell === null || cell === undefined) return false;
-              return cell.toString().split("-").map((c) => c.trim()).includes(barcode);
-            })
-          );
-
-          if (rowIndex >= 0) {
-            remainingProducts.splice(rowIndex, 1); // Remove the product from remainingProducts
-          }
-        }
-      });
-
-      // Restore remaining products UI
       showRemainingProducts();
-
-      // Ensure statistics reflect the loaded state
       updateStatistics();
     }
 
@@ -2386,7 +2356,6 @@
       if (confirmation) {
         // Clear only the scanned and remaining products
         localStorage.removeItem("scannedProducts");
-        localStorage.removeItem("remainingProducts");
         localStorage.removeItem("remainingNotes");
 
         // Reload the page to reset the tables
