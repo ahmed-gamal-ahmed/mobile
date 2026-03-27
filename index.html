@@ -18,6 +18,25 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <style>
+    /* Settings CSS Vars */
+    :root {
+      --app-font-size: 16px;
+      --app-table-density: 0.5rem;
+      --app-scale: 1;
+    }
+    body {
+      font-size: var(--app-font-size);
+      /* Use zoom for scale as it acts globally on Chrome/mobile */
+      zoom: var(--app-scale);
+      transition: font-size 0.3s ease;
+    }
+    table.table {
+      transition: background-color 0.3s ease;
+    }
+    .table td, .table th {
+      padding: var(--app-table-density) 0.5rem;
+      transition: padding 0.3s ease;
+    }
     /* Touch optimization */
     html {
       touch-action: manipulation;
@@ -300,73 +319,11 @@
       </button>
     </div>
 
-    <!-- Column Visibility Section -->
+    <!-- Settings Section -->
     <div class="mb-3">
-      <button class="btn btn-secondary w-100" data-bs-toggle="collapse" data-bs-target="#columnVisibilitySection"
-        aria-expanded="false" title="Toggle Column Visibility">
-        <i class="bi bi-grid"></i> Column Visibility
+      <button id="navSettingsBtn" class="btn btn-primary w-100" title="Open Settings">
+        <i class="bi bi-gear"></i> Settings
       </button>
-      <div class="collapse" id="columnVisibilitySection">
-        <div class="mt-2">
-          <h5 class="text-center">Column Visibility</h5>
-          <div id="columnToggleButtons" class="d-flex flex-wrap justify-content-center gap-2"></div>
-          <div class="mt-2">
-            <button id="toggleEmptyColumnButton" class="btn btn-info btn-sm w-100" data-bs-toggle="tooltip"
-              title="Add/remove writable empty column in Remaining table only">
-              <i class="bi bi-plus-square"></i> Add Empty Column (Remaining)
-            </button>
-          </div>
-          <div class="mt-2">
-            <button id="toggleSearchColumnButton" class="btn btn-outline-info btn-sm w-100" data-bs-toggle="tooltip"
-              title="Show/hide Search column in Remaining table only">
-              Toggle Search Column (Remaining)
-            </button>
-          </div>
-          <div class="mt-2">
-            <button id="toggleTimestampColumnButton" class="btn btn-outline-info btn-sm w-100" data-bs-toggle="tooltip"
-              title="Show/hide Scan Time column in Scanned table">
-              <i class="bi bi-clock"></i> Toggle Scan Time
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Compact View Button -->
-    <div class="mb-3">
-      <button id="toggleCompactViewButton" class="btn btn-secondary w-100" data-bs-toggle="tooltip"
-        title="Toggle Compact Table View">
-        <i class="bi bi-arrows-collapse"></i> Compact Table View
-      </button>
-    </div>
-
-    <!-- Input Mode Switch -->
-    <div class="mb-3">
-      <h5 class="text-center">Input Mode</h5>
-      <div class="btn-group w-100" role="group">
-        <input type="radio" class="btn-check" name="inputMode" id="modeScan" autocomplete="off" checked>
-        <label class="btn btn-outline-primary" for="modeScan">Scan Mode</label>
-
-        <input type="radio" class="btn-check" name="inputMode" id="modeSearch" autocomplete="off">
-        <label class="btn btn-outline-primary" for="modeSearch">Search by Item Number</label>
-      </div>
-    </div>
-
-    <!-- Action Column Section -->
-    <div class="mb-3">
-      <button class="btn btn-warning w-100" data-bs-toggle="collapse" data-bs-target="#actionColumnSection"
-        aria-expanded="false" title="Toggle Action Column">
-        <i class="bi bi-check-circle"></i> Action Column
-      </button>
-      <div class="collapse" id="actionColumnSection">
-        <div class="mt-2">
-          <h5 class="text-center">Show Action Column</h5>
-          <button id="toggleActionColumnButton" class="btn btn-primary w-100" data-bs-toggle="tooltip"
-            title="Toggle Action">
-            <i class="bi bi-eye"></i> Toggle Action Column
-          </button>
-        </div>
-      </div>
     </div>
 
     <!-- Other sidebar functionalities (e.g. export, clear storage, toggle remaining) -->
@@ -376,23 +333,13 @@
         <i class="bi bi-arrow-repeat"></i> Remaining Products
       </button>
     </div>
-    <div class="mb-3">
-      <button id="toggleFocusButton" class="btn btn-secondary w-100" data-bs-toggle="tooltip"
-        title="Toggle focus on row after adding product">
-        <i class="bi bi-bullseye"></i> Focus on Added: On
-      </button>
-    </div>
+
     <div class="mb-3">
       <button id="clearStorageButton" class="btn btn-danger w-100" data-bs-toggle="tooltip" title="Clear Local Storage">
         <i class="bi bi-trash"></i> Clear Storage
       </button>
     </div>
-    <div class="mb-3">
-      <button id="fixDuplicatesBtn" class="btn btn-warning w-100" data-bs-toggle="tooltip"
-        title="Clean Remaining Table">
-        <i class="bi bi-tools"></i> Fix Duplicates
-      </button>
-    </div>
+
     <div class="mb-3">
       <button id="exportButton" class="btn btn-success w-100" data-bs-toggle="tooltip" title="Export Scanned Products">
         <i class="bi bi-file-earmark-spreadsheet"></i> Export Products
@@ -421,13 +368,7 @@
         <i class="bi bi-cloud-check"></i> Saved Operations
       </button>
     </div>
-    <!-- Voice Settings Section -->
-    <div class="mb-3">
-      <button id="voiceToggleButton" class="btn btn-secondary w-100" data-bs-toggle="tooltip"
-        title="Toggle quantity voice (off / English / Arabic)">
-        Voice: Off
-      </button>
-    </div>
+
   </div>
 
   <!-- Open Sidebar Button -->
@@ -624,11 +565,14 @@
         <span class="badge bg-success fs-6 mb-1">Total Scanned: <span id="soTotalScanned">0</span></span>
       </div>
       <div>
+        <button id="deleteSelectedOperationsBtn" class="btn btn-danger me-2" title="Delete Selected Operations">
+          <i class="bi bi-trash"></i> Delete Selected
+        </button>
         <button id="mergeSelectedOperationsBtn" class="btn btn-warning me-2">
           <i class="bi bi-intersect"></i> Merge Selected
         </button>
-        <button id="exportAllOperationsBtn" class="btn btn-success">
-          <i class="bi bi-file-earmark-excel"></i> Export All Operations
+        <button id="extractSelectedOperationsBtn" class="btn btn-success" title="Extract Selected Operations">
+          <i class="bi bi-file-earmark-excel"></i> Extract Selected
         </button>
       </div>
     </div>
@@ -655,6 +599,109 @@
           <!-- Populated via JS -->
         </tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- Settings Page Component -->
+  <div class="container responsive-container pt-3 mt-5 d-none" id="settingsContainer">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h2><i class="bi bi-gear"></i> Settings</h2>
+      <button id="navMainAppFromSettingsBtn" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Inventory
+      </button>
+    </div>
+
+    <!-- Appearance Settings -->
+    <div class="card mb-3 shadow-sm border-0">
+      <div class="card-header bg-dark text-white rounded-top"><i class="bi bi-palette"></i> Appearance Settings</div>
+      <div class="card-body bg-white rounded-bottom">
+        <div class="mb-4">
+          <label class="form-label d-flex justify-content-between">
+            <span class="fw-bold">Font Size</span>
+            <span id="fontSizeDisplay" class="badge bg-primary">Medium</span>
+          </label>
+          <input type="range" class="form-range" id="settingsFontSize" min="1" max="3" step="1" value="2">
+          <div class="d-flex justify-content-between small text-muted">
+            <span>Small</span><span>Medium</span><span>Large</span>
+          </div>
+        </div>
+        <div class="mb-4">
+          <label class="form-label d-flex justify-content-between">
+            <span class="fw-bold">Table Density</span>
+            <span id="tableDensityDisplay" class="badge bg-primary">Normal</span>
+          </label>
+          <input type="range" class="form-range" id="settingsTableDensity" min="1" max="3" step="1" value="2">
+          <div class="d-flex justify-content-between small text-muted">
+            <span>Compact</span><span>Normal</span><span>Large</span>
+          </div>
+        </div>
+        <div class="mb-4">
+          <label class="form-label d-flex justify-content-between">
+            <span class="fw-bold">Global UI Scale</span>
+            <span id="scaleDisplay" class="badge bg-primary">100%</span>
+          </label>
+          <input type="range" class="form-range" id="settingsScale" min="80" max="150" step="5" value="100">
+        </div>
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" id="settingsZebra" checked>
+          <label class="form-check-label fw-bold" for="settingsZebra">Zebra Striped Tables</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Existing Settings Migrated -->
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header bg-dark text-white rounded-top"><i class="bi bi-sliders"></i> Feature Toggles & UI Elements</div>
+      <div class="card-body bg-white rounded-bottom">
+        
+        <h6 class="mb-3 border-bottom pb-2 fw-bold text-primary">Column Visibility</h6>
+        <div id="columnToggleButtons" class="d-flex flex-wrap gap-2 mb-3"></div>
+        <div class="d-flex flex-column gap-2 mb-4">
+          <button id="toggleEmptyColumnButton" class="btn btn-outline-info">
+            <i class="bi bi-plus-square"></i> Add Empty Column (Remaining)
+          </button>
+          <button id="toggleSearchColumnButton" class="btn btn-outline-info">
+            Toggle Search Column (Remaining)
+          </button>
+          <button id="toggleActionColumnButton" class="btn btn-outline-primary">
+            <i class="bi bi-eye"></i> Toggle Action Column
+          </button>
+          <button id="toggleTimestampColumnButton" class="btn btn-outline-info">
+            <i class="bi bi-clock"></i> Toggle Scan Time
+          </button>
+          <button id="toggleCompactViewButton" class="btn btn-outline-secondary d-none">
+            <!-- Hidden to not conflict with new density setting, keeping ID for JS compatibility -->
+          </button>
+        </div>
+
+        <h6 class="mb-3 border-bottom pb-2 fw-bold text-primary">Behavioral Settings</h6>
+        <div class="d-flex flex-column gap-3 mb-2">
+          <div>
+            <label class="form-label fw-bold mb-2">Input Mode</label>
+            <div class="btn-group w-100" role="group">
+              <input type="radio" class="btn-check" name="inputMode" id="modeScan" autocomplete="off" checked>
+              <label class="btn btn-outline-primary" for="modeScan">Scan Mode</label>
+              <input type="radio" class="btn-check" name="inputMode" id="modeSearch" autocomplete="off">
+              <label class="btn btn-outline-primary" for="modeSearch">Search</label>
+            </div>
+          </div>
+          <div>
+            <label class="form-label fw-bold mb-2">Misc Toggles</label>
+            <div class="d-flex flex-column gap-2">
+              <button id="toggleFocusButton" class="btn btn-outline-secondary">
+                <i class="bi bi-bullseye"></i> Focus on Added: On
+              </button>
+              <button id="voiceToggleButton" class="btn btn-outline-secondary">
+                Voice: Off
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-grid pb-5">
+      <button id="resetSettingsBtn" class="btn btn-danger btn-lg"><i class="bi bi-arrow-counterclockwise"></i> Reset to Default Settings</button>
     </div>
   </div>
 
@@ -693,6 +740,78 @@
     let inputMode = "scan"; // scan or search
     let firestoreDb = null;
 
+    // App Settings State and Persistence
+    let appSettings = JSON.parse(localStorage.getItem("appSettings")) || {
+      fontSize: "medium", // small, medium, large
+      tableDensity: "normal", // compact, normal, large
+      scale: 1, // 0.8 to 1.5
+      zebra: true
+    };
+
+    function loadSettings() {
+      const fontSizeMap = { "small": 1, "medium": 2, "large": 3 };
+      document.getElementById("settingsFontSize").value = fontSizeMap[appSettings.fontSize] || 2;
+      document.getElementById("fontSizeDisplay").textContent = appSettings.fontSize.charAt(0).toUpperCase() + appSettings.fontSize.slice(1);
+
+      const tableDensityMap = { "compact": 1, "normal": 2, "large": 3 };
+      document.getElementById("settingsTableDensity").value = tableDensityMap[appSettings.tableDensity] || 2;
+      document.getElementById("tableDensityDisplay").textContent = appSettings.tableDensity.charAt(0).toUpperCase() + appSettings.tableDensity.slice(1);
+
+      document.getElementById("settingsScale").value = Math.round(appSettings.scale * 100);
+      document.getElementById("scaleDisplay").textContent = Math.round(appSettings.scale * 100) + "%";
+      
+      document.getElementById("settingsZebra").checked = appSettings.zebra;
+      
+      applySettings();
+    }
+
+    function saveSettings() {
+      localStorage.setItem("appSettings", JSON.stringify(appSettings));
+      applySettings();
+    }
+
+    function applySettings() {
+      const root = document.documentElement;
+      
+      // Font Size
+      let fsValue = "16px";
+      if (appSettings.fontSize === "small") fsValue = "12px";
+      if (appSettings.fontSize === "large") fsValue = "20px";
+      root.style.setProperty("--app-font-size", fsValue);
+
+      // Table Density
+      let padValue = "0.5rem";
+      if (appSettings.tableDensity === "compact") padValue = "0.2rem";
+      if (appSettings.tableDensity === "large") padValue = "1rem";
+      root.style.setProperty("--app-table-density", padValue);
+
+      // Scale
+      root.style.setProperty("--app-scale", appSettings.scale);
+
+      // Zebra Tables
+      const tables = document.querySelectorAll(".table");
+      tables.forEach(t => {
+        if (appSettings.zebra) {
+          t.classList.add("table-striped");
+        } else {
+          t.classList.remove("table-striped");
+        }
+      });
+    }
+
+    function resetSettings() {
+      if (confirm("Reset all appearance settings to default?")) {
+        appSettings = {
+          fontSize: "medium",
+          tableDensity: "normal",
+          scale: 1,
+          zebra: true
+        };
+        saveSettings();
+        loadSettings();
+      }
+    }
+
     function getFormattedTimestamp() {
       const now = new Date();
       const pad = (n) => n.toString().padStart(2, '0');
@@ -710,26 +829,7 @@
       });
     }
 
-    function applyCompactView() {
-      const tables = document.querySelectorAll(".table");
-      tables.forEach(table => {
-         if (compactView) {
-            table.classList.add("compact-table");
-         } else {
-            table.classList.remove("compact-table");
-         }
-      });
-      const btn = document.getElementById("toggleCompactViewButton");
-      if (btn) {
-         if (compactView) {
-            btn.classList.add("btn-primary");
-            btn.classList.remove("btn-secondary");
-         } else {
-            btn.classList.remove("btn-primary");
-            btn.classList.add("btn-secondary");
-         }
-      }
-    }
+
 
     function updateStatistics() {
       const fileNameEl = document.getElementById("statsFileName");
@@ -1067,9 +1167,7 @@
       document
         .getElementById("clearStorageButton")
         .addEventListener("click", clearLocalStorage);
-      document
-        .getElementById("fixDuplicatesBtn")
-        .addEventListener("click", fixDuplicates);
+
       document
         .getElementById("exportButton")
         .addEventListener("click", exportScannedProducts);
@@ -1127,11 +1225,7 @@
         applyTimestampColumnVisibility();
       });
 
-      document.getElementById("toggleCompactViewButton").addEventListener("click", () => {
-        compactView = !compactView;
-        localStorage.setItem("compactView", compactView);
-        applyCompactView();
-      });
+
 
       document.getElementById("modeScan").addEventListener("change", (e) => { 
         if(e.target.checked) inputMode = "scan"; 
@@ -1144,11 +1238,56 @@
         document.getElementById("mainAppContainer").classList.add("d-none");
         document.getElementById("dataImportContainer").classList.add("d-none");
         document.getElementById("savedOperationsContainer").classList.add("d-none");
+        document.getElementById("settingsContainer").classList.add("d-none");
         document.getElementById("barcodeManagerContainer").classList.remove("d-none");
         document.getElementById("sidebar").classList.remove("open");
         document.body.classList.remove("sidebar-open");
         renderBarcodeManagerTable();
       });
+
+      document.getElementById("navSettingsBtn").addEventListener("click", () => {
+        document.getElementById("mainAppContainer").classList.add("d-none");
+        document.getElementById("dataImportContainer").classList.add("d-none");
+        document.getElementById("savedOperationsContainer").classList.add("d-none");
+        document.getElementById("barcodeManagerContainer").classList.add("d-none");
+        document.getElementById("settingsContainer").classList.remove("d-none");
+        document.getElementById("sidebar").classList.remove("open");
+        document.body.classList.remove("sidebar-open");
+      });
+
+      document.getElementById("navMainAppFromSettingsBtn").addEventListener("click", () => {
+        document.getElementById("settingsContainer").classList.add("d-none");
+        document.getElementById("mainAppContainer").classList.remove("d-none");
+      });
+
+      // Settings DOM Events
+      document.getElementById("settingsFontSize").addEventListener("input", (e) => {
+        const val = parseInt(e.target.value);
+        appSettings.fontSize = val === 1 ? "small" : (val === 2 ? "medium" : "large");
+        document.getElementById("fontSizeDisplay").textContent = appSettings.fontSize.charAt(0).toUpperCase() + appSettings.fontSize.slice(1);
+        saveSettings();
+      });
+
+      document.getElementById("settingsTableDensity").addEventListener("input", (e) => {
+        const val = parseInt(e.target.value);
+        appSettings.tableDensity = val === 1 ? "compact" : (val === 2 ? "normal" : "large");
+        document.getElementById("tableDensityDisplay").textContent = appSettings.tableDensity.charAt(0).toUpperCase() + appSettings.tableDensity.slice(1);
+        saveSettings();
+      });
+
+      document.getElementById("settingsScale").addEventListener("input", (e) => {
+        const val = parseInt(e.target.value);
+        appSettings.scale = val / 100;
+        document.getElementById("scaleDisplay").textContent = val + "%";
+        saveSettings();
+      });
+
+      document.getElementById("settingsZebra").addEventListener("change", (e) => {
+        appSettings.zebra = e.target.checked;
+        saveSettings();
+      });
+
+      document.getElementById("resetSettingsBtn").addEventListener("click", resetSettings);
 
       document.getElementById("navMainAppBtn").addEventListener("click", () => {
         document.getElementById("barcodeManagerContainer").classList.add("d-none");
@@ -1387,7 +1526,7 @@
           : '<i class="bi bi-search"></i> Show Search Column (Remaining)';
       }
 
-      applyCompactView();
+
       applyTimestampColumnVisibility();
 
       // Mobile-optimized sidebar toggle
@@ -1400,6 +1539,9 @@
         document.getElementById("sidebar").classList.remove("open");
         document.body.classList.remove("sidebar-open");
       });
+      
+      // Load app settings
+      loadSettings();
 
       // Close sidebar when clicking the overlay (for mobile)
       document.addEventListener("click", (event) => {
@@ -2049,37 +2191,7 @@
       }
     }
 
-    function fixDuplicates() {
-      // Get all barcodes currently in the Scanned Products table
-      const scannedList = [...scannedBarcodes.keys()].map(barcode => String(barcode).trim());
 
-      let removedCount = 0;
-
-      // For every scanned barcode, find exactly ONE match in the Remaining table and remove it
-      scannedList.forEach(barcode => {
-        const rowIndex = remainingProducts.findIndex((row) =>
-          row.some((cell) => {
-            if (cell === null || cell === undefined) return false;
-            const cellParts = String(cell).split("-").map((c) => c.trim());
-            return cellParts.includes(barcode);
-          })
-        );
-
-        if (rowIndex >= 0) {
-          remainingProducts.splice(rowIndex, 1);
-          removedCount++;
-        }
-      });
-
-      if (removedCount > 0) {
-        showRemainingProducts();
-        saveProgress();
-        updateStatistics();
-        alert(`${removedCount} duplicate product(s) were removed from Remaining Products.`);
-      } else {
-        alert("No duplicates found in Remaining Products.");
-      }
-    }
 
     function exportScannedProducts() {
       const scannerName = prompt("Please enter the scanner's name:");
@@ -2242,8 +2354,18 @@
             throw new Error("Invalid session file format.");
           }
 
+          // Backup new settings system
+          const keysToPreserve = ["appSettings", "focusEnabled", "voiceMode", "searchColumnVisible", "timestampColumnVisible", "remainingNotesColumnVisible", "ignoreFirstRows"];
+          const preservedSettings = {};
+          keysToPreserve.forEach(k => preservedSettings[k] = localStorage.getItem(k));
+
           // Clear existing memory
           localStorage.clear();
+
+          // Restore settings
+          keysToPreserve.forEach(k => {
+            if (preservedSettings[k] !== null) localStorage.setItem(k, preservedSettings[k]);
+          });
 
           // Restore Core Memory
           if (importedSession.excelData) localStorage.setItem("excelData", JSON.stringify(importedSession.excelData));
@@ -2256,14 +2378,7 @@
           const importedMappings = new Map(importedSession.editedBarcodes || []);
           localStorage.setItem("editedBarcodes", JSON.stringify(Array.from(importedMappings.entries())));
 
-          // Restore Settings
-          if (importedSession.settings) {
-            localStorage.setItem("searchColumnVisible", importedSession.settings.searchColumnVisible !== false);
-            localStorage.setItem("remainingNotesColumnVisible", importedSession.settings.remainingNotesColumnVisible === true);
-            localStorage.setItem("actionColumnVisible", importedSession.settings.actionColumnVisible === true);
-            localStorage.setItem("voiceMode", importedSession.settings.voiceMode || "off");
-            localStorage.setItem("focusEnabled", importedSession.settings.focusEnabled !== false);
-          }
+
 
           alert("Session imported successfully! Reloading application...");
           location.reload();
@@ -2416,19 +2531,7 @@
         loadBtn.innerHTML = '<i class="bi bi-cloud-arrow-down"></i> Load';
         loadBtn.addEventListener("click", () => loadOperation(op));
 
-        const exportBtn = document.createElement("button");
-        exportBtn.className = "btn btn-sm btn-success me-1 my-1";
-        exportBtn.innerHTML = '<i class="bi bi-file-earmark-excel"></i> Export';
-        exportBtn.addEventListener("click", () => exportSingleOperation(op));
-
-        const delBtn = document.createElement("button");
-        delBtn.className = "btn btn-sm btn-danger my-1";
-        delBtn.innerHTML = '<i class="bi bi-trash"></i> Delete';
-        delBtn.addEventListener("click", () => deleteOperation(op.id));
-
         tdActions.appendChild(loadBtn);
-        tdActions.appendChild(exportBtn);
-        tdActions.appendChild(delBtn);
 
         tr.appendChild(tdSelect);
         tr.appendChild(tdName);
@@ -2456,7 +2559,17 @@
       if (!confirm(`Are you sure you want to load "${op.operationName}"? Current unsaved progress will be replaced.`)) return;
 
       try {
+        // Backup new settings system
+        const keysToPreserve = ["appSettings", "focusEnabled", "voiceMode", "searchColumnVisible", "timestampColumnVisible", "remainingNotesColumnVisible", "ignoreFirstRows"];
+        const preservedSettings = {};
+        keysToPreserve.forEach(k => preservedSettings[k] = localStorage.getItem(k));
+
         localStorage.clear();
+
+        // Restore settings
+        keysToPreserve.forEach(k => {
+          if (preservedSettings[k] !== null) localStorage.setItem(k, preservedSettings[k]);
+        });
         localStorage.setItem("excelData", op.excelData || "[]");
         localStorage.setItem("fileName", op.operationName);
         localStorage.setItem("remainingProducts", op.remainingProducts || "[]");
@@ -2536,14 +2649,21 @@
       XLSX.writeFile(wb, exportName);
     }
 
-    document.getElementById("exportAllOperationsBtn").addEventListener("click", () => {
-      if (savedOperations.length === 0) {
-        alert("No operations to export.");
+    document.getElementById("extractSelectedOperationsBtn").addEventListener("click", () => {
+      const checkboxes = document.querySelectorAll(".op-select-checkbox:checked");
+      if (checkboxes.length === 0) {
+        alert("Please select at least one operation to extract.");
         return;
       }
       const wb = XLSX.utils.book_new();
 
-      savedOperations.forEach(op => {
+      const selectedOps = [];
+      checkboxes.forEach(cb => {
+        const op = savedOperations.find(o => o.id === cb.value);
+        if (op) selectedOps.push(op);
+      });
+
+      selectedOps.forEach(op => {
         const parsedExcelData = JSON.parse(op.excelData || "[]");
         const parsedScannedProducts = JSON.parse(op.scannedProducts || "[]");
         const parsedRemainingProducts = JSON.parse(op.remainingProducts || "[]");
@@ -2595,6 +2715,50 @@
         document.querySelectorAll(".op-select-checkbox").forEach(cb => {
           cb.checked = checked;
         });
+      }
+    });
+
+    // Delete Selected Logic
+    document.getElementById("deleteSelectedOperationsBtn").addEventListener("click", async () => {
+      const checkboxes = document.querySelectorAll(".op-select-checkbox:checked");
+      if (checkboxes.length === 0) {
+        alert("Please select at least one operation to delete.");
+        return;
+      }
+
+      if (!confirm(`Are you sure you want to permanently delete the selected ${checkboxes.length} operation(s)?`)) {
+        return;
+      }
+
+      const btn = document.getElementById("deleteSelectedOperationsBtn");
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Deleting...';
+      btn.disabled = true;
+
+      try {
+        const batch = firestoreDb.batch();
+        checkboxes.forEach(cb => {
+          const docRef = firestoreDb.collection("savedOperations").doc(cb.value);
+          batch.delete(docRef);
+        });
+
+        await batch.commit();
+
+        // Update local array
+        const deletedIds = Array.from(checkboxes).map(cb => cb.value);
+        savedOperations = savedOperations.filter(op => !deletedIds.includes(op.id));
+        
+        // Clear select all checkbox if checked
+        const selectAllCb = document.getElementById("selectAllOps");
+        if (selectAllCb) selectAllCb.checked = false;
+
+        renderSavedOperationsTable();
+      } catch (err) {
+        console.error("Error deleting operations:", err);
+        alert("Failed to delete selected operations.");
+      } finally {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
       }
     });
 
