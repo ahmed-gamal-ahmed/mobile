@@ -1537,6 +1537,29 @@
       }
     }
 
+    async function checkForceAssignmentAfterSave() {
+      if (!firestoreDb || !currentUser) return;
+      try {
+        const doc = await firestoreDb
+          .collection("assignments")
+          .doc(currentUser.uid)
+          .get();
+
+        if (!doc.exists) return;
+
+        const data = doc.data();
+
+        // Only act if there is a pending force assignment
+        if (data.status !== "pending" || data.forceMode !== "force") return;
+
+        // Run the force assignment logic
+        await handleForceAssignment(data);
+
+      } catch (err) {
+        console.error("checkForceAssignmentAfterSave error:", err);
+      }
+    }
+
     async function checkOperationAlreadySaved() {
       try {
         if (scannedBarcodes.size === 0) return true; // nothing to save
