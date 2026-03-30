@@ -17,6 +17,7 @@
   <!-- Firebase (App + Firestore, compat builds for simplicity) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <style>
     /* Settings CSS Vars */
     :root {
@@ -247,6 +248,19 @@
     }
 
     /* Responsive adjustments */
+    #loginOverlay {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      z-index: 9999 !important;
+      background: #f8f9fa;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
     @media (max-width: 768px) {
       #sidebar {
         width: 80%;
@@ -273,6 +287,32 @@
 </head>
 
 <body class="bg-light">
+  <!-- Full-screen loading splash (shown first, hides after auth) -->
+  <div id="appLoadingScreen" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#f8f9fa;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;">
+    <div class="spinner-border text-primary" style="width:3rem;height:3rem;" role="status"></div>
+    <span style="color:#6c757d;font-size:1rem;">Loading...</span>
+  </div>
+
+  <!-- Login Overlay (hidden by default, shown only when not authenticated) -->
+  <div id="loginOverlay" class="d-none" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#f8f9fa;z-index:9999;display:flex;align-items:center;justify-content:center;">
+    <div class="card p-4 shadow-lg" style="max-width: 400px; width: 90%; border-radius: 12px;">
+      <h3 class="text-center mb-4 fw-bold">Login</h3>
+      <div id="loginError" class="alert alert-danger d-none py-2" role="alert"></div>
+      <div class="mb-3">
+        <label class="form-label fw-bold">Email</label>
+        <input type="email" id="loginEmail" class="form-control form-control-lg" placeholder="Email address" />
+      </div>
+      <div class="mb-4">
+        <label class="form-label fw-bold">Password</label>
+        <input type="password" id="loginPassword" class="form-control form-control-lg" placeholder="Password" />
+      </div>
+      <button id="loginBtn" class="btn btn-primary btn-lg w-100 fw-bold">
+        <span id="loginSpinner" class="spinner-border spinner-border-sm d-none me-2" role="status" aria-hidden="true"></span>
+        Login
+      </button>
+    </div>
+  </div>
+
   <!-- Sidebar with new header and collapsible sections -->
   <div id="sidebar" class="sidebar">
     <div class="sidebar-header d-flex justify-content-between align-items-center">
@@ -369,13 +409,40 @@
       </button>
     </div>
 
+    <!-- User Profile & Logout -->
+    <div class="mb-3 mt-4 pt-3 border-top border-secondary">
+      <div class="text-center text-white mb-2 fw-bold" id="sidebarUserLabel">👤 Unknown</div>
+      <button id="logoutBtn" class="btn btn-danger w-100 fw-bold" title="Logout">
+        <i class="bi bi-box-arrow-right"></i> Logout
+      </button>
+      <button id="adminDashboardBtn" class="btn btn-warning w-100 fw-bold mt-2 d-none" title="Admin Dashboard" onclick="window.open('admin.html', '_blank')">
+        <i class="bi bi-speedometer2"></i> Admin Dashboard
+      </button>
+    </div>
+
   </div>
 
   <!-- Open Sidebar Button -->
-  <button id="openSidebarButton" data-bs-toggle="tooltip" title="Open Sidebar">☰</button>
+  <button id="openSidebarButton" class="d-none" data-bs-toggle="tooltip" title="Open Sidebar">☰</button>
 
   <!-- Make container fluid for better mobile layout -->
-  <div class="container responsive-container pt-3 mt-5" id="mainAppContainer">
+  <div class="container responsive-container pt-3 mt-5 d-none" id="mainAppContainer">
+    <div id="assignmentBanner" class="alert alert-success alert-dismissible d-none shadow-sm" role="alert" style="cursor:pointer; border-left: 5px solid #198754;">
+      📦 <strong>New inventory assigned by admin</strong> — Click here to load it.
+    </div>
+    <!-- Auto-saving banner -->
+    <div id="autoSavingBanner" class="alert alert-info d-none" role="alert">
+      <div class="d-flex align-items-center gap-2">
+        <span class="spinner-border spinner-border-sm" role="status"></span>
+        <strong>Admin assigned a new inventory order — saving your current work automatically...</strong>
+      </div>
+    </div>
+
+    <!-- Force assignment result banner -->
+    <div id="forceAssignmentBanner" class="alert alert-success alert-dismissible d-none" role="alert">
+      <span id="forceAssignmentBannerText"></span>
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
     <h1 class="text-center mb-4" id="pageHeader">Product Inventory</h1>
 
     <!-- Dashboard Statistics Cards -->
@@ -750,6 +817,7 @@
     let compactView = localStorage.getItem("compactView") === "true";
     let inputMode = "scan"; // scan or search
     let firestoreDb = null;
+    let assignmentUnsubscribe = null; // Holds the Firestore real-time listener unsubscribe fn
 
     // App Settings State and Persistence
     let appSettings = JSON.parse(localStorage.getItem("appSettings")) || {
@@ -773,6 +841,10 @@
       "Total": "الإجمالي",
       "Remaining": "المتبقي",
       "Scanned": "الممسوح",
+      "New inventory assigned by admin": "جرد جديد تم تعيينه من قبل المسؤول",
+      "Admin assigned a new inventory order — saving your current work automatically...": "المسؤول قام بتعيين جرد جديد — يتم حفظ عملك الحالي تلقائياً...",
+      "New inventory loaded by admin.": "تم تحميل الجرد الجديد بنجاح من قبل المسؤول.",
+      "Your work was saved and new inventory loaded by admin.": "تم حفظ عملك وتحميل الجرد الجديد من قبل المسؤول.",
       "Total Items": "إجمالي العناصر",
       "Progress:": "التقدم:",
       "Enter Barcode": "أدخل الباركود",
@@ -1325,8 +1397,435 @@
       });
     }
 
+    async function handleLogout() {
+      // Stop assignment listener
+      if (assignmentUnsubscribe) {
+        assignmentUnsubscribe();
+        assignmentUnsubscribe = null;
+      }
+
+      try {
+        await firebase.auth().signOut();
+      } catch (err) {
+        console.error("Logout error:", err);
+      }
+
+      // Clear currentUser
+      currentUser = null;
+
+      // Clear scan progress from localStorage only
+      localStorage.removeItem("scannedProducts");
+      localStorage.removeItem("remainingProducts");
+      localStorage.removeItem("remainingNotes");
+
+      // Reset in-memory state
+      scannedBarcodes.clear();
+      remainingProducts = [];
+      remainingNotes = {};
+      excelData = [];
+      fileName = "Product Inventory";
+
+      // Reset CSS
+      const root = document.documentElement;
+      root.style.setProperty("--app-scale", "1");
+      root.style.setProperty("--app-font-size", "16px");
+      root.style.setProperty("--app-table-density", "0.5rem");
+      document.body.style.zoom = "1";
+      document.body.style.marginLeft = "0";
+      document.body.classList.remove("sidebar-open");
+      document.getElementById("sidebar").classList.remove("open");
+
+      // Hide ALL app containers
+      document.getElementById("mainAppContainer").classList.add("d-none");
+      document.getElementById("barcodeManagerContainer").classList.add("d-none");
+      document.getElementById("dataImportContainer").classList.add("d-none");
+      document.getElementById("savedOperationsContainer").classList.add("d-none");
+      document.getElementById("settingsContainer").classList.add("d-none");
+      document.getElementById("openSidebarButton").classList.add("d-none");
+
+      // Clear tables
+      const productTableBody = document.getElementById("productTableBody");
+      if (productTableBody) productTableBody.innerHTML = "";
+      const remainingTableBody = document.getElementById("remainingTableBody");
+      if (remainingTableBody) remainingTableBody.innerHTML = "";
+
+      // Reset page header
+      document.getElementById("pageHeader").textContent = "Product Inventory";
+
+      // Show login overlay
+      const overlay = document.getElementById("loginOverlay");
+      overlay.classList.remove("d-none");
+      overlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:#f8f9fa; z-index:9999; display:flex; align-items:center; justify-content:center;";
+
+      // Clear login form
+      const emailInput = document.getElementById("loginEmail");
+      const passInput = document.getElementById("loginPassword");
+      const errorEl = document.getElementById("loginError");
+      if (emailInput) emailInput.value = "";
+      if (passInput) passInput.value = "";
+      if (errorEl) errorEl.classList.add("d-none");
+    }
+
+    let appInitialized = false;
+    let currentUser = null;
+
+    function applyRoleUI() {
+      const isAdmin = currentUser && currentUser.role === "admin";
+
+      // Bulk action buttons — admin only
+      const deleteSelectedBtn = document.getElementById("deleteSelectedOperationsBtn");
+      const mergeSelectedBtn = document.getElementById("mergeSelectedOperationsBtn");
+      const selectAllOps = document.getElementById("selectAllOps");
+
+      if (deleteSelectedBtn) deleteSelectedBtn.style.display = isAdmin ? "" : "none";
+      if (mergeSelectedBtn) mergeSelectedBtn.style.display = isAdmin ? "" : "none";
+
+      // Hide select-all checkbox for normal users since bulk delete is hidden
+      if (selectAllOps) selectAllOps.style.display = isAdmin ? "" : "none";
+
+      // Admin dashboard button — admin only
+      const adminDashboardBtn = document.getElementById("adminDashboardBtn");
+      if (adminDashboardBtn) adminDashboardBtn.style.display = isAdmin ? "" : "none";
+
+      // Update sidebar username display
+      const userDisplayEl = document.getElementById("sidebarUserLabel");
+      if (userDisplayEl && currentUser) {
+        userDisplayEl.textContent = "👤 " + currentUser.displayName;
+      }
+    }
+
+    // ─── Real-time Assignment Listener ─────────────────────────────────────────
+
+    function startAssignmentListener() {
+      if (!firestoreDb || !currentUser) return;
+      // Unsubscribe any previous listener before starting a new one
+      if (assignmentUnsubscribe) {
+        assignmentUnsubscribe();
+        assignmentUnsubscribe = null;
+      }
+      assignmentUnsubscribe = firestoreDb.collection("assignments").doc(currentUser.uid)
+        .onSnapshot(async (doc) => {
+          if (!doc.exists) return;
+          const data = doc.data();
+          if (data.status !== "pending") return;
+          if (data.forceMode !== "force") {
+            // Normal assignment — show the existing click-to-load green banner only
+            showAssignmentBanner(data);
+            return;
+          }
+          // Force mode — run the force assignment logic
+          await handleForceAssignment(data);
+        }, (err) => {
+          console.error("Assignment listener error:", err);
+        });
+    }
+
+    async function handleForceAssignment(data) {
+      const alreadySaved = await checkOperationAlreadySaved();
+
+      if (alreadySaved) {
+        // Both conditions passed — load silently
+        await applyForceAssignment(data);
+        showForceAssignmentBanner("✅ New inventory loaded by admin.");
+      } else {
+        // Conditions not met — auto-save first, then apply assignment
+        showAutoSavingBanner();
+        await triggerSaveOperation(); // silent save, no prompts
+        await applyForceAssignment(data);
+        hideAutoSavingBanner();
+        showForceAssignmentBanner("✅ Your work was saved and new inventory loaded by admin.");
+      }
+    }
+
+    async function checkOperationAlreadySaved() {
+      try {
+        if (scannedBarcodes.size === 0) return true; // nothing to save
+
+        const snapshot = await firestoreDb
+          .collection("savedOperations")
+          .where("createdBy", "==", currentUser.uid)
+          .where("operationName", "==", fileName)
+          .orderBy("timestamp", "desc")
+          .limit(1)
+          .get();
+
+        if (snapshot.empty) return false;
+
+        const lastOp = snapshot.docs[0].data();
+        const savedScannedCount = JSON.parse(lastOp.scannedProducts || "[]").length;
+
+        // Both conditions: name matches AND scanned count matches
+        return savedScannedCount === scannedBarcodes.size;
+      } catch (err) {
+        console.error("checkOperationAlreadySaved error:", err);
+        return false;
+      }
+    }
+
+    async function applyForceAssignment(data) {
+      try {
+        // Step 1: Parse the assigned excelData
+        const parsedExcelData = JSON.parse(data.excelData);
+
+        // Step 2: Clear ONLY scan progress from localStorage
+        localStorage.removeItem("scannedProducts");
+        localStorage.removeItem("remainingProducts");
+        localStorage.removeItem("remainingNotes");
+        localStorage.removeItem("excelData");
+        localStorage.removeItem("fileName");
+
+        // Step 3: Clear in-memory state
+        scannedBarcodes.clear();
+        remainingProducts = [];
+        remainingNotes = {};
+        excelData = [];
+        const productTableBody = document.getElementById("productTableBody");
+        if (productTableBody) productTableBody.innerHTML = "";
+
+        // Step 4: Set new fileName
+        fileName = data.fileName;
+        document.getElementById("pageHeader").textContent = fileName;
+        localStorage.setItem("fileName", fileName);
+
+        // Step 5: Process and load the new data
+        processImportedData(parsedExcelData);
+
+        // Step 6: Mark assignment as loaded in Firestore
+        await firestoreDb.collection("assignments").doc(currentUser.uid).update({
+          status: "loaded"
+        });
+
+      } catch (err) {
+        console.error("applyForceAssignment error:", err);
+      }
+    }
+
+    function showAssignmentBanner(data) {
+      const banner = document.getElementById("assignmentBanner");
+      if (!banner) return;
+      banner.classList.remove("d-none");
+      banner.onclick = async () => {
+        if (await hasUnsavedWork()) {
+          const proceed = await showUnsavedWorkWarning();
+          if (!proceed) return;
+        }
+        try {
+          await applyForceAssignment(data);
+          banner.classList.add("d-none");
+        } catch(err) {
+          console.error(err);
+        }
+      };
+    }
+
+    // Banner helper functions
+    function showAutoSavingBanner() {
+      document.getElementById("autoSavingBanner").classList.remove("d-none");
+      // Disable barcode input during auto-save
+      const bi = document.getElementById("barcodeInput");
+      if (bi) bi.disabled = true;
+    }
+
+    function hideAutoSavingBanner() {
+      document.getElementById("autoSavingBanner").classList.add("d-none");
+      const bi = document.getElementById("barcodeInput");
+      if (bi) bi.disabled = false;
+    }
+
+    function showForceAssignmentBanner(message) {
+      const banner = document.getElementById("forceAssignmentBanner");
+      document.getElementById("forceAssignmentBannerText").textContent = message;
+      banner.classList.remove("d-none");
+      // Auto-hide after 5 seconds
+      setTimeout(() => {
+        banner.classList.add("d-none");
+      }, 5000);
+    }
+
+    async function hasUnsavedWork() {
+      if (scannedBarcodes.size === 0) return false;
+      try {
+        const snapshot = await firestoreDb
+          .collection("savedOperations")
+          .where("createdBy", "==", currentUser.uid)
+          .orderBy("timestamp", "desc")
+          .limit(1)
+          .get();
+        if (snapshot.empty) return true;
+        const lastOp = snapshot.docs[0].data();
+        const lastSavedCount = JSON.parse(lastOp.scannedProducts || "[]").length;
+        return lastSavedCount !== scannedBarcodes.size;
+      } catch (err) {
+        console.error("hasUnsavedWork check failed:", err);
+        return false;
+      }
+    }
+
+    function showUnsavedWorkWarning() {
+      return new Promise((resolve) => {
+        document.getElementById("unsavedCount").textContent = scannedBarcodes.size;
+        const modal = new bootstrap.Modal(document.getElementById("unsavedWorkModal"));
+        modal.show();
+        document.getElementById("unsavedWorkSaveBtn").onclick = async () => {
+          modal.hide();
+          await triggerSaveOperation();
+          resolve(true);
+        };
+        document.getElementById("unsavedWorkCancelBtn").onclick = () => {
+          modal.hide();
+          resolve(false);
+        };
+      });
+    }
+
+    // Silent save — no prompts, no alerts
+    async function triggerSaveOperation() {
+      if (!firestoreDb || !currentUser) return;
+      if (!excelData || excelData.length === 0) return;
+
+      const sessionDataStr = localStorage.getItem("scannedProducts") || "[]";
+      try {
+        await firestoreDb.collection("savedOperations").add({
+          operationName:    fileName,
+          timestamp:        Date.now(),
+          totalProducts:    excelData.length > 1 ? excelData.length - 1 : 0,
+          scannedCount:     scannedBarcodes.size,
+          remainingCount:   remainingProducts.length,
+          auditors:         [currentUser.displayName],
+          createdBy:        currentUser.uid,
+          createdByName:    currentUser.displayName,
+          excelData:        JSON.stringify(excelData),
+          scannedProducts:  sessionDataStr,
+          remainingProducts: JSON.stringify(remainingProducts),
+          remainingNotes:   JSON.stringify(remainingNotes),
+          editedBarcodes:   JSON.stringify(Array.from(editedBarcodes.entries()))
+        });
+      } catch (err) {
+        console.error("triggerSaveOperation error:", err);
+      }
+    }
+
     document.addEventListener("DOMContentLoaded", () => {
+      initFirebase();
+
+      const loginOverlay  = document.getElementById("loginOverlay");
+      const loginBtn      = document.getElementById("loginBtn");
+      const loginEmail    = document.getElementById("loginEmail");
+      const loginPassword = document.getElementById("loginPassword");
+      const loginError    = document.getElementById("loginError");
+      const loginSpinner  = document.getElementById("loginSpinner");
+      const loadingScreen = document.getElementById("appLoadingScreen");
+
+      // Wire up the login button
+      if (loginBtn) {
+        loginBtn.addEventListener("click", async () => {
+          loginError.classList.add("d-none");
+          loginSpinner.classList.remove("d-none");
+          loginBtn.disabled = true;
+          try {
+            await firebase.auth().signInWithEmailAndPassword(loginEmail.value, loginPassword.value);
+          } catch (err) {
+            loginError.textContent = "Invalid email or password";
+            loginError.classList.remove("d-none");
+            loginSpinner.classList.add("d-none");
+            loginBtn.disabled = false;
+          }
+        });
+      }
+
+      // Auth state is the single gatekeeper for everything
+      firebase.auth().onAuthStateChanged(async (firebaseUser) => {
+        const loadingScreenEl = document.getElementById("appLoadingScreen");
+
+        if (!firebaseUser) {
+          // Not logged in — show login form
+          loadingScreenEl.style.display = "none";
+          const overlay = document.getElementById("loginOverlay");
+          overlay.classList.remove("d-none");
+          overlay.style.display = "flex";
+          currentUser = null;
+          if (loginSpinner) loginSpinner.classList.add("d-none");
+          if (loginBtn) loginBtn.disabled = false;
+          return;
+        }
+
+        try {
+          const userDoc = await firestoreDb.collection("users").doc(firebaseUser.uid).get();
+
+          if (!userDoc.exists) {
+            await firebase.auth().signOut();
+            loadingScreenEl.style.display = "none";
+            const overlay = document.getElementById("loginOverlay");
+            overlay.classList.remove("d-none");
+            overlay.style.display = "flex";
+            return;
+          }
+
+          const userData = userDoc.data();
+          currentUser = {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            displayName: userData.displayName,
+            role: userData.role
+          };
+
+          // CRITICAL: Hide login overlay completely before showing app
+          const overlay = document.getElementById("loginOverlay");
+          overlay.classList.add("d-none");
+          overlay.style.display = "none";
+
+          // CRITICAL: Reset body and all containers to visible state
+          // This fixes the white screen after logout → login
+          document.body.style.zoom = "1";
+          document.body.style.marginLeft = "0";
+          document.body.classList.remove("sidebar-open");
+          document.getElementById("sidebar").classList.remove("open");
+
+          // Show main UI elements
+          document.getElementById("mainAppContainer").classList.remove("d-none");
+          document.getElementById("openSidebarButton").classList.remove("d-none");
+
+          // Make sure all other page containers are hidden except main
+          document.getElementById("barcodeManagerContainer").classList.add("d-none");
+          document.getElementById("dataImportContainer").classList.add("d-none");
+          document.getElementById("savedOperationsContainer").classList.add("d-none");
+          document.getElementById("settingsContainer").classList.add("d-none");
+
+          // Apply role UI, settings, and start listeners
+          applyRoleUI();
+          loadSettings();
+          applySettings();
+
+          // Start assignment listener
+          startAssignmentListener();
+
+          // Run app initialization (loadProgress, updateStatistics etc.)
+          initializeApp();
+
+          // Hide loading screen last
+          loadingScreenEl.style.display = "none";
+
+        } catch (err) {
+          console.error("Auth state error:", err);
+          loadingScreenEl.style.display = "none";
+          const overlay = document.getElementById("loginOverlay");
+          overlay.classList.remove("d-none");
+          overlay.style.display = "flex";
+        }
+      });
+    });
+
+    function initializeApp() {
+      if (appInitialized) return;
+      appInitialized = true;
+
       const barcodeInput = document.getElementById("barcodeInput");
+
+      // Logout logic
+      const logoutBtn = document.getElementById("logoutBtn");
+      if (logoutBtn) {
+        logoutBtn.addEventListener("click", handleLogout);
+      }
 
       // Initialize Bootstrap Tooltips
       const tooltipTriggerList = [].slice.call(
@@ -1334,7 +1833,7 @@
       );
       tooltipTriggerList.map(function (tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl, {
-          trigger: 'hover' // Better for mobile - don't require click to dismiss
+          trigger: 'hover'
         });
       });
 
@@ -1421,8 +1920,6 @@
         localStorage.setItem("timestampColumnVisible", timestampColumnVisible);
         applyTimestampColumnVisibility();
       });
-
-
 
       document.getElementById("modeScan").addEventListener("change", (e) => { 
         if(e.target.checked) inputMode = "scan"; 
@@ -1554,6 +2051,7 @@
       document.getElementById("bmSearchInput").addEventListener("input", (e) => {
         renderBarcodeManagerTable(e.target.value);
       });
+
       function renderSheetList(sheets) {
         const tbody = document.getElementById("sheetSelectTableBody");
         const noSheetsMsg = document.getElementById("noSheetsMessage");
@@ -1698,7 +2196,7 @@
       });
 
       // Initialize Firebase / Firestore and load barcode mappings
-      initFirebase();
+      // initFirebase() already called at start of DOMContentLoaded
       loadBarcodeMappingsFromFirestore();
       subscribeToBarcodeMappings();
 
@@ -1729,7 +2227,6 @@
           : '<i class="bi bi-search"></i> Show Search Column (Remaining)';
       }
 
-
       applyTimestampColumnVisibility();
 
       // Mobile-optimized sidebar toggle
@@ -1756,9 +2253,16 @@
           document.body.classList.remove("sidebar-open");
         }
       });
-    });
+    }
 
-    function handleFileUpload(event) {
+    async function handleFileUpload(event) {
+      if (await hasUnsavedWork()) {
+        const proceed = await showUnsavedWorkWarning();
+        if (!proceed) {
+          event.target.value = "";
+          return;
+        }
+      }
       const file = event.target.files[0];
       if (!file) return;
 
@@ -2349,16 +2853,17 @@
       updateStatistics();
     }
 
-    function clearLocalStorage() {
+    async function clearLocalStorage() {
+      if (await hasUnsavedWork()) {
+        const proceed = await showUnsavedWorkWarning();
+        if (!proceed) return;
+      }
       const confirmation = confirm(
         "Are you sure you want to clear all scanned and remaining products?"
       );
       if (confirmation) {
-        // Clear only the scanned and remaining products
         localStorage.removeItem("scannedProducts");
         localStorage.removeItem("remainingNotes");
-
-        // Reload the page to reset the tables
         location.reload();
       }
     }
@@ -2366,11 +2871,7 @@
 
 
     function exportScannedProducts() {
-      const scannerName = prompt("Please enter the scanner's name:");
-      if (!scannerName) {
-        alert("Scanner name is required!");
-        return;
-      }
+      const scannerName = currentUser ? currentUser.displayName : "Unknown";
 
       // --- Sheet 1: Scanned Products ---
       const scannedData = [];
@@ -2585,7 +3086,7 @@
       }
 
       const operationName = fileName || "Unknown Operation";
-      const auditorName = prompt("Enter Auditor Name (optional):", "Auditor") || "Unknown";
+      const auditorName = currentUser ? currentUser.displayName : "Auditor";
 
       const btn = document.getElementById("saveReviewOperationBtn");
       const originalHtml = btn.innerHTML;
@@ -2601,6 +3102,8 @@
           scannedCount: scannedBarcodes.size,
           remainingCount: remainingProducts.length,
           auditors: [auditorName],
+          createdBy: currentUser ? currentUser.uid : "unknown",
+          createdByName: currentUser ? currentUser.displayName : "Unknown",
           // Payload
           excelData: JSON.stringify(excelData),
           scannedProducts: sessionDataStr,
@@ -2609,6 +3112,7 @@
           editedBarcodes: JSON.stringify(Array.from(editedBarcodes.entries()))
         });
         alert("Review Operation saved online successfully.");
+        await checkForceAssignmentAfterSave();
       } catch (err) {
         console.error("Error saving operation:", err);
         alert("Failed to save operation online. See console for details.");
@@ -2640,9 +3144,15 @@
         return;
       }
       const tbody = document.getElementById("soTableBody");
-      tbody.innerHTML = '<tr><td colspan="6" class="text-center">Loading operations...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center">Loading operations...</td></tr>';
+
       try {
-        const snapshot = await firestoreDb.collection("savedOperations").orderBy("timestamp", "desc").get();
+        // ALL users (admin and normal) see ALL operations
+        const snapshot = await firestoreDb
+          .collection("savedOperations")
+          .orderBy("timestamp", "desc")
+          .get();
+
         savedOperations = [];
         snapshot.forEach(doc => {
           savedOperations.push({ id: doc.id, ...doc.data() });
@@ -2650,7 +3160,7 @@
         renderSavedOperationsTable();
       } catch (err) {
         console.error("Error loading operations:", err);
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Failed to load operations.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger">Failed to load operations.</td></tr>';
       }
     }
 
@@ -2698,12 +3208,28 @@
 
         const tdActions = document.createElement("td");
 
+        // Load button — visible to ALL users
         const loadBtn = document.createElement("button");
         loadBtn.className = "btn btn-sm btn-primary me-1 my-1";
         loadBtn.innerHTML = '<i class="bi bi-cloud-arrow-down"></i> Load';
         loadBtn.addEventListener("click", () => loadOperation(op));
-
         tdActions.appendChild(loadBtn);
+
+        // Extract button — visible to ALL users
+        const extractBtn = document.createElement("button");
+        extractBtn.className = "btn btn-sm btn-success me-1 my-1";
+        extractBtn.innerHTML = '<i class="bi bi-file-earmark-excel"></i> Extract';
+        extractBtn.addEventListener("click", () => exportSingleOperation(op));
+        tdActions.appendChild(extractBtn);
+
+        // Delete button — ADMIN ONLY
+        if (currentUser && currentUser.role === "admin") {
+          const deleteBtn = document.createElement("button");
+          deleteBtn.className = "btn btn-sm btn-danger me-1 my-1";
+          deleteBtn.innerHTML = '<i class="bi bi-trash"></i> Delete';
+          deleteBtn.addEventListener("click", () => deleteOperation(op.id));
+          tdActions.appendChild(deleteBtn);
+        }
 
         tr.appendChild(tdSelect);
         tr.appendChild(tdName);
@@ -2727,18 +3253,20 @@
 
     document.getElementById("soSearchInput").addEventListener("input", renderSavedOperationsTable);
 
-    function loadOperation(op) {
+    async function loadOperation(op) {
+      if (await hasUnsavedWork()) {
+        const proceed = await showUnsavedWorkWarning();
+        if (!proceed) return;
+      }
       if (!confirm(`Are you sure you want to load "${op.operationName}"? Current unsaved progress will be replaced.`)) return;
 
       try {
-        // Backup new settings system
         const keysToPreserve = ["appSettings", "focusEnabled", "voiceMode", "searchColumnVisible", "timestampColumnVisible", "remainingNotesColumnVisible", "ignoreFirstRows"];
         const preservedSettings = {};
         keysToPreserve.forEach(k => preservedSettings[k] = localStorage.getItem(k));
 
         localStorage.clear();
 
-        // Restore settings
         keysToPreserve.forEach(k => {
           if (preservedSettings[k] !== null) localStorage.setItem(k, preservedSettings[k]);
         });
@@ -2746,7 +3274,6 @@
         localStorage.setItem("fileName", op.operationName);
         localStorage.setItem("remainingProducts", op.remainingProducts || "[]");
         
-        // Ensure older payloads default to 'scan' source dynamically
         let scannedPayload = [];
         try {
           scannedPayload = JSON.parse(op.scannedProducts || "[]");
@@ -2760,7 +3287,6 @@
           localStorage.setItem("editedBarcodes", op.editedBarcodes);
         }
 
-        // Let Settings be default or as per device
         alert("Operation loaded successfully! Reloading application...");
         location.reload();
       } catch (err) {
@@ -3090,6 +3616,30 @@
       }
     });
   </script>
+
+  <!-- Unsaved Work Warning Modal -->
+  <div class="modal fade" id="unsavedWorkModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-warning">
+          <h5 class="modal-title">⚠️ Unsaved Work Detected</h5>
+        </div>
+        <div class="modal-body">
+          <p>You have <strong><span id="unsavedCount">0</span> scanned items</strong> that have not been saved to Firestore yet.</p>
+          <p>Please save your current operation before continuing, or cancel to go back.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-success" id="unsavedWorkSaveBtn">
+            <i class="bi bi-cloud-upload"></i> Save Operation First
+          </button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="unsavedWorkCancelBtn">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </body>
 
 </html>
