@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Shipment Tracker — Inventory PWA</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" />
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <style>
+    body {
+      background: #f0f2f5;
+      font-size: 15px;
+      padding-top: 70px;
+    }
+    .navbar {
+      background: linear-gradient(135deg, #0d6efd, #6610f2);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+    }
+    .navbar-brand {
+      font-weight: 800;
+      font-size: 1.25rem;
+      color: #fff !important;
+    }
+    #loadingScreen {
+      position: fixed;
+      inset: 0;
+      background: #f8f9fa;
+      z-index: 99999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .stat-card {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #eee;
+      padding: 1rem;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .stat-card .stat-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #6c757d;
+      margin-bottom: 4px;
+    }
+    .stat-card .stat-value {
+      font-size: 1.6rem;
+      font-weight: 800;
+    }
+    .details-row td {
+      padding: 0 !important;
+      border-top: none !important;
+    }
+    .details-inner {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      padding: 16px;
+      margin: 4px 8px 8px 8px;
+    }
+    .details-table-wrap {
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .fs-small { font-size: 0.82rem; }
+    .table td, .table th { vertical-align: middle; }
+    button, .btn { min-height: 44px; }
+    @media (max-width: 767px) {
+      .filter-row { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loading Screen -->
+  <div id="loadingScreen">
+    <div class="spinner-border text-primary" style="width:3rem;height:3rem;" role="status"></div>
+    <span class="fw-bold text-secondary">Loading Shipment Tracker...</span>
+  </div>
+
+  <!-- Navbar -->
+  <nav class="navbar fixed-top navbar-expand-lg">
+    <div class="container-fluid px-3">
+      <span class="navbar-brand">📦 Shipment Tracker</span>
+      <div class="d-flex align-items-center gap-2 ms-auto flex-wrap">
+        <span class="text-white fw-semibold fs-small" id="trackerNameLabel">👤 Tracker</span>
+        <button id="logoutBtn" class="btn btn-danger btn-sm fw-bold">
+          <i class="bi bi-box-arrow-right"></i> Logout
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content (hidden until auth check passes) -->
+  <div class="container-fluid px-3 pb-5" id="mainContent" style="display:none;">
+
+    <!-- Stats Row -->
+    <div class="row g-3 mt-2 mb-4">
+      <div class="col-4">
+        <div class="stat-card">
+          <div class="stat-label">Total Operations</div>
+          <div class="stat-value text-primary" id="statTotalOps">0</div>
+        </div>
+      </div>
+      <div class="col-4">
+        <div class="stat-card">
+          <div class="stat-label">Total Scanned</div>
+          <div class="stat-value text-success" id="statTotalScanned">0</div>
+        </div>
+      </div>
+      <div class="col-4">
+        <div class="stat-card">
+          <div class="stat-label">Total Remaining</div>
+          <div class="stat-value text-warning" id="statTotalRemaining">0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-body py-3">
+        <div class="row g-2 align-items-end">
+          <div class="col-12 col-md-3">
+            <input type="text" id="filterName" class="form-control"
+              placeholder="Search by operation name...">
+          </div>
+          <div class="col-12 col-md-3">
+            <input type="text" id="filterAuditor" class="form-control"
+              placeholder="Filter by auditor name...">
+          </div>
+          <div class="col-6 col-md-2">
+            <input type="date" id="filterFromDate" class="form-control" title="From date">
+          </div>
+          <div class="col-6 col-md-2">
+            <input type="date" id="filterToDate" class="form-control" title="To date">
+          </div>
+          <div class="col-12 col-md-2">
+            <button id="clearFiltersBtn" class="btn btn-outline-secondary w-100">
+              <i class="bi bi-x-circle"></i> Clear Filters
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Operations Table -->
+    <div class="card shadow-sm border-0">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-bordered table-hover mb-0">
+            <thead class="table-dark">
+              <tr>
+                <th>Operation Name</th>
+                <th>Auditors</th>
+                <th>Date &amp; Time</th>
+                <th class="text-center">Total</th>
+                <th class="text-center">Scanned</th>
+                <th class="text-center">Remaining</th>
+                <th style="min-width:180px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="opsTableBody">
+              <tr><td colspan="7" class="text-center text-muted py-4">
+                <span class="spinner-border spinner-border-sm me-2"></span>Loading operations...
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /mainContent -->
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // ─── Firebase Init ─────────────────────────────────────────────────────────
+    const firebaseConfig = {
+      apiKey: "AIzaSyDRE4VFqnr5Y_1AlaPUDcGoZ7njAOmL0T0",
+      authDomain: "productinventorypwa.firebaseapp.com",
+      projectId: "productinventorypwa",
+      storageBucket: "productinventorypwa.firebasestorage.app",
+      messagingSenderId: "87116351333",
+      appId: "1:87116351333:web:88a611c8352c0103d1038c"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    let currentTracker = null;
+    let allOperations = [];
+
+    // ─── Auth Guard ────────────────────────────────────────────────────────────
+    auth.onAuthStateChanged(async (firebaseUser) => {
+      if (!firebaseUser) {
+        window.location.href = "index.html";
+        return;
+      }
+      try {
+        const doc = await db.collection("users").doc(firebaseUser.uid).get();
+        if (!doc.exists || doc.data().role !== "tracker") {
+          window.location.href = "index.html";
+          return;
+        }
+        const data = doc.data();
+        currentTracker = {
+          uid: firebaseUser.uid,
+          email: data.email,
+          displayName: data.displayName,
+          phone: data.phone || "",
+          role: "tracker"
+        };
+        document.getElementById("trackerNameLabel").textContent = "👤 " + currentTracker.displayName;
+      } catch (err) {
+        console.error("Auth guard error:", err);
+        window.location.href = "index.html";
+        return;
+      }
+
+      document.getElementById("loadingScreen").style.display = "none";
+      document.getElementById("mainContent").style.display = "";
+      loadOperations();
+    });
+
+    // ─── Logout ────────────────────────────────────────────────────────────────
+    document.getElementById("logoutBtn").addEventListener("click", async () => {
+      await auth.signOut();
+      window.location.href = "index.html";
+    });
+
+    // ─── Load All Operations ───────────────────────────────────────────────────
+    async function loadOperations() {
+      try {
+        const snapshot = await db.collection("savedOperations")
+          .orderBy("timestamp", "desc")
+          .get();
+        allOperations = [];
+        snapshot.forEach(doc => allOperations.push({ id: doc.id, ...doc.data() }));
+        applyFilters();
+      } catch (err) {
+        document.getElementById("opsTableBody").innerHTML =
+          `<tr><td colspan="7" class="text-center text-danger py-4">Failed to load operations: ${escHtml(err.message)}</td></tr>`;
+      }
+    }
+
+    // ─── Filtering ─────────────────────────────────────────────────────────────
+    function applyFilters() {
+      const nameFilter = document.getElementById("filterName").value.toLowerCase().trim();
+      const auditorFilter = document.getElementById("filterAuditor").value.toLowerCase().trim();
+      const fromDate = document.getElementById("filterFromDate").value;
+      const toDate = document.getElementById("filterToDate").value;
+
+      let filtered = allOperations;
+
+      if (nameFilter) {
+        filtered = filtered.filter(op =>
+          (op.operationName || "").toLowerCase().includes(nameFilter)
+        );
+      }
+      if (auditorFilter) {
+        filtered = filtered.filter(op =>
+          (op.auditors || []).some(a => a.toLowerCase().includes(auditorFilter)) ||
+          (op.createdByName || "").toLowerCase().includes(auditorFilter)
+        );
+      }
+      if (fromDate) {
+        const from = new Date(fromDate).getTime();
+        filtered = filtered.filter(op => op.timestamp >= from);
+      }
+      if (toDate) {
+        const to = new Date(toDate).getTime() + 86400000;
+        filtered = filtered.filter(op => op.timestamp <= to);
+      }
+
+      renderOperationsTable(filtered);
+      updateStatsCards(filtered);
+    }
+
+    ["filterName", "filterAuditor", "filterFromDate", "filterToDate"].forEach(id => {
+      document.getElementById(id).addEventListener("input", applyFilters);
+    });
+
+    document.getElementById("clearFiltersBtn").addEventListener("click", () => {
+      document.getElementById("filterName").value = "";
+      document.getElementById("filterAuditor").value = "";
+      document.getElementById("filterFromDate").value = "";
+      document.getElementById("filterToDate").value = "";
+      applyFilters();
+    });
+
+    // ─── Stats Cards ───────────────────────────────────────────────────────────
+    function updateStatsCards(ops) {
+      document.getElementById("statTotalOps").textContent = ops.length;
+      document.getElementById("statTotalScanned").textContent =
+        ops.reduce((s, op) => s + (op.scannedCount || 0), 0);
+      document.getElementById("statTotalRemaining").textContent =
+        ops.reduce((s, op) => s + (op.remainingCount || 0), 0);
+    }
+
+    // ─── Render Table ──────────────────────────────────────────────────────────
+    function renderOperationsTable(ops) {
+      const tbody = document.getElementById("opsTableBody");
+      tbody.innerHTML = "";
+
+      if (!ops || ops.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No operations found.</td></tr>`;
+        return;
+      }
+
+      ops.forEach(op => {
+        const dateStr = op.timestamp ? new Date(op.timestamp).toLocaleString() : "—";
+        const auditors = (op.auditors && op.auditors.length) ? op.auditors.join(", ") : "—";
+        const rowId = "op-row-" + op.id;
+        const detailsId = "op-details-" + op.id;
+
+        // Main row
+        const tr = document.createElement("tr");
+        tr.id = rowId;
+        tr.innerHTML = `
+          <td class="fw-semibold">${escHtml(op.operationName || "—")}</td>
+          <td class="fs-small">${escHtml(auditors)}</td>
+          <td class="fs-small">${dateStr}</td>
+          <td class="text-center">${op.totalProducts || 0}</td>
+          <td class="text-center text-success fw-bold">${op.scannedCount || 0}</td>
+          <td class="text-center fw-bold" style="color:#fd7e14;">${op.remainingCount || 0}</td>
+          <td>
+            <button class="btn btn-sm btn-success me-1 my-1 load-btn" data-id="${op.id}">
+              <i class="bi bi-cloud-arrow-down"></i> Load
+            </button>
+            <button class="btn btn-sm btn-outline-secondary my-1 details-btn" data-id="${op.id}" data-target="${detailsId}">
+              ▶ Details
+            </button>
+          </td>`;
+        tbody.appendChild(tr);
+
+        // Expandable details row (hidden by default)
+        const detailsTr = document.createElement("tr");
+        detailsTr.id = detailsId;
+        detailsTr.className = "details-row d-none";
+        const td = document.createElement("td");
+        td.colSpan = 7;
+        td.innerHTML = buildDetailsHTML(op);
+        detailsTr.appendChild(td);
+        tbody.appendChild(detailsTr);
+      });
+
+      // Wire Load buttons
+      tbody.querySelectorAll(".load-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const op = allOperations.find(o => o.id === btn.dataset.id);
+          if (op) loadOperation(op);
+        });
+      });
+
+      // Wire Details toggle buttons
+      tbody.querySelectorAll(".details-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const target = document.getElementById(btn.dataset.target);
+          if (!target) return;
+          const isHidden = target.classList.contains("d-none");
+          target.classList.toggle("d-none", !isHidden);
+          btn.innerHTML = isHidden ? "▼ Details" : "▶ Details";
+        });
+      });
+    }
+
+    // ─── Build expandable details HTML ────────────────────────────────────────
+    function buildDetailsHTML(op) {
+      const parsedExcel = safeParseJson(op.excelData, []);
+      const parsedScanned = safeParseJson(op.scannedProducts, []);
+      const parsedRemaining = safeParseJson(op.remainingProducts, []);
+      const headers = parsedExcel[0] || [];
+
+      const total = op.totalProducts || 0;
+      const scanned = op.scannedCount || 0;
+      const pct = total > 0 ? Math.round((scanned / total) * 100) : 0;
+
+      // Progress bar
+      let html = `<div class="details-inner">
+        <div class="mb-3">
+          <div class="d-flex justify-content-between small fw-bold mb-1">
+            <span class="text-success">Scanned: ${scanned} / ${total}</span>
+            <span>${pct}%</span>
+          </div>
+          <div class="progress" style="height:10px;border-radius:50px;">
+            <div class="progress-bar bg-success" style="width:${pct}%;border-radius:50px;"></div>
+          </div>
+        </div>`;
+
+      // Scanned table
+      html += `<h6 class="fw-bold text-success mb-2"><i class="bi bi-check-circle"></i> Scanned Products (${parsedScanned.length})</h6>`;
+      if (parsedScanned.length === 0) {
+        html += `<p class="text-muted small">No scanned products.</p>`;
+      } else {
+        html += `<div class="details-table-wrap mb-3"><table class="table table-sm table-bordered table-striped mb-0">
+          <thead class="table-dark"><tr>`;
+        headers.forEach(h => { html += `<th>${escHtml(String(h))}</th>`; });
+        html += `<th>Scan Time</th><th>Source</th></tr></thead><tbody>`;
+        parsedScanned.forEach(sp => {
+          html += `<tr>`;
+          const rowData = sp.data || [];
+          headers.forEach((_, i) => {
+            html += `<td class="fs-small">${escHtml(String(rowData[i] !== undefined ? rowData[i] : ""))}</td>`;
+          });
+          html += `<td class="fs-small">${escHtml(sp.timestamp || "")}</td>`;
+          html += `<td class="fs-small">${escHtml(sp.source || "scan")}</td>`;
+          html += `</tr>`;
+        });
+        html += `</tbody></table></div>`;
+      }
+
+      // Remaining table
+      html += `<h6 class="fw-bold text-warning mb-2"><i class="bi bi-hourglass-split"></i> Remaining Products (${parsedRemaining.length})</h6>`;
+      if (parsedRemaining.length === 0) {
+        html += `<p class="text-muted small">No remaining products.</p>`;
+      } else {
+        html += `<div class="details-table-wrap"><table class="table table-sm table-bordered table-striped mb-0">
+          <thead class="table-dark"><tr>`;
+        headers.forEach(h => { html += `<th>${escHtml(String(h))}</th>`; });
+        html += `</tr></thead><tbody>`;
+        parsedRemaining.forEach(row => {
+          html += `<tr>`;
+          (Array.isArray(row) ? row : []).forEach(cell => {
+            html += `<td class="fs-small">${escHtml(String(cell !== null && cell !== undefined ? cell : ""))}</td>`;
+          });
+          html += `</tr>`;
+        });
+        html += `</tbody></table></div>`;
+      }
+
+      html += `</div>`;
+      return html;
+    }
+
+    // ─── Load Operation → index.html (tracker mode) ───────────────────────────
+    function loadOperation(op) {
+      if (!confirm(`Load "${op.operationName}" into the inventory app?`)) return;
+
+      const keysToPreserve = ["appSettings","focusEnabled","voiceMode","searchColumnVisible",
+        "timestampColumnVisible","remainingNotesColumnVisible","ignoreFirstRows"];
+      const saved = {};
+      keysToPreserve.forEach(k => saved[k] = localStorage.getItem(k));
+      localStorage.clear();
+      keysToPreserve.forEach(k => { if (saved[k] !== null) localStorage.setItem(k, saved[k]); });
+
+      localStorage.setItem("excelData",          op.excelData          || "[]");
+      localStorage.setItem("fileName",           op.operationName);
+      localStorage.setItem("remainingProducts",  op.remainingProducts  || "[]");
+      localStorage.setItem("remainingNotes",     op.remainingNotes     || "{}");
+      let sp = [];
+      try { sp = JSON.parse(op.scannedProducts || "[]"); sp.forEach(i => { i.source = i.source || "scan"; }); } catch(_) {}
+      localStorage.setItem("scannedProducts",    JSON.stringify(sp));
+      if (op.editedBarcodes) localStorage.setItem("editedBarcodes", op.editedBarcodes);
+
+      // Tracker mode flag — forces search mode + shows remaining in index.html
+      localStorage.setItem("trackerMode", "true");
+
+      window.location.href = "index.html";
+    }
+
+    // ─── Utilities ────────────────────────────────────────────────────────────
+    function escHtml(str) {
+      return String(str)
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    }
+    function safeParseJson(str, fallback) {
+      try { return JSON.parse(str || JSON.stringify(fallback)); }
+      catch (_) { return fallback; }
+    }
+  </script>
+</body>
+</html>

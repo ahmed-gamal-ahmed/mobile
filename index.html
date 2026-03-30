@@ -1810,6 +1810,12 @@
             role: userData.role
           };
 
+          // Tracker users belong in tracker.html — redirect immediately
+          if (currentUser.role === "tracker") {
+            window.location.href = "tracker.html";
+            return;
+          }
+
           // CRITICAL: Hide login overlay completely before showing app
           const overlay = document.getElementById("loginOverlay");
           overlay.classList.add("d-none");
@@ -2248,6 +2254,18 @@
 
       // Load previous progress if available
       loadProgress();
+
+      // Handle trackerMode flag — set by tracker.html when loading an operation
+      if (localStorage.getItem("trackerMode") === "true") {
+        localStorage.removeItem("trackerMode");
+        // Force search mode ON
+        inputMode = "search";
+        const modeSearch = document.getElementById("modeSearch");
+        if (modeSearch) modeSearch.checked = true;
+        // Always show remaining products section
+        const remainingSection = document.getElementById("remainingProductsSection");
+        if (remainingSection) remainingSection.classList.remove("d-none");
+      }
 
       // Initialize voice button state
       updateVoiceButtonText();
