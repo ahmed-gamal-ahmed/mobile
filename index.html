@@ -731,7 +731,20 @@
     <div class="card shadow-sm border-0 mb-4">
       <div class="card-header bg-dark text-white rounded-top"><i class="bi bi-sliders"></i> Feature Toggles & UI Elements</div>
       <div class="card-body bg-white rounded-bottom">
-        
+
+        <h6 class="mb-3 border-bottom pb-2 fw-bold text-primary">Import Mode</h6>
+        <div class="form-check form-switch mb-4">
+          <input class="form-check-input" type="checkbox" id="columnFilterToggle">
+          <label class="form-check-label fw-bold" for="columnFilterToggle">
+            Filter Columns on Import
+          </label>
+          <div class="form-text text-muted small mt-1">
+            When ON — imports only 5 columns: Description, Bar code, Work quantity,
+            Item number, Location. All other columns are ignored.<br>
+            When OFF — imports all columns from the file as-is.
+          </div>
+        </div>
+
         <h6 class="mb-3 border-bottom pb-2 fw-bold text-primary">Column Visibility</h6>
         <div id="columnToggleButtons" class="d-flex flex-wrap gap-2 mb-3"></div>
         <div class="d-flex flex-column gap-2 mb-4">
@@ -825,7 +838,8 @@
       tableDensity: "normal", // compact, normal, large
       scale: 1, // 0.8 to 1.5
       zebra: true,
-      language: "en"
+      language: "en",
+      columnFilterEnabled: false  // default OFF — import all columns
     };
 
     const baseTranslations = {
@@ -1027,7 +1041,10 @@
       if (langElem) langElem.value = appSettings.language;
       const langDisp = document.getElementById("languageDisplay");
       if (langDisp) langDisp.textContent = appSettings.language === "ar" ? "Arabic" : "English";
-      
+
+      const columnFilterToggle = document.getElementById("columnFilterToggle");
+      if (columnFilterToggle) columnFilterToggle.checked = appSettings.columnFilterEnabled || false;
+
       applySettings();
     }
 
@@ -1074,7 +1091,8 @@
           tableDensity: "normal",
           scale: 1,
           zebra: true,
-          language: "en"
+          language: "en",
+          columnFilterEnabled: false
         };
         saveSettings();
         loadSettings();
@@ -2010,6 +2028,11 @@
         saveSettings();
       });
 
+      document.getElementById("columnFilterToggle").addEventListener("change", (e) => {
+        appSettings.columnFilterEnabled = e.target.checked;
+        saveSettings();
+      });
+
       document.getElementById("resetSettingsBtn").addEventListener("click", resetSettings);
 
       document.getElementById("navMainAppBtn").addEventListener("click", () => {
@@ -2330,16 +2353,92 @@
       return row.map(cell => (cell === null || cell === undefined ? "" : cell.toString().trim()));
     }
 
+    const REQUIRED_COLUMNS = [
+      "description",
+      "bar code",
+      "work quantity",
+      "item number",
+      "location"
+    ];
+
+    const COLUMN_DISPLAY_NAMES = [
+      "Description",
+      "Bar code",
+      "Work quantity",
+      "Item number",
+      "Location"
+    ];
+
+    function filterToRequiredColumns(parsedData) {
+      if (!parsedData || parsedData.length === 0) return [];
+
+      // Find header row and normalize
+      const headerRow = parsedData[0];
+      const normalizedHeaders = headerRow.map(h =>
+        (h === null || h === undefined ? "" : h.toString().trim().toLowerCase())
+      );
+
+      // Find index of each required column in the file
+      const columnIndexMap = REQUIRED_COLUMNS.map(colName =>
+        normalizedHeaders.findIndex(h => h === colName)
+      );
+
+      // Build filtered header row — only include found columns
+      const filteredHeaders = [];
+      const validColumnIndices = [];
+
+      REQUIRED_COLUMNS.forEach((colName, i) => {
+        if (columnIndexMap[i] !== -1) {
+          filteredHeaders.push(COLUMN_DISPLAY_NAMES[i]);
+          validColumnIndices.push({ requiredIndex: i, fileIndex: columnIndexMap[i] });
+        }
+      });
+
+      if (filteredHeaders.length === 0) return [];
+
+      // Build filtered data rows
+      const filteredData = [filteredHeaders];
+      for (let rowIdx = 1; rowIdx < parsedData.length; rowIdx++) {
+        const originalRow = parsedData[rowIdx];
+        const filteredRow = validColumnIndices.map(({ fileIndex }) => {
+          const cell = originalRow[fileIndex];
+          return cell === null || cell === undefined ? "" : cell;
+        });
+        filteredData.push(filteredRow);
+      }
+
+      return filteredData;
+    }
+
     function processImportedData(parsedData) {
       const ignoreCheckbox = document.getElementById("ignoreFirstRowsCheckbox");
       if (ignoreCheckbox && ignoreCheckbox.checked) {
         parsedData = parsedData.slice(3);
       }
 
-      parsedData = parsedData.filter(row => row.some(cell => cell !== null && cell !== undefined && cell !== ''));
+      // Remove empty rows
+      parsedData = parsedData.filter(row =>
+        row.some(cell => cell !== null && cell !== undefined && cell !== '')
+      );
+
       if (parsedData.length < 1) {
         alert("The file appears to be empty.");
         return;
+      }
+
+      // Apply column filter only if the setting is enabled
+      if (appSettings.columnFilterEnabled) {
+        parsedData = filterToRequiredColumns(parsedData);
+
+        if (parsedData.length < 1) {
+          alert(
+            "No matching columns found in the file.\n\n" +
+            "Please ensure the file contains at least one of:\n" +
+            "Description, Bar code, Work quantity, Item number, Location.\n\n" +
+            "Or turn OFF 'Filter Columns on Import' in Settings to import all columns."
+          );
+          return;
+        }
       }
 
       excelData = parsedData;
@@ -2792,7 +2891,11 @@
         moveToScannedButton.textContent = "Move";
         moveToScannedButton.className = "btn btn-success btn-sm action-column";
         moveToScannedButton.addEventListener("click", () => {
-          let primaryBarcode = String(row[0] || "").split("-")[0].trim();
+          // When column filter is ON: Bar code is always at index 1
+          // When column filter is OFF: fall back to index 0
+          let primaryBarcode = appSettings.columnFilterEnabled
+            ? String(row[1] || row[0] || "").split("-")[0].trim()
+            : String(row[0] || "").split("-")[0].trim();
           if (primaryBarcode) {
             const input = document.getElementById("barcodeInput");
             if (input) {
