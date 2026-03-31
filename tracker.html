@@ -105,6 +105,9 @@
       <span class="navbar-brand">📦 Shipment Tracker</span>
       <div class="d-flex align-items-center gap-2 ms-auto flex-wrap">
         <span class="text-white fw-semibold fs-small" id="trackerNameLabel">👤 Tracker</span>
+        <a href="index.html?home=true" class="btn btn-outline-light btn-sm fw-bold">
+          <i class="bi bi-arrow-left"></i> Back to App
+        </a>
         <a href="settings.html" class="btn btn-outline-light btn-sm fw-bold">
           <i class="bi bi-gear"></i> Settings
         </a>
@@ -222,9 +225,9 @@
       try {
         const doc = await db.collection("users").doc(firebaseUser.uid).get();
         const role = doc.exists ? (doc.data().role || "").toLowerCase() : "";
-        if (role !== "tracker") {
+        if (role !== "tracker" && role !== "admin") {
           await auth.signOut();
-          alert("Access Denied: Tracker privileges required.");
+          alert("Access Denied: Tracker or Admin privileges required.");
           window.location.href = "index.html";
           return;
         }

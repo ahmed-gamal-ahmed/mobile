@@ -414,11 +414,16 @@
     <div class="mb-3 mt-4 pt-3 border-top border-secondary">
       <div class="text-center text-white mb-2 fw-bold" id="sidebarUserLabel">👤 Unknown</div>
       <button id="logoutBtn" class="btn btn-danger w-100 fw-bold" title="Logout">
+        <span id="logoutSpinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
         <i class="bi bi-box-arrow-right"></i> Logout
       </button>
       <button id="adminDashboardBtn" class="btn btn-warning w-100 fw-bold mt-2 d-none" title="Admin Dashboard"
-        onclick="window.open('admin.html', '_blank')">
+        onclick="window.open('admin.html', '_self')">
         <i class="bi bi-speedometer2"></i> Admin Dashboard
+      </button>
+      <button id="shipmentTrackerBtn" class="btn btn-info w-100 fw-bold mt-2 d-none" title="Shipment Tracker"
+        onclick="window.open('tracker.html', '_self')">
+        <i class="bi bi-box-seam"></i> Shipment Tracker
       </button>
     </div>
 
@@ -429,6 +434,12 @@
 
   <!-- Make container fluid for better mobile layout -->
   <div class="container responsive-container pt-3 mt-5 d-none" id="mainAppContainer">
+    <div id="sessionRestoredBanner" class="alert alert-info alert-dismissible d-none" role="alert">
+      <i class="bi bi-cloud-download"></i>
+      <strong>Progress restored from your last session.</strong>
+      <span id="sessionRestoredDetails" class="ms-1"></span>
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
     <div id="assignmentBanner" class="alert alert-success alert-dismissible d-none shadow-sm" role="alert"
       style="cursor:pointer; border-left: 5px solid #198754;">
       📦 <strong>New inventory assigned by admin</strong> — Click here to load it.
@@ -1163,12 +1174,89 @@
       });
     }
 
+    async function saveSessionToFirestore() {
+      if (!firestoreDb || !currentUser) return;
+      if (!excelData || excelData.length === 0) return;
+
+      try {
+        const sessionData = {
+          lastSession: {
+            fileName: fileName || "Product Inventory",
+            excelData: localStorage.getItem("excelData") || "[]",
+            scannedProducts: localStorage.getItem("scannedProducts") || "[]",
+            remainingProducts: localStorage.getItem("remainingProducts") || "[]",
+            remainingNotes: localStorage.getItem("remainingNotes") || "{}",
+            savedAt: Date.now()
+          }
+        };
+
+        await firestoreDb
+          .collection("users")
+          .doc(currentUser.uid)
+          .update(sessionData);
+
+        console.log("Session saved to Firestore on logout.");
+      } catch (err) {
+        console.error("Failed to save session to Firestore:", err);
+      }
+    }
+
+    async function restoreSessionFromFirestore() {
+      if (!firestoreDb || !currentUser) return false;
+
+      try {
+        const userDoc = await firestoreDb
+          .collection("users")
+          .doc(currentUser.uid)
+          .get();
+
+        if (!userDoc.exists) return false;
+
+        const userData = userDoc.data();
+        const lastSession = userData.lastSession;
+
+        // No saved session exists
+        if (!lastSession || !lastSession.excelData || lastSession.excelData === "[]") return false;
+
+        // Check if localStorage already has data from this session
+        // If localStorage already has excelData, it means the user
+        // refreshed the page — don't overwrite with Firestore data
+        const localExcelData = localStorage.getItem("excelData");
+        if (localExcelData && localExcelData !== "[]") {
+          console.log("LocalStorage already has data — skipping Firestore restore.");
+          return false;
+        }
+
+        // Restore all session data to localStorage
+        localStorage.setItem("excelData", lastSession.excelData || "[]");
+        localStorage.setItem("fileName", lastSession.fileName || "Product Inventory");
+        localStorage.setItem("scannedProducts", lastSession.scannedProducts || "[]");
+        localStorage.setItem("remainingProducts", lastSession.remainingProducts || "[]");
+        localStorage.setItem("remainingNotes", lastSession.remainingNotes || "{}");
+
+        console.log("Session restored from Firestore.");
+        return true;
+
+      } catch (err) {
+        console.error("Failed to restore session from Firestore:", err);
+        return false;
+      }
+    }
+
     async function handleLogout() {
+      const logoutBtn = document.getElementById("logoutBtn");
+      const logoutSpinner = document.getElementById("logoutSpinner");
+      if (logoutBtn) logoutBtn.disabled = true;
+      if (logoutSpinner) logoutSpinner.classList.remove("d-none");
+
       // Stop assignment listener
       if (assignmentUnsubscribe) {
         assignmentUnsubscribe();
         assignmentUnsubscribe = null;
       }
+
+      // SAVE SESSION BEFORE LOGOUT — must happen before clearing anything
+      await saveSessionToFirestore();
 
       try {
         await firebase.auth().signOut();
@@ -1179,10 +1267,12 @@
       // Clear currentUser
       currentUser = null;
 
-      // Clear scan progress from localStorage only
+      // Clear scan progress from localStorage
       localStorage.removeItem("scannedProducts");
       localStorage.removeItem("remainingProducts");
       localStorage.removeItem("remainingNotes");
+      localStorage.removeItem("excelData");
+      localStorage.removeItem("fileName");
 
       // Reset in-memory state
       scannedBarcodes.clear();
@@ -1252,12 +1342,24 @@
       // Admin dashboard button — admin only
       // Use classList so we properly override Bootstrap's d-none class
       const adminDashboardBtn = document.getElementById("adminDashboardBtn");
+      const shipmentTrackerBtn = document.getElementById("shipmentTrackerBtn");
+
       if (adminDashboardBtn) {
         if (isAdmin) {
           adminDashboardBtn.classList.remove("d-none");
           adminDashboardBtn.style.display = "";
         } else {
           adminDashboardBtn.classList.add("d-none");
+        }
+      }
+
+      if (shipmentTrackerBtn) {
+        const isTracker = currentUser && currentUser.role === "tracker";
+        if (isAdmin || isTracker) {
+          shipmentTrackerBtn.classList.remove("d-none");
+          shipmentTrackerBtn.style.display = "";
+        } else {
+          shipmentTrackerBtn.classList.add("d-none");
         }
       }
 
@@ -1573,9 +1675,11 @@
             role: (userData.role || "").toLowerCase()
           };
 
-          // Tracker users belong in tracker.html — redirect immediately
-          if (currentUser.role === "tracker") {
-            window.location.href = "tracker.html";
+          // Both Admin and Tracker can use index.html
+          if (currentUser.role !== "admin" && currentUser.role !== "tracker") {
+            await firebase.auth().signOut();
+            alert("Access Denied: Unauthorized role.");
+            window.location.reload();
             return;
           }
 
@@ -1613,11 +1717,54 @@
           // Start assignment listener
           startAssignmentListener();
 
+          // Restore session from Firestore if localStorage is empty
+          let wasRestored = false;
+          if (currentUser.role !== "tracker") {
+            wasRestored = await restoreSessionFromFirestore();
+          }
+
           // Run app initialization (loadProgress, updateStatistics etc.)
           initializeApp();
 
+          // Show restoration banner if data was restored
+          if (wasRestored) {
+            const banner = document.getElementById("sessionRestoredBanner");
+            const detailsSpan = document.getElementById("sessionRestoredDetails");
+
+            // Show file name and scanned count in banner
+            try {
+              const restoredFileName = localStorage.getItem("fileName") || "Unknown file";
+              const restoredScanned = JSON.parse(
+                localStorage.getItem("scannedProducts") || "[]"
+              ).length;
+              detailsSpan.textContent =
+                `File: "${restoredFileName}" — ${restoredScanned} scanned item(s).`;
+            } catch (e) {
+              detailsSpan.textContent = "";
+            }
+
+            banner.classList.remove("d-none");
+
+            // Auto-hide after 6 seconds
+            setTimeout(() => {
+              banner.classList.add("d-none");
+            }, 6000);
+          }
+
           // Hide loading screen last
           loadingScreenEl.style.display = "none";
+
+          // --- Default Redirects on Entry (unless coming 'home' via explicit link) ---
+          const isHomeShortcut = window.location.search.includes("home=true");
+          if (!isHomeShortcut) {
+            if (currentUser.role === "admin") {
+              window.location.href = "admin.html";
+              return;
+            } else if (currentUser.role === "tracker") {
+              window.location.href = "tracker.html";
+              return;
+            }
+          }
 
         } catch (err) {
           console.error("Auth state error:", err);

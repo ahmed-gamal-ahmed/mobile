@@ -1,4 +1,4 @@
-const CACHE_NAME = "product-inventory-cache-v6";
+const CACHE_NAME = "product-inventory-cache-v8";
 const APP_PREFIX = "product-inventory-";
 
 // Include all icons and critical assets
