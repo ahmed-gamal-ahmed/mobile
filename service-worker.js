@@ -1,4 +1,4 @@
-const CACHE_NAME = "product-inventory-cache-v2";
+const CACHE_NAME = "product-inventory-cache-v6";
 const APP_PREFIX = "product-inventory-";
 
 // Include all icons and critical assets
@@ -23,10 +23,10 @@ const urlsToCache = [
 // Install event - cache assets with improved error handling for mobile networks
 self.addEventListener("install", (event) => {
   console.log('Service Worker: Installing');
-  
+
   // Skip waiting to ensure the new service worker activates immediately
   self.skipWaiting();
-  
+
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
@@ -45,7 +45,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("fetch", (event) => {
   // Don't handle non-GET requests
   if (event.request.method !== 'GET') return;
-  
+
   const url = new URL(event.request.url);
 
   // Bypass cache for unsupported schemes (like chrome-extension://)
@@ -59,7 +59,7 @@ self.addEventListener("fetch", (event) => {
   ) {
     return; // Let the browser handle it entirely
   }
-  
+
   // For other API requests or AJAX calls - try network first
   if (event.request.headers.get('accept')?.includes('application/json')) {
     return event.respondWith(
@@ -110,24 +110,24 @@ self.addEventListener("fetch", (event) => {
               // Network failed, but we already have cached response
               console.log('Network failed, serving from cache');
             });
-            
+
           // Start the fetch but return cached response immediately
           fetchPromise; // Don't wait for it
           return cachedResponse;
         }
-        
+
         // If not in cache, fetch from network and cache the response
         return fetch(event.request)
           .then(response => {
             if (!response || response.status !== 200 || response.type !== 'basic') {
               return response;
             }
-            
+
             const responseToCache = response.clone();
             caches.open(CACHE_NAME).then(cache => {
               cache.put(event.request, responseToCache);
             });
-            
+
             return response;
           });
       })
@@ -137,10 +137,10 @@ self.addEventListener("fetch", (event) => {
 // Activate event - clean up old caches, take control immediately for better mobile experience
 self.addEventListener("activate", (event) => {
   console.log('Service Worker: Activated');
-  
+
   // Take control of clients immediately
   event.waitUntil(clients.claim());
-  
+
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(

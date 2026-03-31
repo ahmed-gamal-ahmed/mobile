@@ -9,11 +9,21 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <script src="app-settings.js"></script>
+
   <style>
+    html {
+      zoom: var(--app-scale, 1);
+    }
     body {
+      font-family: 'Cairo', system-ui, -apple-system, sans-serif;
       background: #f0f2f5;
-      font-size: 15px;
+      font-size: var(--app-font-size, 15px);
       padding-top: 70px;
+      transition: font-size 0.3s ease;
     }
     .navbar {
       background: linear-gradient(135deg, #0d6efd, #6610f2);
@@ -70,7 +80,11 @@
       overflow-y: auto;
     }
     .fs-small { font-size: 0.82rem; }
-    .table td, .table th { vertical-align: middle; }
+    .table td, .table th {
+      vertical-align: middle;
+      padding: var(--app-table-density, 0.5rem) 0.5rem !important;
+      transition: padding 0.3s ease;
+    }
     button, .btn { min-height: 44px; }
     @media (max-width: 767px) {
       .filter-row { flex-direction: column; }
@@ -91,6 +105,9 @@
       <span class="navbar-brand">📦 Shipment Tracker</span>
       <div class="d-flex align-items-center gap-2 ms-auto flex-wrap">
         <span class="text-white fw-semibold fs-small" id="trackerNameLabel">👤 Tracker</span>
+        <a href="settings.html" class="btn btn-outline-light btn-sm fw-bold">
+          <i class="bi bi-gear"></i> Settings
+        </a>
         <button id="logoutBtn" class="btn btn-danger btn-sm fw-bold">
           <i class="bi bi-box-arrow-right"></i> Logout
         </button>
@@ -204,7 +221,10 @@
       }
       try {
         const doc = await db.collection("users").doc(firebaseUser.uid).get();
-        if (!doc.exists || doc.data().role !== "tracker") {
+        const role = doc.exists ? (doc.data().role || "").toLowerCase() : "";
+        if (role !== "tracker") {
+          await auth.signOut();
+          alert("Access Denied: Tracker privileges required.");
           window.location.href = "index.html";
           return;
         }
@@ -222,6 +242,10 @@
         window.location.href = "index.html";
         return;
       }
+
+      // LOAD PREFERENCES
+      await AppSettings.loadFromFirestore(db, firebaseUser.uid);
+      AppSettings.applyTranslations();
 
       document.getElementById("loadingScreen").style.display = "none";
       document.getElementById("mainContent").style.display = "";

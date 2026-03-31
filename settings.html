@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Settings — Inventory PWA</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" />
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <script src="app-settings.js"></script>
+
+  <style>
+    html {
+      zoom: var(--app-scale);
+    }
+    body {
+      font-family: 'Cairo', system-ui, -apple-system, sans-serif;
+      font-size: var(--app-font-size);
+      background: linear-gradient(135deg, #0d1b2a 0%, #1b2a4a 100%);
+      min-height: 100vh;
+      padding-top: 70px;
+      padding-bottom: 60px;
+    }
+    .table td, .table th {
+      padding: var(--app-table-density) 0.75rem !important;
+    }
+
+    /* ── Navbar ── */
+    .navbar {
+      background: linear-gradient(135deg, #0d6efd, #6610f2);
+      box-shadow: 0 2px 20px rgba(13, 110, 253, 0.4);
+    }
+    .navbar-brand {
+      font-weight: 800;
+      font-size: 1.2rem;
+      color: #fff !important;
+      letter-spacing: 0.5px;
+    }
+
+    /* ── Page Hero ── */
+    .settings-hero {
+      text-align: center;
+      padding: 2rem 0 1.5rem;
+      color: #fff;
+    }
+    .settings-hero h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 0.25rem;
+    }
+    .settings-hero p {
+      opacity: 0.7;
+      font-size: 0.95rem;
+    }
+
+    /* ── Section Cards ── */
+    .settings-card {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .settings-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+    .settings-card .card-section-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #a0cfff;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .settings-card .card-section-title i {
+      font-size: 1rem;
+    }
+
+    /* ── Setting Rows ── */
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+      color: #fff;
+      gap: 16px;
+    }
+    .setting-row:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+    .setting-row:first-child {
+      padding-top: 0;
+    }
+    .setting-label {
+      font-weight: 600;
+      font-size: 0.95rem;
+      flex: 1;
+    }
+    .setting-description {
+      font-size: 0.78rem;
+      opacity: 0.6;
+      margin-top: 2px;
+    }
+    .setting-value-badge {
+      background: rgba(13, 110, 253, 0.3);
+      border: 1px solid rgba(13, 110, 253, 0.5);
+      color: #7eb8ff;
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 3px 12px;
+      border-radius: 99px;
+      white-space: nowrap;
+      min-width: 60px;
+      text-align: center;
+    }
+
+    /* ── Range Sliders ── */
+    .form-range {
+      accent-color: #0d6efd;
+    }
+    .slider-wrap {
+      width: 100%;
+    }
+    .slider-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      opacity: 0.5;
+      margin-top: 2px;
+      color: #fff;
+    }
+
+    /* ── Toggle Switch ── */
+    .form-check-input {
+      width: 3em;
+      height: 1.5em;
+      cursor: pointer;
+    }
+    .form-check-input:checked {
+      background-color: #0d6efd;
+      border-color: #0d6efd;
+    }
+
+    /* ── Select Dropdown ── */
+    .form-select {
+      background-color: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      border-radius: 8px;
+      max-width: 200px;
+    }
+    .form-select option {
+      background-color: #1b2a4a;
+      color: #fff;
+    }
+    .form-select:focus {
+      background-color: rgba(255, 255, 255, 0.15);
+      border-color: #0d6efd;
+      color: #fff;
+      box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.3);
+    }
+
+    /* ── Preview Table ── */
+    .preview-section {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px dashed rgba(255, 255, 255, 0.15);
+      border-radius: 10px;
+      padding: 16px;
+      margin-top: 20px;
+    }
+    .preview-section-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #a0cfff;
+      margin-bottom: 12px;
+    }
+    .preview-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .preview-table th,
+    .preview-table td {
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #fff;
+      background: rgba(255, 255, 255, 0.04);
+      font-size: 0.82rem;
+    }
+    .preview-table th {
+      background: rgba(13, 110, 253, 0.2);
+      font-weight: 700;
+    }
+
+    /* ── Reset Button ── */
+    .btn-reset {
+      background: rgba(220, 53, 69, 0.15);
+      border: 1px solid rgba(220, 53, 69, 0.4);
+      color: #ff8a97;
+      border-radius: 10px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      width: 100%;
+    }
+    .btn-reset:hover {
+      background: rgba(220, 53, 69, 0.3);
+      border-color: rgba(220, 53, 69, 0.6);
+      color: #ffb3bc;
+    }
+
+    /* ── Auth Loading ── */
+    #authLoadingScreen {
+      position: fixed;
+      inset: 0;
+      background: #0d1b2a;
+      z-index: 99999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 16px;
+      color: #fff;
+    }
+
+    /* ── Saved Toast ── */
+    #savedToast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #198754;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      box-shadow: 0 4px 16px rgba(25, 135, 84, 0.4);
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.3s ease;
+      z-index: 9999;
+      pointer-events: none;
+    }
+    #savedToast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    button, .btn {
+      min-height: 44px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Auth loading screen -->
+  <div id="authLoadingScreen">
+    <div class="spinner-border text-primary" style="width:3rem;height:3rem;" role="status"></div>
+    <span class="fw-bold" style="opacity:0.7;">Checking authentication...</span>
+  </div>
+
+  <!-- Navbar -->
+  <nav class="navbar fixed-top navbar-expand-lg">
+    <div class="container-fluid px-3">
+      <span class="navbar-brand">⚙️ Settings</span>
+      <div class="d-flex align-items-center gap-2 ms-auto flex-wrap">
+        <span class="text-white fw-semibold" style="font-size:0.82rem;" id="settingsUserLabel">👤 —</span>
+        <a id="backToAppBtn" href="index.html" class="btn btn-outline-light btn-sm fw-bold">
+          <i class="bi bi-arrow-left"></i> Back to App
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main content (hidden until auth passes) -->
+  <div id="settingsMain" class="container" style="max-width:680px; display:none;">
+
+    <!-- Hero -->
+    <div class="settings-hero">
+      <h1><i class="bi bi-gear-wide-connected"></i> App Settings</h1>
+      <p>Customize your display, scale, and preferences. All settings are saved automatically.</p>
+    </div>
+
+    <!-- ══ CARD 1: Display Preferences ══ -->
+    <div class="settings-card">
+      <div class="card-section-title">
+        <i class="bi bi-palette2"></i> Display Preferences
+      </div>
+
+      <!-- Font Size -->
+      <div class="setting-row flex-column align-items-start">
+        <div class="d-flex justify-content-between w-100 align-items-center">
+          <div>
+            <div class="setting-label">Font Size</div>
+            <div class="setting-description">Adjusts the base text size across the app</div>
+          </div>
+          <span class="setting-value-badge" id="fontSizeDisplay">Medium</span>
+        </div>
+        <div class="slider-wrap mt-3">
+          <input type="range" class="form-range" id="settingsFontSize" min="1" max="3" step="1" value="2">
+          <div class="slider-labels">
+            <span>Small</span><span>Medium</span><span>Large</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table Density -->
+      <div class="setting-row flex-column align-items-start">
+        <div class="d-flex justify-content-between w-100 align-items-center">
+          <div>
+            <div class="setting-label">Table Density</div>
+            <div class="setting-description">Controls the row padding inside all tables</div>
+          </div>
+          <span class="setting-value-badge" id="tableDensityDisplay">Normal</span>
+        </div>
+        <div class="slider-wrap mt-3">
+          <input type="range" class="form-range" id="settingsTableDensity" min="1" max="3" step="1" value="2">
+          <div class="slider-labels">
+            <span>Compact</span><span>Normal</span><span>Comfortable</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Preview Table -->
+      <div class="preview-section">
+        <div class="preview-section-title"><i class="bi bi-table"></i> Live Table Preview</div>
+        <table class="preview-table" id="previewTable">
+          <thead>
+            <tr>
+              <th>Barcode</th><th>Description</th><th>Qty</th><th>Location</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>123456789</td><td>Product Alpha</td><td>50</td><td>A1-01</td></tr>
+            <tr><td>987654321</td><td>Product Beta</td><td>120</td><td>B2-05</td></tr>
+            <tr><td>555000111</td><td>Product Gamma</td><td>8</td><td>C3-11</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Zebra Striping -->
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Zebra Striped Tables</div>
+          <div class="setting-description">Alternating row colors for easier reading</div>
+        </div>
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" id="settingsZebra" role="switch">
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ CARD 2: App Scaling ══ -->
+    <div class="settings-card">
+      <div class="card-section-title">
+        <i class="bi bi-fullscreen"></i> App Scaling
+      </div>
+
+      <!-- App Scale -->
+      <div class="setting-row flex-column align-items-start">
+        <div class="d-flex justify-content-between w-100 align-items-center">
+          <div>
+            <div class="setting-label">Global UI Scale</div>
+            <div class="setting-description">Zooms the entire app interface in or out</div>
+          </div>
+          <span class="setting-value-badge" id="scaleDisplay">100%</span>
+        </div>
+        <div class="slider-wrap mt-3">
+          <input type="range" class="form-range" id="settingsScale" min="70" max="130" step="5" value="100">
+          <div class="slider-labels">
+            <span>70%</span><span>100%</span><span>130%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ CARD 3: Language & Behavior ══ -->
+    <div class="settings-card">
+      <div class="card-section-title">
+        <i class="bi bi-translate"></i> Language & Behavior
+      </div>
+
+      <!-- Language -->
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Language</div>
+          <div class="setting-description">Changes text direction and UI language</div>
+        </div>
+        <select class="form-select" id="settingsLanguage">
+          <option value="en">English (LTR)</option>
+          <option value="ar">Arabic (RTL)</option>
+        </select>
+      </div>
+
+      <!-- Column Filter -->
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Filter Columns on Import</div>
+          <div class="setting-description">When ON, imports only 5 key columns. When OFF, imports all.</div>
+        </div>
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" id="settingsColumnFilter" role="switch">
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ CARD 4: Navigation ══ -->
+    <div class="settings-card">
+      <div class="card-section-title">
+        <i class="bi bi-grid-3x3-gap"></i> Navigation
+      </div>
+      <div class="d-grid gap-2">
+        <a href="index.html" class="btn btn-outline-light fw-bold">
+          <i class="bi bi-house"></i> Go to Inventory
+        </a>
+        <a href="tracker.html" class="btn btn-outline-info fw-bold">
+          <i class="bi bi-truck"></i> Go to Tracker
+        </a>
+        <a id="adminDashboardLink" href="admin.html" class="btn btn-warning fw-bold d-none">
+          <i class="bi bi-speedometer2"></i> Admin Dashboard
+        </a>
+      </div>
+    </div>
+
+    <!-- ══ Reset ══ -->
+    <div class="mb-5">
+      <button id="resetSettingsBtn" class="btn btn-reset">
+        <i class="bi bi-arrow-counterclockwise"></i> Reset All Settings to Default
+      </button>
+    </div>
+
+  </div>
+
+  <!-- Saved Toast -->
+  <div id="savedToast"><i class="bi bi-check-circle-fill me-2"></i>Settings saved!</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // ── Firebase Init ─────────────────────────────────────────────────────────
+    const firebaseConfig = {
+      apiKey: "AIzaSyDRE4VFqnr5Y_1AlaPUDcGoZ7njAOmL0T0",
+      authDomain: "productinventorypwa.firebaseapp.com",
+      projectId: "productinventorypwa",
+      storageBucket: "productinventorypwa.firebasestorage.app",
+      messagingSenderId: "87116351333",
+      appId: "1:87116351333:web:88a611c8352c0103d1038c"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db   = firebase.firestore();
+
+    // ── Sync UI controls to current settings ──────────────────────────────────
+    function syncUI() {
+      const s = AppSettings.get();
+      const fsMap = { small: 1, medium: 2, large: 3 };
+      const tdMap = { compact: 1, normal: 2, large: 3 };
+
+      document.getElementById("settingsFontSize").value = fsMap[s.fontSize] || 2;
+      document.getElementById("fontSizeDisplay").textContent = capitalize(s.fontSize);
+
+      document.getElementById("settingsTableDensity").value = tdMap[s.tableDensity] || 2;
+      document.getElementById("tableDensityDisplay").textContent = capitalize(s.tableDensity);
+
+      document.getElementById("settingsScale").value = Math.round(s.scale * 100);
+      document.getElementById("scaleDisplay").textContent = Math.round(s.scale * 100) + "%";
+
+      document.getElementById("settingsZebra").checked = s.zebra !== false;
+      document.getElementById("settingsLanguage").value = s.language || "ar";
+      document.getElementById("settingsColumnFilter").checked = !!s.columnFilterEnabled;
+
+      const pt = document.getElementById("previewTable");
+      if (pt) {
+        if (s.zebra) pt.classList.add("table-striped"); else pt.classList.remove("table-striped");
+      }
+    }
+
+
+    function capitalize(str) {
+      if (!str) return "";
+      return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+
+    let _currentUserUid = null;
+
+    // ── Save & Apply ──────────────────────────────────────────────────────────
+    function updateSettingAndSave(key, value) {
+      const s = AppSettings.get();
+      s[key] = value;
+      AppSettings.save(s, db, _currentUserUid);
+      syncUI();
+      showSavedToast();
+    }
+
+    function showSavedToast() {
+      const toast = document.getElementById("savedToast");
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 2000);
+    }
+
+    // ── Wire up slider: Font Size ──────────────────────────────────────────────
+    document.getElementById("settingsFontSize").addEventListener("input", (e) => {
+      const v = parseInt(e.target.value);
+      const val = v === 1 ? "small" : v === 2 ? "medium" : "large";
+      updateSettingAndSave("fontSize", val);
+    });
+
+    // ── Wire up slider: Table Density ─────────────────────────────────────────
+    document.getElementById("settingsTableDensity").addEventListener("input", (e) => {
+      const v = parseInt(e.target.value);
+      const val = v === 1 ? "compact" : v === 2 ? "normal" : "large";
+      updateSettingAndSave("tableDensity", val);
+    });
+
+    // ── Wire up slider: Scale ─────────────────────────────────────────────────
+    document.getElementById("settingsScale").addEventListener("input", (e) => {
+      const val = parseInt(e.target.value) / 100;
+      updateSettingAndSave("scale", val);
+    });
+
+    // ── Wire up: Zebra ────────────────────────────────────────────────────────
+    document.getElementById("settingsZebra").addEventListener("change", (e) => {
+      updateSettingAndSave("zebra", e.target.checked);
+    });
+
+    // ── Wire up: Language ─────────────────────────────────────────────────────
+    document.getElementById("settingsLanguage").addEventListener("change", (e) => {
+      updateSettingAndSave("language", e.target.value);
+    });
+
+    // ── Wire up: Column Filter ────────────────────────────────────────────────
+    document.getElementById("settingsColumnFilter").addEventListener("change", (e) => {
+      updateSettingAndSave("columnFilterEnabled", e.target.checked);
+    });
+
+    // ── Reset ─────────────────────────────────────────────────────────────────
+    document.getElementById("resetSettingsBtn").addEventListener("click", () => {
+      if (!confirm("Reset all settings to default values?")) return;
+      AppSettings.save(AppSettings.DEFAULTS, db, _currentUserUid);
+      syncUI();
+      showSavedToast();
+    });
+
+    // ── Auth Guard ────────────────────────────────────────────────────────────
+    auth.onAuthStateChanged(async (firebaseUser) => {
+      const loadingEl = document.getElementById("authLoadingScreen");
+      if (!firebaseUser) {
+        window.location.href = "index.html";
+        return;
+      }
+      try {
+        const userDoc = await db.collection("users").doc(firebaseUser.uid).get();
+        if (!userDoc.exists) {
+          await auth.signOut();
+          window.location.href = "index.html";
+          return;
+        }
+        const data = userDoc.data();
+
+        _currentUserUid = firebaseUser.uid;
+        
+        // Show user name in navbar
+        document.getElementById("settingsUserLabel").textContent = "👤 " + (data.displayName || firebaseUser.email);
+
+        // Show admin link if admin
+        if (data.role === "admin") {
+          document.getElementById("adminDashboardLink").classList.remove("d-none");
+        }
+
+        // LOAD FROM FIRESTORE
+        await AppSettings.loadFromFirestore(db, firebaseUser.uid);
+
+      } catch (err) {
+        console.error("Settings auth error:", err);
+        window.location.href = "index.html";
+        return;
+      }
+
+      // Auth passed — show UI, hide loading
+      loadingEl.style.display = "none";
+      document.getElementById("settingsMain").style.display = "";
+
+      // Sync controls to current settings
+      syncUI();
+    });
+  </script>
+</body>
+</html>

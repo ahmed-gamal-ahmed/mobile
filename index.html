@@ -18,26 +18,28 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <!-- Shared App Settings & Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <script src="app-settings.js"></script>
+
   <style>
-    /* Settings CSS Vars */
-    :root {
-      --app-font-size: 16px;
-      --app-table-density: 0.5rem;
-      --app-scale: 1;
-    }
     body {
-      font-size: var(--app-font-size);
-      /* Use zoom for scale as it acts globally on Chrome/mobile */
-      zoom: var(--app-scale);
+      font-family: 'Cairo', system-ui, -apple-system, sans-serif;
       transition: font-size 0.3s ease;
     }
+
     table.table {
       transition: background-color 0.3s ease;
     }
-    .table td, .table th {
+
+    .table td,
+    .table th {
       padding: var(--app-table-density) 0.5rem;
       transition: padding 0.3s ease;
     }
+
     /* Touch optimization */
     html {
       touch-action: manipulation;
@@ -193,10 +195,6 @@
     }
 
     .action-column {
-      display: none;
-    }
-
-    body.show-action .action-column {
       display: table-cell;
     }
 
@@ -206,10 +204,10 @@
       margin: 0 auto;
     }
 
-    /* Table Responsive Formatting */
+    /* Table Responsive Formatting — padding is driven by --app-table-density CSS var */
     .table td,
     .table th {
-      padding: 14px 16px;
+      padding: var(--app-table-density) 0.75rem;
       vertical-align: middle;
       max-width: 350px;
       word-wrap: break-word;
@@ -228,7 +226,7 @@
       padding: 2px 4px !important;
       font-size: 0.8rem;
     }
-    
+
     .compact-table .btn {
       padding: 0.1rem 0.3rem;
       font-size: 0.75rem;
@@ -288,13 +286,15 @@
 
 <body class="bg-light">
   <!-- Full-screen loading splash (shown first, hides after auth) -->
-  <div id="appLoadingScreen" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#f8f9fa;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;">
+  <div id="appLoadingScreen"
+    style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#f8f9fa;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;">
     <div class="spinner-border text-primary" style="width:3rem;height:3rem;" role="status"></div>
     <span style="color:#6c757d;font-size:1rem;">Loading...</span>
   </div>
 
   <!-- Login Overlay (hidden by default, shown only when not authenticated) -->
-  <div id="loginOverlay" class="d-none" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#f8f9fa;z-index:9999;display:flex;align-items:center;justify-content:center;">
+  <div id="loginOverlay" class="d-none"
+    style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#f8f9fa;z-index:9999;display:flex;align-items:center;justify-content:center;">
     <div class="card p-4 shadow-lg" style="max-width: 400px; width: 90%; border-radius: 12px;">
       <h3 class="text-center mb-4 fw-bold">Login</h3>
       <div id="loginError" class="alert alert-danger d-none py-2" role="alert"></div>
@@ -307,7 +307,8 @@
         <input type="password" id="loginPassword" class="form-control form-control-lg" placeholder="Password" />
       </div>
       <button id="loginBtn" class="btn btn-primary btn-lg w-100 fw-bold">
-        <span id="loginSpinner" class="spinner-border spinner-border-sm d-none me-2" role="status" aria-hidden="true"></span>
+        <span id="loginSpinner" class="spinner-border spinner-border-sm d-none me-2" role="status"
+          aria-hidden="true"></span>
         Login
       </button>
     </div>
@@ -415,7 +416,8 @@
       <button id="logoutBtn" class="btn btn-danger w-100 fw-bold" title="Logout">
         <i class="bi bi-box-arrow-right"></i> Logout
       </button>
-      <button id="adminDashboardBtn" class="btn btn-warning w-100 fw-bold mt-2 d-none" title="Admin Dashboard" onclick="window.open('admin.html', '_blank')">
+      <button id="adminDashboardBtn" class="btn btn-warning w-100 fw-bold mt-2 d-none" title="Admin Dashboard"
+        onclick="window.open('admin.html', '_blank')">
         <i class="bi bi-speedometer2"></i> Admin Dashboard
       </button>
     </div>
@@ -427,7 +429,8 @@
 
   <!-- Make container fluid for better mobile layout -->
   <div class="container responsive-container pt-3 mt-5 d-none" id="mainAppContainer">
-    <div id="assignmentBanner" class="alert alert-success alert-dismissible d-none shadow-sm" role="alert" style="cursor:pointer; border-left: 5px solid #198754;">
+    <div id="assignmentBanner" class="alert alert-success alert-dismissible d-none shadow-sm" role="alert"
+      style="cursor:pointer; border-left: 5px solid #198754;">
       📦 <strong>New inventory assigned by admin</strong> — Click here to load it.
     </div>
     <!-- Auto-saving banner -->
@@ -447,17 +450,21 @@
 
     <!-- Dashboard Statistics Cards -->
     <div class="d-flex flex-wrap gap-2 gap-md-3 mb-4" id="mainDashboardStats">
-      <div class="status-card shadow-sm flex-fill text-center p-2 p-md-3 bg-white" style="border-radius: 12px; border: 1px solid #eee;">
+      <div class="status-card shadow-sm flex-fill text-center p-2 p-md-3 bg-white"
+        style="border-radius: 12px; border: 1px solid #eee;">
         <span class="d-block text-uppercase fw-bold text-muted mb-1" style="font-size: 0.7rem;">Total Items</span>
         <h3 id="mainStatsTotalProducts" class="mb-0 fw-bold">0</h3>
       </div>
-      <div class="status-card shadow-sm flex-fill text-center p-2 p-md-3 bg-white" style="border-radius: 12px; border: 1px solid #eee; border-bottom: 4px solid #28a745;">
+      <div class="status-card shadow-sm flex-fill text-center p-2 p-md-3 bg-white"
+        style="border-radius: 12px; border: 1px solid #eee; border-bottom: 4px solid #28a745;">
         <span class="d-block text-uppercase fw-bold text-muted mb-1" style="font-size: 0.7rem;">Scanned</span>
         <h3 id="mainStatsScannedProducts" class="text-success mb-0 fw-bold">0</h3>
       </div>
-      <div class="status-card shadow-sm flex-fill text-center p-2 p-md-3 bg-white" style="border-radius: 12px; border: 1px solid #eee; border-bottom: 4px solid var(--talabat-orange);">
+      <div class="status-card shadow-sm flex-fill text-center p-2 p-md-3 bg-white"
+        style="border-radius: 12px; border: 1px solid #eee; border-bottom: 4px solid var(--talabat-orange);">
         <span class="d-block text-uppercase fw-bold text-muted mb-1" style="font-size: 0.7rem;">Remaining</span>
-        <h3 id="mainStatsRemainingProducts" class="text-warning mb-0 fw-bold" style="color: var(--talabat-orange) !important;">0</h3>
+        <h3 id="mainStatsRemainingProducts" class="text-warning mb-0 fw-bold"
+          style="color: var(--talabat-orange) !important;">0</h3>
       </div>
     </div>
 
@@ -467,7 +474,8 @@
         <span class="text-success">Progress: <span id="progressPercentScanned">0%</span></span>
       </div>
       <div class="progress" style="height: 12px; border-radius: 50px; background-color: #eee;">
-        <div id="mainProgressBarScanned" class="progress-bar bg-success" role="progressbar" style="width: 0%; border-radius: 50px;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+        <div id="mainProgressBarScanned" class="progress-bar bg-success" role="progressbar"
+          style="width: 0%; border-radius: 50px;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
       </div>
     </div>
 
@@ -487,7 +495,7 @@
         <tbody id="productTableBody"></tbody>
       </table>
     </div>
-    <div id="remainingProductsSection" class="mt-5 d-none">
+    <div id="remainingProductsSection" class="mt-5">
       <h3 class="text-center">Remaining Products</h3>
       <div class="table-responsive">
         <table class="table table-bordered table-striped mt-3">
@@ -729,7 +737,8 @@
 
     <!-- Existing Settings Migrated -->
     <div class="card shadow-sm border-0 mb-4">
-      <div class="card-header bg-dark text-white rounded-top"><i class="bi bi-sliders"></i> Feature Toggles & UI Elements</div>
+      <div class="card-header bg-dark text-white rounded-top"><i class="bi bi-sliders"></i> Feature Toggles & UI
+        Elements</div>
       <div class="card-body bg-white rounded-bottom">
 
         <h6 class="mb-3 border-bottom pb-2 fw-bold text-primary">Import Mode</h6>
@@ -754,9 +763,7 @@
           <button id="toggleSearchColumnButton" class="btn btn-outline-info">
             Toggle Search Column (Remaining)
           </button>
-          <button id="toggleActionColumnButton" class="btn btn-outline-primary">
-            <i class="bi bi-eye"></i> Toggle Action Column
-          </button>
+
           <button id="toggleTimestampColumnButton" class="btn btn-outline-info">
             <i class="bi bi-clock"></i> Toggle Scan Time
           </button>
@@ -792,7 +799,8 @@
     </div>
 
     <div class="d-grid pb-5">
-      <button id="resetSettingsBtn" class="btn btn-danger btn-lg"><i class="bi bi-arrow-counterclockwise"></i> Reset to Default Settings</button>
+      <button id="resetSettingsBtn" class="btn btn-danger btn-lg"><i class="bi bi-arrow-counterclockwise"></i> Reset to
+        Default Settings</button>
     </div>
   </div>
 
@@ -832,272 +840,12 @@
     let firestoreDb = null;
     let assignmentUnsubscribe = null; // Holds the Firestore real-time listener unsubscribe fn
 
-    // App Settings State and Persistence
-    let appSettings = JSON.parse(localStorage.getItem("appSettings")) || {
-      fontSize: "medium", // small, medium, large
-      tableDensity: "normal", // compact, normal, large
-      scale: 1, // 0.8 to 1.5
-      zebra: true,
-      language: "en",
-      columnFilterEnabled: false  // default OFF — import all columns
-    };
+    // Proxy to shared AppSettings module — the standalone settings.html page
+    // is the canonical settings UI. This getter keeps legacy code working.
+    let appSettings = AppSettings.get();
+    // Re-sync whenever we need the latest value
+    function getAppSettings() { return AppSettings.get(); }
 
-    const baseTranslations = {
-      "Product Inventory": "جرد المنتجات",
-      "Settings": "الإعدادات",
-      "Barcode Manager": "إدارة الباركود",
-      "Saved Operations": "العمليات المحفوظة",
-      "Data Import": "استيراد البيانات",
-      "Inventory Menu": "قائمة الجرد",
-      "Statistics": "الإحصائيات",
-      "File Name": "اسم الملف",
-      "No file uploaded": "لم يتم رفع ملف",
-      "Total": "الإجمالي",
-      "Remaining": "المتبقي",
-      "Scanned": "الممسوح",
-      "New inventory assigned by admin": "جرد جديد تم تعيينه من قبل المسؤول",
-      "Admin assigned a new inventory order — saving your current work automatically...": "المسؤول قام بتعيين جرد جديد — يتم حفظ عملك الحالي تلقائياً...",
-      "New inventory loaded by admin.": "تم تحميل الجرد الجديد بنجاح من قبل المسؤول.",
-      "Your work was saved and new inventory loaded by admin.": "تم حفظ عملك وتحميل الجرد الجديد من قبل المسؤول.",
-      "Total Items": "إجمالي العناصر",
-      "Progress:": "التقدم:",
-      "Enter Barcode": "أدخل الباركود",
-      "Barcode not found": "الباركود غير موجود",
-      "Scanned Products": "المنتجات الممسوحة",
-      "Remaining Products": "المنتجات المتبقية",
-      "Clear Storage": "مسح التخزين",
-      "Export Products": "تصدير المنتجات",
-      "Save JSON": "حفظ كـ JSON",
-      "Load JSON": "تحميل JSON",
-      "Save Review Operation": "حفظ عملية المراجعة",
-      "No description available for search.": "لا يوجد وصف متاح للبحث.",
-      "Add New Mapping": "إضافة تعيين جديد",
-      "Original Barcode (correct)": "الباركود الأصلي (الصحيح)",
-      "Edited Barcode (scanned)": "الباركود المعدل (الممسوح)",
-      "Save": "حفظ",
-      "Search mappings by barcode...": "بحث في التعيينات بالباركود...",
-      "Original Barcode": "الباركود الأصلي",
-      "Edited Barcode": "الباركود المعدل",
-      "Actions": "إجراءات",
-      "Ignore first 3 rows of the file": "تجاهل أول 3 صفوف من الملف",
-      "Offline Import (Excel / CSV)": "استيراد بدون اتصال (Excel / CSV)",
-      "Upload Excel or CSV File": "رفع ملف Excel أو CSV",
-      "Online Import (Google Sheets)": "استيراد متصل (جداول جوجل)",
-      "Import from Google Sheets": "استيراد من جداول جوجل",
-      "Paste public link": "ضع الرابط العام هنا",
-      "Load Worksheets": "تحميل أوراق العمل",
-      "Search worksheets...": "البحث في أوراق العمل...",
-      "No sheets found.": "لا توجد أوراق عمل.",
-      "Worksheet Name": "اسم ورقة العمل",
-      "Number of Items": "عدد العناصر",
-      "Total Operations:": "إجمالي العمليات:",
-      "Total Scanned:": "إجمالي الممسوح:",
-      "Delete Selected": "حذف المحدد",
-      "Merge Selected": "دمج المحدد",
-      "Extract Selected": "استخراج المحدد",
-      "Search operations...": "بحث في العمليات...",
-      "Operation Name": "اسم العملية",
-      "Auditors": "المراجعون",
-      "Date & Time": "التاريخ والوقت",
-      "Total Products": "إجمالي المنتجات",
-      "Back to Inventory": "العودة للجرد",
-      "Appearance Settings": "إعدادات المظهر",
-      "Font Size": "حجم الخط",
-      "Table Density": "كثافة الجدول",
-      "Global UI Scale": "حجم واجهة المستخدم",
-      "Zebra Striped Tables": "الجداول المخططة",
-      "Language": "اللغة",
-      "Feature Toggles & UI Elements": "إعدادات ميزات واجهة المستخدم",
-      "Column Visibility": "عرض الأعمدة",
-      "Add Empty Column (Remaining)": "إضافة عمود فارغ (المتبقي)",
-      "Toggle Search Column (Remaining)": "تبديل عمود البحث (المتبقي)",
-      "Toggle Action Column": "تبديل عمود الإجراءات",
-      "Toggle Scan Time": "تبديل وقت المسح",
-      "Behavioral Settings": "إعدادات السلوك",
-      "Input Mode": "وضع الإدخال",
-      "Scan Mode": "وضع المسح",
-      "Search": "بحث",
-      "Misc Toggles": "مفاتيح متنوعة",
-      "Focus on Added: On": "التركيز التلقائي: قيد التشغيل",
-      "Voice: Off": "الصوت: معطل",
-      "Reset to Default Settings": "إعادة تعيين للافتراضي",
-      "Close Sidebar": "إغلاق القائمة الجانبية",
-      "Open Data Import": "استيراد البيانات",
-      "Open Barcode Manager": "إدارة الباركود",
-      "Open Settings": "الإعدادات",
-      "Show/Hide Remaining Products": "إظهار/إخفاء المتبقي",
-      "Clear Local Storage": "مسح مساحة التخزين المحلية",
-      "Export Scanned Products": "تصدير المنتجات الممسوحة",
-      "Export Session (JSON)": "تصدير الجلسة (JSON)",
-      "Import Session (JSON)": "استيراد الجلسة (JSON)",
-      "Open Sidebar": "فتح القائمة الجانبية",
-      "Small": "صغير",
-      "Medium": "متوسط",
-      "Large": "كبير",
-      "Compact": "مضغوط",
-      "Normal": "طبيعي",
-      "Import": "استيراد",
-      "Delete": "حذف",
-      "Move": "نقل",
-      "Return": "استرجاع",
-      "Scan": "مسح",
-      "English (LTR)": "الإنجليزية (LTR)",
-      "Arabic (RTL)": "العربية (RTL)",
-      "English": "الإنجليزية",
-      "Arabic": "العربية",
-      "Source": "المصدر",
-      "Scan Time": "وقت المسح",
-      "Action": "إجراء",
-      "Notes": "ملاحظات",
-      "Write here...": "اكتب هنا...",
-      "Remove Empty Column (Remaining)": "إزالة عمود فارغ (المتبقي)",
-      "Show Search Column (Remaining)": "إظهار عمود البحث (المتبقي)",
-      "Hide Search Column (Remaining)": "إخفاء عمود البحث (المتبقي)"
-    };
-
-    const translations = {
-      ar: baseTranslations,
-      en: Object.fromEntries(Object.entries(baseTranslations).map(([k, v]) => [v, k]))
-    };
-
-    let translationObserver = null;
-    
-    function applyTranslations() {
-      if (!appSettings.language) return;
-      const isAr = appSettings.language === "ar";
-      document.documentElement.dir = isAr ? "rtl" : "ltr";
-      document.documentElement.lang = isAr ? "ar" : "en";
-      const dict = isAr ? translations.ar : translations.en;
-
-      if (translationObserver) {
-        translationObserver.disconnect();
-      }
-
-      function walkTextNodes(node) {
-        if (node.nodeType === 3) {
-           let text = node.nodeValue.trim();
-           if (text && dict[text]) {
-             node.nodeValue = node.nodeValue.replace(text, dict[text]);
-           }
-        } else if (node.nodeType === 1 && node.nodeName !== 'SCRIPT' && node.nodeName !== 'STYLE') {
-           if (node.hasAttribute && node.hasAttribute('placeholder')) {
-             let holder = node.getAttribute('placeholder').trim();
-             if (dict[holder]) node.setAttribute('placeholder', dict[holder]);
-           }
-           if (node.hasAttribute && node.hasAttribute('title')) {
-             let titleAttr = node.getAttribute('title').trim();
-             if (dict[titleAttr]) node.setAttribute('title', dict[titleAttr]);
-           }
-           if (node.tagName === 'INPUT' && (node.type === 'button' || node.type === 'submit')) {
-             let val = node.value.trim();
-             if (dict[val]) node.value = dict[val];
-           }
-           // Use array snapshot to avoid infinite loops when iterating
-           let children = Array.from(node.childNodes);
-           for (let i = 0; i < children.length; i++) {
-             walkTextNodes(children[i]);
-           }
-        }
-      }
-      
-      walkTextNodes(document.body);
-
-      translationObserver = new MutationObserver((mutations) => {
-        translationObserver.disconnect();
-        mutations.forEach(m => {
-          m.addedNodes.forEach(added => {
-            if (added.nodeType === 1 || added.nodeType === 3) {
-              walkTextNodes(added);
-            }
-          });
-          if (m.type === 'characterData') {
-             let text = m.target.nodeValue.trim();
-             if (text && dict[text]) {
-               m.target.nodeValue = m.target.nodeValue.replace(text, dict[text]);
-             }
-          }
-        });
-        translationObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
-      });
-      translationObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
-    }
-
-    function loadSettings() {
-      const fontSizeMap = { "small": 1, "medium": 2, "large": 3 };
-      document.getElementById("settingsFontSize").value = fontSizeMap[appSettings.fontSize] || 2;
-      document.getElementById("fontSizeDisplay").textContent = appSettings.fontSize.charAt(0).toUpperCase() + appSettings.fontSize.slice(1);
-
-      const tableDensityMap = { "compact": 1, "normal": 2, "large": 3 };
-      document.getElementById("settingsTableDensity").value = tableDensityMap[appSettings.tableDensity] || 2;
-      document.getElementById("tableDensityDisplay").textContent = appSettings.tableDensity.charAt(0).toUpperCase() + appSettings.tableDensity.slice(1);
-
-      document.getElementById("settingsScale").value = Math.round(appSettings.scale * 100);
-      document.getElementById("scaleDisplay").textContent = Math.round(appSettings.scale * 100) + "%";
-      
-      document.getElementById("settingsZebra").checked = appSettings.zebra;
-      
-      if (!appSettings.language) appSettings.language = "en";
-      const langElem = document.getElementById("settingsLanguage");
-      if (langElem) langElem.value = appSettings.language;
-      const langDisp = document.getElementById("languageDisplay");
-      if (langDisp) langDisp.textContent = appSettings.language === "ar" ? "Arabic" : "English";
-
-      const columnFilterToggle = document.getElementById("columnFilterToggle");
-      if (columnFilterToggle) columnFilterToggle.checked = appSettings.columnFilterEnabled || false;
-
-      applySettings();
-    }
-
-    function saveSettings() {
-      localStorage.setItem("appSettings", JSON.stringify(appSettings));
-      applySettings();
-    }
-
-    function applySettings() {
-      const root = document.documentElement;
-      
-      applyTranslations();
-      
-      // Font Size
-      let fsValue = "16px";
-      if (appSettings.fontSize === "small") fsValue = "12px";
-      if (appSettings.fontSize === "large") fsValue = "20px";
-      root.style.setProperty("--app-font-size", fsValue);
-
-      // Table Density
-      let padValue = "0.5rem";
-      if (appSettings.tableDensity === "compact") padValue = "0.2rem";
-      if (appSettings.tableDensity === "large") padValue = "1rem";
-      root.style.setProperty("--app-table-density", padValue);
-
-      // Scale
-      root.style.setProperty("--app-scale", appSettings.scale);
-
-      // Zebra Tables
-      const tables = document.querySelectorAll(".table");
-      tables.forEach(t => {
-        if (appSettings.zebra) {
-          t.classList.add("table-striped");
-        } else {
-          t.classList.remove("table-striped");
-        }
-      });
-    }
-
-    function resetSettings() {
-      if (confirm("Reset all appearance settings to default?")) {
-        appSettings = {
-          fontSize: "medium",
-          tableDensity: "normal",
-          scale: 1,
-          zebra: true,
-          language: "en",
-          columnFilterEnabled: false
-        };
-        saveSettings();
-        loadSettings();
-      }
-    }
 
     function getFormattedTimestamp() {
       const now = new Date();
@@ -1502,8 +1250,16 @@
       if (selectAllOps) selectAllOps.style.display = isAdmin ? "" : "none";
 
       // Admin dashboard button — admin only
+      // Use classList so we properly override Bootstrap's d-none class
       const adminDashboardBtn = document.getElementById("adminDashboardBtn");
-      if (adminDashboardBtn) adminDashboardBtn.style.display = isAdmin ? "" : "none";
+      if (adminDashboardBtn) {
+        if (isAdmin) {
+          adminDashboardBtn.classList.remove("d-none");
+          adminDashboardBtn.style.display = "";
+        } else {
+          adminDashboardBtn.classList.add("d-none");
+        }
+      }
 
       // Update sidebar username display
       const userDisplayEl = document.getElementById("sidebarUserLabel");
@@ -1653,7 +1409,7 @@
         try {
           await applyForceAssignment(data);
           banner.classList.add("d-none");
-        } catch(err) {
+        } catch (err) {
           console.error(err);
         }
       };
@@ -1727,19 +1483,19 @@
       const sessionDataStr = localStorage.getItem("scannedProducts") || "[]";
       try {
         await firestoreDb.collection("savedOperations").add({
-          operationName:    fileName,
-          timestamp:        Date.now(),
-          totalProducts:    excelData.length > 1 ? excelData.length - 1 : 0,
-          scannedCount:     scannedBarcodes.size,
-          remainingCount:   remainingProducts.length,
-          auditors:         [currentUser.displayName],
-          createdBy:        currentUser.uid,
-          createdByName:    currentUser.displayName,
-          excelData:        JSON.stringify(excelData),
-          scannedProducts:  sessionDataStr,
+          operationName: fileName,
+          timestamp: Date.now(),
+          totalProducts: excelData.length > 1 ? excelData.length - 1 : 0,
+          scannedCount: scannedBarcodes.size,
+          remainingCount: remainingProducts.length,
+          auditors: [currentUser.displayName],
+          createdBy: currentUser.uid,
+          createdByName: currentUser.displayName,
+          excelData: JSON.stringify(excelData),
+          scannedProducts: sessionDataStr,
           remainingProducts: JSON.stringify(remainingProducts),
-          remainingNotes:   JSON.stringify(remainingNotes),
-          editedBarcodes:   JSON.stringify(Array.from(editedBarcodes.entries()))
+          remainingNotes: JSON.stringify(remainingNotes),
+          editedBarcodes: JSON.stringify(Array.from(editedBarcodes.entries()))
         });
       } catch (err) {
         console.error("triggerSaveOperation error:", err);
@@ -1749,12 +1505,12 @@
     document.addEventListener("DOMContentLoaded", () => {
       initFirebase();
 
-      const loginOverlay  = document.getElementById("loginOverlay");
-      const loginBtn      = document.getElementById("loginBtn");
-      const loginEmail    = document.getElementById("loginEmail");
+      const loginOverlay = document.getElementById("loginOverlay");
+      const loginBtn = document.getElementById("loginBtn");
+      const loginEmail = document.getElementById("loginEmail");
       const loginPassword = document.getElementById("loginPassword");
-      const loginError    = document.getElementById("loginError");
-      const loginSpinner  = document.getElementById("loginSpinner");
+      const loginError = document.getElementById("loginError");
+      const loginSpinner = document.getElementById("loginSpinner");
       const loadingScreen = document.getElementById("appLoadingScreen");
 
       // Wire up the login button
@@ -1764,6 +1520,7 @@
           loginSpinner.classList.remove("d-none");
           loginBtn.disabled = true;
           try {
+            await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
             await firebase.auth().signInWithEmailAndPassword(loginEmail.value, loginPassword.value);
           } catch (err) {
             loginError.textContent = "Invalid email or password";
@@ -1795,6 +1552,12 @@
 
           if (!userDoc.exists) {
             await firebase.auth().signOut();
+            if (loginError) {
+              loginError.textContent = "Access Denied: User role not found in database. Please contact Administrator.";
+              loginError.classList.remove("d-none");
+            } else {
+              alert("Access Denied: User role not found in database.");
+            }
             loadingScreenEl.style.display = "none";
             const overlay = document.getElementById("loginOverlay");
             overlay.classList.remove("d-none");
@@ -1807,7 +1570,7 @@
             uid: firebaseUser.uid,
             email: firebaseUser.email,
             displayName: userData.displayName,
-            role: userData.role
+            role: (userData.role || "").toLowerCase()
           };
 
           // Tracker users belong in tracker.html — redirect immediately
@@ -1838,10 +1601,14 @@
           document.getElementById("savedOperationsContainer").classList.add("d-none");
           document.getElementById("settingsContainer").classList.add("d-none");
 
-          // Apply role UI, settings, and start listeners
+          // Apply role UI and start listeners
           applyRoleUI();
-          loadSettings();
-          applySettings();
+
+          // Load from Firestore (which also applies CSS vars automatically)
+          await AppSettings.loadFromFirestore(firestoreDb, firebaseUser.uid);
+
+          // Apply translations with the loaded settings
+          AppSettings.applyTranslations();
 
           // Start assignment listener
           startAssignmentListener();
@@ -1854,6 +1621,13 @@
 
         } catch (err) {
           console.error("Auth state error:", err);
+          await firebase.auth().signOut();
+          if (loginError) {
+            loginError.textContent = "Authentication Error: " + err.message;
+            loginError.classList.remove("d-none");
+          } else {
+            alert("Authentication Error: " + err.message);
+          }
           loadingScreenEl.style.display = "none";
           const overlay = document.getElementById("loginOverlay");
           overlay.classList.remove("d-none");
@@ -1968,11 +1742,11 @@
         applyTimestampColumnVisibility();
       });
 
-      document.getElementById("modeScan").addEventListener("change", (e) => { 
-        if(e.target.checked) inputMode = "scan"; 
+      document.getElementById("modeScan").addEventListener("change", (e) => {
+        if (e.target.checked) inputMode = "scan";
       });
-      document.getElementById("modeSearch").addEventListener("change", (e) => { 
-        if(e.target.checked) inputMode = "search"; 
+      document.getElementById("modeSearch").addEventListener("change", (e) => {
+        if (e.target.checked) inputMode = "search";
       });
 
       document.getElementById("navBarcodeManagerBtn").addEventListener("click", () => {
@@ -1987,13 +1761,10 @@
       });
 
       document.getElementById("navSettingsBtn").addEventListener("click", () => {
-        document.getElementById("mainAppContainer").classList.add("d-none");
-        document.getElementById("dataImportContainer").classList.add("d-none");
-        document.getElementById("savedOperationsContainer").classList.add("d-none");
-        document.getElementById("barcodeManagerContainer").classList.add("d-none");
-        document.getElementById("settingsContainer").classList.remove("d-none");
+        // Navigate to the standalone settings page
         document.getElementById("sidebar").classList.remove("open");
         document.body.classList.remove("sidebar-open");
+        window.location.href = "settings.html";
       });
 
       document.getElementById("navMainAppFromSettingsBtn").addEventListener("click", () => {
@@ -2001,45 +1772,54 @@
         document.getElementById("mainAppContainer").classList.remove("d-none");
       });
 
-      // Settings DOM Events
+      // Settings DOM Events — inline settings panel (legacy, still functional)
       document.getElementById("settingsFontSize").addEventListener("input", (e) => {
         const val = parseInt(e.target.value);
-        appSettings.fontSize = val === 1 ? "small" : (val === 2 ? "medium" : "large");
-        document.getElementById("fontSizeDisplay").textContent = appSettings.fontSize.charAt(0).toUpperCase() + appSettings.fontSize.slice(1);
-        saveSettings();
+        const fontSize = val === 1 ? "small" : (val === 2 ? "medium" : "large");
+        document.getElementById("fontSizeDisplay").textContent = fontSize.charAt(0).toUpperCase() + fontSize.slice(1);
+        AppSettings.save({ fontSize }, firestoreDb, currentUser?.uid);
+        appSettings = AppSettings.get();
       });
 
       document.getElementById("settingsTableDensity").addEventListener("input", (e) => {
         const val = parseInt(e.target.value);
-        appSettings.tableDensity = val === 1 ? "compact" : (val === 2 ? "normal" : "large");
-        document.getElementById("tableDensityDisplay").textContent = appSettings.tableDensity.charAt(0).toUpperCase() + appSettings.tableDensity.slice(1);
-        saveSettings();
+        const tableDensity = val === 1 ? "compact" : (val === 2 ? "normal" : "large");
+        document.getElementById("tableDensityDisplay").textContent = tableDensity.charAt(0).toUpperCase() + tableDensity.slice(1);
+        AppSettings.save({ tableDensity }, firestoreDb, currentUser?.uid);
+        appSettings = AppSettings.get();
       });
 
       document.getElementById("settingsScale").addEventListener("input", (e) => {
         const val = parseInt(e.target.value);
-        appSettings.scale = val / 100;
         document.getElementById("scaleDisplay").textContent = val + "%";
-        saveSettings();
+        AppSettings.save({ scale: val / 100 }, firestoreDb, currentUser?.uid);
+        appSettings = AppSettings.get();
       });
 
       document.getElementById("settingsZebra").addEventListener("change", (e) => {
-        appSettings.zebra = e.target.checked;
-        saveSettings();
+        AppSettings.save({ zebra: e.target.checked }, firestoreDb, currentUser?.uid);
+        appSettings = AppSettings.get();
       });
 
       document.getElementById("settingsLanguage").addEventListener("change", (e) => {
-        appSettings.language = e.target.value;
-        document.getElementById("languageDisplay").textContent = appSettings.language === "ar" ? "Arabic" : "English";
-        saveSettings();
+        const language = e.target.value;
+        document.getElementById("languageDisplay").textContent = language === "ar" ? "Arabic" : "English";
+        AppSettings.save({ language }, firestoreDb, currentUser?.uid);
+        AppSettings.applyTranslations();
+        appSettings = AppSettings.get();
       });
 
       document.getElementById("columnFilterToggle").addEventListener("change", (e) => {
-        appSettings.columnFilterEnabled = e.target.checked;
-        saveSettings();
+        AppSettings.save({ columnFilterEnabled: e.target.checked }, firestoreDb, currentUser?.uid);
+        appSettings = AppSettings.get();
       });
 
-      document.getElementById("resetSettingsBtn").addEventListener("click", resetSettings);
+      document.getElementById("resetSettingsBtn").addEventListener("click", () => {
+        if (!confirm("Reset all appearance settings to default?")) return;
+        AppSettings.save(AppSettings.DEFAULTS, firestoreDb, currentUser?.uid);
+        AppSettings.applyTranslations();
+        appSettings = AppSettings.get();
+      });
 
       document.getElementById("navMainAppBtn").addEventListener("click", () => {
         document.getElementById("barcodeManagerContainer").classList.add("d-none");
@@ -2303,9 +2083,8 @@
         document.getElementById("sidebar").classList.remove("open");
         document.body.classList.remove("sidebar-open");
       });
-      
-      // Load app settings
-      loadSettings();
+
+      // AppSettings handles settings loading during auth resolution now
 
       // Close sidebar when clicking the overlay (for mobile)
       document.addEventListener("click", (event) => {
@@ -2445,7 +2224,7 @@
       }
 
       // Apply column filter only if the setting is enabled
-      if (appSettings.columnFilterEnabled) {
+      if (AppSettings.get().columnFilterEnabled) {
         parsedData = filterToRequiredColumns(parsedData);
 
         if (parsedData.length < 1) {
@@ -2467,6 +2246,15 @@
 
       renderTableHeaders();
       showRemainingProducts();
+
+      // Ensure remaining products section is visible after import
+      const remainingSection = document.getElementById("remainingProductsSection");
+      if (remainingSection) {
+        remainingSection.classList.remove("d-none");
+        const toggleBtn = document.getElementById("toggleRemainingButton");
+        if (toggleBtn) toggleBtn.textContent = "Hide Remaining Products";
+      }
+
       saveProgress();
       updateStatistics();
     }
@@ -2651,7 +2439,7 @@
       if (inputMode === "search" && !forceSource) {
         let found = false;
         const normalizedSearch = barcode.toLowerCase();
-        
+
         // Search scanned table first
         for (let [key, row] of scannedBarcodes.entries()) {
           const itemNumberCell = row.cells[3] || row.cells[2] || row.cells[0]; // fallback
@@ -2663,7 +2451,7 @@
             break;
           }
         }
-        
+
         // Search remaining
         if (!found) {
           const tableBody = document.getElementById("remainingTableBody");
@@ -2678,7 +2466,7 @@
             }
           });
         }
-        
+
         if (!found) {
           showBarcodeNotFoundAlert();
           speakBarcodeNotFound();
@@ -2828,17 +2616,15 @@
     }
 
     function toggleRemainingProducts() {
-      const remainingSection = document.getElementById(
-        "remainingProductsSection"
-      );
+      const remainingSection = document.getElementById("remainingProductsSection");
       const button = document.getElementById("toggleRemainingButton");
 
       if (remainingSection.classList.contains("d-none")) {
         remainingSection.classList.remove("d-none");
-        button.textContent = "Hide Remaining Products";
+        button.innerHTML = '<i class="bi bi-eye-slash"></i> Hide Remaining Products';
       } else {
         remainingSection.classList.add("d-none");
-        button.textContent = "Show Remaining Products";
+        button.innerHTML = '<i class="bi bi-eye"></i> Show Remaining Products';
       }
     }
 
@@ -2911,7 +2697,7 @@
         moveToScannedButton.addEventListener("click", () => {
           // When column filter is ON: Bar code is always at index 1
           // When column filter is OFF: fall back to index 0
-          let primaryBarcode = appSettings.columnFilterEnabled
+          let primaryBarcode = AppSettings.get().columnFilterEnabled
             ? String(row[1] || row[0] || "").split("-")[0].trim()
             : String(row[0] || "").split("-")[0].trim();
           if (primaryBarcode) {
@@ -3098,21 +2884,7 @@
       event.returnValue = "";
     });
 
-    // Toggle for Action column
-    document
-      .getElementById("toggleActionColumnButton")
-      .addEventListener("click", function () {
-        document.body.classList.toggle("show-action");
-        localStorage.setItem(
-          "actionColumnVisible",
-          document.body.classList.contains("show-action")
-        );
-      });
-    const actionColumnVisible =
-      localStorage.getItem("actionColumnVisible") === "true";
-    if (actionColumnVisible) {
-      document.body.classList.add("show-action");
-    }
+    // Action column is now always visible via CSS
 
     // Sidebar open/close functionality
     document.getElementById("openSidebarButton").addEventListener("click", () => {
@@ -3417,14 +3189,14 @@
         localStorage.setItem("excelData", op.excelData || "[]");
         localStorage.setItem("fileName", op.operationName);
         localStorage.setItem("remainingProducts", op.remainingProducts || "[]");
-        
+
         let scannedPayload = [];
         try {
           scannedPayload = JSON.parse(op.scannedProducts || "[]");
           scannedPayload.forEach(item => { item.source = item.source || 'scan'; });
-        } catch(e) {}
+        } catch (e) { }
         localStorage.setItem("scannedProducts", JSON.stringify(scannedPayload));
-        
+
         localStorage.setItem("remainingNotes", op.remainingNotes || "{}");
 
         if (op.editedBarcodes) {
@@ -3589,7 +3361,7 @@
         // Update local array
         const deletedIds = Array.from(checkboxes).map(cb => cb.value);
         savedOperations = savedOperations.filter(op => !deletedIds.includes(op.id));
-        
+
         // Clear select all checkbox if checked
         const selectAllCb = document.getElementById("selectAllOps");
         if (selectAllCb) selectAllCb.checked = false;
@@ -3769,7 +3541,8 @@
           <h5 class="modal-title">⚠️ Unsaved Work Detected</h5>
         </div>
         <div class="modal-body">
-          <p>You have <strong><span id="unsavedCount">0</span> scanned items</strong> that have not been saved to Firestore yet.</p>
+          <p>You have <strong><span id="unsavedCount">0</span> scanned items</strong> that have not been saved to
+            Firestore yet.</p>
           <p>Please save your current operation before continuing, or cancel to go back.</p>
         </div>
         <div class="modal-footer">
