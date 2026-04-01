@@ -331,6 +331,55 @@
       text-align: center;
       font-weight: bold;
     }
+
+    /* Fixed Input Bar Feature */
+    body.fixed-input-bar #scanSection .mb-3:first-child {
+      display: none !important;
+    }
+    #fixedInputBar {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: #fff;
+      border-top: 2px solid #0d6efd;
+      padding: 10px 16px;
+      z-index: 1050;
+      box-shadow: 0 -4px 16px rgba(0,0,0,0.13);
+    }
+    body.fixed-input-bar #fixedInputBar {
+      display: block;
+    }
+    body.fixed-input-bar {
+      padding-bottom: 80px !important;
+    }
+    body.tabbed-scanning-mode.fixed-input-bar {
+      padding-bottom: 140px !important;
+    }
+    body.tabbed-scanning-mode.fixed-input-bar #fixedInputBar {
+      bottom: 60px;
+    }
+    #fixedInputBar .fixed-barcode-input {
+      font-size: 16px;
+      border-radius: 12px;
+      border: 2px solid #0d6efd;
+      padding: 10px 14px;
+      width: 100%;
+      box-shadow: 0 2px 8px rgba(13,110,253,0.12);
+      outline: none;
+    }
+    #fixedInputBar .fixed-barcode-input:focus {
+      border-color: #0a58ca;
+      box-shadow: 0 0 0 3px rgba(13,110,253,0.25);
+    }
+    #fixedInputBar .fixed-input-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #0d6efd;
+      margin-bottom: 4px;
+      display: block;
+    }
   </style>
 </head>
 
@@ -746,6 +795,12 @@
     <button id="tabRemainingBtn" class="tab-btn"><i class="bi bi-box-seam"></i> Remaining</button>
   </nav>
 
+  <!-- Fixed Input Bar (Shown only when enabled in settings) -->
+  <div id="fixedInputBar">
+    <span class="fixed-input-label"><i class="bi bi-upc-scan"></i> Enter Barcode</span>
+    <input type="text" id="fixedBarcodeInput" class="fixed-barcode-input" placeholder="Scan or type barcode..." autocomplete="off" />
+  </div>
+
   <!-- Settings Page Component -->
   <div class="container responsive-container pt-3 mt-5 d-none" id="settingsContainer">
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -861,6 +916,16 @@
               <button id="voiceToggleButton" class="btn btn-outline-secondary">
                 Voice: Off
               </button>
+            </div>
+          </div>
+          <div>
+            <label class="form-label fw-bold mb-2">Scan Input</label>
+            <div class="form-check form-switch mb-1">
+              <input class="form-check-input" type="checkbox" id="settingsFixedInputBar">
+              <label class="form-check-label fw-bold" for="settingsFixedInputBar">Fixed Input Bar</label>
+            </div>
+            <div class="form-text text-muted small">
+              Pins the barcode input to the bottom of the screen so it stays visible while you scroll through the scanned table.
             </div>
           </div>
         </div>
@@ -1890,7 +1955,11 @@
         }
       }
 
-      // Logout logic
+      // Fixed Input Bar Initialization
+      if (currentSettings.fixedInputBar) {
+        applyFixedInputBar(true);
+      }
+
       const logoutBtn = document.getElementById("logoutBtn");
       if (logoutBtn) {
         logoutBtn.addEventListener("click", handleLogout);
@@ -2052,6 +2121,15 @@
         AppSettings.save({ columnFilterEnabled: e.target.checked }, firestoreDb, currentUser?.uid);
         appSettings = AppSettings.get();
       });
+
+      document.getElementById("settingsFixedInputBar").addEventListener("change", (e) => {
+        const enabled = e.target.checked;
+        AppSettings.save({ fixedInputBar: enabled }, firestoreDb, currentUser?.uid);
+        applyFixedInputBar(enabled);
+        appSettings = AppSettings.get();
+      });
+      // Sync checkbox state to saved setting
+      document.getElementById("settingsFixedInputBar").checked = !!AppSettings.get().fixedInputBar;
 
       document.getElementById("resetSettingsBtn").addEventListener("click", () => {
         if (!confirm("Reset all appearance settings to default?")) return;
@@ -2679,6 +2757,35 @@
       });
     }
 
+    function applyFixedInputBar(enabled) {
+      const body = document.body;
+      const fixedBar = document.getElementById("fixedInputBar");
+      const fixedInput = document.getElementById("fixedBarcodeInput");
+
+      if (enabled) {
+        body.classList.add("fixed-input-bar");
+        // Wire keypress if not already wired
+        if (fixedInput && !fixedInput._wired) {
+          fixedInput._wired = true;
+          fixedInput.addEventListener("keypress", function (e) {
+            if (e.key === "Enter") {
+              // Proxy the event to handleBarcodeSearch using a compatible event-like object
+              const proxy = {
+                target: fixedInput,
+                key: e.key,
+                preventDefault: () => e.preventDefault()
+              };
+              handleBarcodeSearch(proxy);
+            }
+          });
+        }
+        // Autofocus the fixed input
+        setTimeout(() => { if (fixedInput) fixedInput.focus(); }, 100);
+      } else {
+        body.classList.remove("fixed-input-bar");
+      }
+    }
+
     function handleBarcodeSearch(event, forceSource = null) {
       let barcode = event.target.value.toString().trim();
 
@@ -2744,7 +2851,7 @@
         tableBody.appendChild(row);
         reindexScannedTable();
         
-        // Ensure Tabbed Scan pane is visible if enabled
+        // Ensure Tabbed Scan pane is visible if enabled (only switch if not already on scan tab)
         if (AppSettings.get().tabbedScanningMode) {
           const tabScanBtn = document.getElementById("tabScanBtn");
           if (tabScanBtn && !tabScanBtn.classList.contains("active")) {
@@ -2752,19 +2859,19 @@
           }
         }
 
+        // Scroll the moved row into view
         row.scrollIntoView({ behavior: "smooth", block: "center" });
         row.classList.add("duplicate-row");
         setTimeout(() => {
           row.classList.remove("duplicate-row");
         }, 3000);
         
-        // Make it focus on the row moved (specifically the qty input if available)
-        const rxInput = row.querySelector(".received-qty-input");
-        if (rxInput && !rxInput.hasAttribute("readonly")) {
-          rxInput.focus();
-        } else {
-          row.tabIndex = -1;
-          row.focus();
+        // Keep focus on the active input (fixed bar or main) — do NOT steal focus to the row
+        const activeInput = document.body.classList.contains("fixed-input-bar")
+          ? document.getElementById("fixedBarcodeInput")
+          : document.getElementById("barcodeInput");
+        if (activeInput) {
+          activeInput.focus();
         }
         
         // Speak the quantity again when the same code is entered
@@ -2792,10 +2899,12 @@
         } else {
           showBarcodeNotFoundAlert();
           speakBarcodeNotFound();
-          const input = document.getElementById("barcodeInput");
-          if (input) {
-            input.value = "";
-            input.focus();
+          const notFoundActive = document.body.classList.contains("fixed-input-bar")
+            ? document.getElementById("fixedBarcodeInput")
+            : document.getElementById("barcodeInput");
+          if (notFoundActive) {
+            notFoundActive.value = "";
+            notFoundActive.focus();
           }
         }
       }

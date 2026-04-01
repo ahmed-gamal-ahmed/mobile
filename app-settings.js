@@ -20,7 +20,8 @@
     columnFilterEnabled: false,
     tabbedScanningMode: false,
     showReceivedQtyColumn: true,
-    enableManualInput: true
+    enableManualInput: true,
+    fixedInputBar: false
   };
 
   /* ── CSS value maps ──────────────────────────────────────────────────── */
