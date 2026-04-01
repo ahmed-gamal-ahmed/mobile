@@ -448,6 +448,17 @@
           <input class="form-check-input" type="checkbox" id="settingsEnableManualInput" role="switch">
         </div>
       </div>
+
+      <!-- Fixed Input Bar -->
+      <div class="setting-row">
+        <div>
+          <div class="setting-label"><i class="bi bi-pin-angle-fill me-1 text-primary"></i>Fixed Input Bar</div>
+          <div class="setting-description">Pins the barcode input to the bottom of the screen — stays visible while scrolling through the scanned table</div>
+        </div>
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" id="settingsFixedInputBar" role="switch">
+        </div>
+      </div>
     </div>
 
     <!-- ══ CARD 4: Table View Options (Legacy Restore) ══ -->
@@ -556,6 +567,7 @@
       document.getElementById("settingsTabbedScanningMode").checked = !!s.tabbedScanningMode;
       document.getElementById("settingsShowReceivedQtyColumn").checked = s.showReceivedQtyColumn !== false;
       document.getElementById("settingsEnableManualInput").checked = s.enableManualInput !== false;
+      document.getElementById("settingsFixedInputBar").checked = !!s.fixedInputBar;
 
       // LocalStorage flags (Legacy UI features restored)
       document.getElementById("settingsNotesColumn").checked = localStorage.getItem("remainingNotesColumnVisible") === "true";
@@ -639,6 +651,11 @@
     // ── Wire up: Manual Input ───────────────────────────────────────────────
     document.getElementById("settingsEnableManualInput").addEventListener("change", (e) => {
       updateSettingAndSave("enableManualInput", e.target.checked);
+    });
+
+    // ── Wire up: Fixed Input Bar ────────────────────────────────────────────
+    document.getElementById("settingsFixedInputBar").addEventListener("change", (e) => {
+      updateSettingAndSave("fixedInputBar", e.target.checked);
     });
 
     // ── Wire up: Legacy Table Options ───────────────────────────────────────
