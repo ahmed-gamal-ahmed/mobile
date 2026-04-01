@@ -406,7 +406,6 @@
         </select>
       </div>
 
-      <!-- Column Filter -->
       <div class="setting-row">
         <div>
           <div class="setting-label">Filter Columns on Import</div>
@@ -416,9 +415,82 @@
           <input class="form-check-input" type="checkbox" id="settingsColumnFilter" role="switch">
         </div>
       </div>
+
+      <!-- Tabbed Scanning Mode -->
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Enable Tabbed View</div>
+          <div class="setting-description">Tabbed View allows switching between Scan and Remaining screens</div>
+        </div>
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" id="settingsTabbedScanningMode" role="switch">
+        </div>
+      </div>
+
+      <!-- Received Quantity Column -->
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Show Received Quantity Column</div>
+          <div class="setting-description">Displays the Received Qty column in the Scanned Products table</div>
+        </div>
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" id="settingsShowReceivedQtyColumn" role="switch">
+        </div>
+      </div>
+
+      <!-- Enable Manual Input -->
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Enable Manual Input</div>
+          <div class="setting-description">Allows typing numbers directly into the Received Qty column</div>
+        </div>
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" id="settingsEnableManualInput" role="switch">
+        </div>
+      </div>
     </div>
 
-    <!-- ══ CARD 4: Navigation ══ -->
+    <!-- ══ CARD 4: Table View Options (Legacy Restore) ══ -->
+    <div class="settings-card">
+      <div class="card-section-title">
+        <i class="bi bi-layout-wtf"></i> Advanced Table Options
+      </div>
+
+      <!-- Notes Column -->
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Show Empty Column (Notes)</div>
+          <div class="setting-description">Adds an empty column in the Remaining products table to capture notes</div>
+        </div>
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" id="settingsNotesColumn" role="switch">
+        </div>
+      </div>
+
+      <!-- Search Column -->
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Show Search Column</div>
+          <div class="setting-description">Displays an internal app search mechanism column in the Remaining products table</div>
+        </div>
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" id="settingsSearchColumn" role="switch">
+        </div>
+      </div>
+
+      <!-- Timestamp Column -->
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Show Scan Time Column</div>
+          <div class="setting-description">Displays the exact time a product was scanned in the Scanned products table</div>
+        </div>
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" id="settingsTimestampColumn" role="switch">
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ CARD 5: Navigation ══ -->
     <div class="settings-card">
       <div class="card-section-title">
         <i class="bi bi-grid-3x3-gap"></i> Navigation
@@ -481,6 +553,14 @@
       document.getElementById("settingsZebra").checked = s.zebra !== false;
       document.getElementById("settingsLanguage").value = s.language || "ar";
       document.getElementById("settingsColumnFilter").checked = !!s.columnFilterEnabled;
+      document.getElementById("settingsTabbedScanningMode").checked = !!s.tabbedScanningMode;
+      document.getElementById("settingsShowReceivedQtyColumn").checked = s.showReceivedQtyColumn !== false;
+      document.getElementById("settingsEnableManualInput").checked = s.enableManualInput !== false;
+
+      // LocalStorage flags (Legacy UI features restored)
+      document.getElementById("settingsNotesColumn").checked = localStorage.getItem("remainingNotesColumnVisible") === "true";
+      document.getElementById("settingsSearchColumn").checked = localStorage.getItem("searchColumnVisible") === "true";
+      document.getElementById("settingsTimestampColumn").checked = localStorage.getItem("timestampColumnVisible") === "true";
 
       const pt = document.getElementById("previewTable");
       if (pt) {
@@ -544,6 +624,35 @@
     // ── Wire up: Column Filter ────────────────────────────────────────────────
     document.getElementById("settingsColumnFilter").addEventListener("change", (e) => {
       updateSettingAndSave("columnFilterEnabled", e.target.checked);
+    });
+
+    // ── Wire up: Tabbed View ────────────────────────────────────────────────
+    document.getElementById("settingsTabbedScanningMode").addEventListener("change", (e) => {
+      updateSettingAndSave("tabbedScanningMode", e.target.checked);
+    });
+
+    // ── Wire up: Received Qty ───────────────────────────────────────────────
+    document.getElementById("settingsShowReceivedQtyColumn").addEventListener("change", (e) => {
+      updateSettingAndSave("showReceivedQtyColumn", e.target.checked);
+    });
+
+    // ── Wire up: Manual Input ───────────────────────────────────────────────
+    document.getElementById("settingsEnableManualInput").addEventListener("change", (e) => {
+      updateSettingAndSave("enableManualInput", e.target.checked);
+    });
+
+    // ── Wire up: Legacy Table Options ───────────────────────────────────────
+    document.getElementById("settingsNotesColumn").addEventListener("change", (e) => {
+      localStorage.setItem("remainingNotesColumnVisible", e.target.checked);
+      showSavedToast();
+    });
+    document.getElementById("settingsSearchColumn").addEventListener("change", (e) => {
+      localStorage.setItem("searchColumnVisible", e.target.checked);
+      showSavedToast();
+    });
+    document.getElementById("settingsTimestampColumn").addEventListener("change", (e) => {
+      localStorage.setItem("timestampColumnVisible", e.target.checked);
+      showSavedToast();
     });
 
     // ── Reset ─────────────────────────────────────────────────────────────────

@@ -281,6 +281,56 @@
         width: 100%;
       }
     }
+
+    /* Tabbed Scanning Mode Styles */
+    body.tabbed-scanning-mode {
+      padding-bottom: 80px !important;
+    }
+    .tabbed-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: #fff;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+      display: flex;
+      z-index: 1040;
+    }
+    .tabbed-nav .tab-btn {
+      flex: 1;
+      padding: 15px;
+      font-weight: bold;
+      font-size: 1.1rem;
+      border: none;
+      background: #f8f9fa;
+      color: #6c757d;
+      transition: all 0.2s;
+      border-top: 3px solid transparent;
+      border-right: 1px solid #dee2e6;
+    }
+    .tabbed-nav .tab-btn:last-child {
+      border-right: none;
+    }
+    .tabbed-nav .tab-btn.active {
+      background: #fff;
+      color: #0d6efd;
+      border-top: 3px solid #0d6efd;
+    }
+    .duplicate-row {
+      background-color: #fff3cd !important;
+      color: #856404 !important;
+      transition: background-color 3s ease;
+    }
+
+    /* Received Quantity Feature */
+    body:not(.show-received-qty) .received-qty-column {
+      display: none !important;
+    }
+    .received-qty-input {
+      width: 70px;
+      text-align: center;
+      font-weight: bold;
+    }
   </style>
 </head>
 
@@ -490,21 +540,23 @@
       </div>
     </div>
 
-    <div class="mb-3">
-      <label for="barcodeInput" class="form-label">Enter Barcode</label>
-      <input type="text" id="barcodeInput" class="form-control" placeholder="Enter Barcode" />
-      <div id="barcodeNotFoundAlert" class="alert alert-danger mt-2 py-2 d-none" role="alert">
-        Barcode not found
+    <div id="scanSection">
+      <div class="mb-3">
+        <label for="barcodeInput" class="form-label">Enter Barcode</label>
+        <input type="text" id="barcodeInput" class="form-control" placeholder="Enter Barcode" />
+        <div id="barcodeNotFoundAlert" class="alert alert-danger mt-2 py-2 d-none" role="alert">
+          Barcode not found
+        </div>
       </div>
-    </div>
-    <h3 class="text-center">Scanned Products</h3>
-    <div class="table-responsive"> <!-- Wrap tables in responsive container -->
-      <table class="table table-bordered table-striped mt-3">
-        <thead class="table-dark">
-          <tr id="tableHeaders"></tr>
-        </thead>
-        <tbody id="productTableBody"></tbody>
-      </table>
+      <h3 class="text-center">Scanned Products</h3>
+      <div class="table-responsive"> <!-- Wrap tables in responsive container -->
+        <table class="table table-bordered table-striped mt-3">
+          <thead class="table-dark">
+            <tr id="tableHeaders"></tr>
+          </thead>
+          <tbody id="productTableBody"></tbody>
+        </table>
+      </div>
     </div>
     <div id="remainingProductsSection" class="mt-5">
       <h3 class="text-center">Remaining Products</h3>
@@ -687,6 +739,12 @@
       </table>
     </div>
   </div>
+
+  <!-- Tabbed Navigation Bar (Shown only when enabled) -->
+  <nav id="bottomTabNav" class="tabbed-nav d-none">
+    <button id="tabScanBtn" class="tab-btn active"><i class="bi bi-upc-scan"></i> Scan</button>
+    <button id="tabRemainingBtn" class="tab-btn"><i class="bi bi-box-seam"></i> Remaining</button>
+  </nav>
 
   <!-- Settings Page Component -->
   <div class="container responsive-container pt-3 mt-5 d-none" id="settingsContainer">
@@ -1789,6 +1847,49 @@
 
       const barcodeInput = document.getElementById("barcodeInput");
 
+      // Features Initialization
+      const currentSettings = AppSettings.get();
+      
+      if (currentSettings.showReceivedQtyColumn !== false) {
+        document.body.classList.add("show-received-qty");
+      }
+      if (currentSettings.enableManualInput !== false) {
+        document.body.classList.add("enable-manual-input");
+      }
+
+      // Tabbed Scanning Mode Initialization
+      if (currentSettings.tabbedScanningMode) {
+        document.body.classList.add("tabbed-scanning-mode");
+        const bottomNav = document.getElementById("bottomTabNav");
+        const scanSection = document.getElementById("scanSection");
+        const remainingSection = document.getElementById("remainingProductsSection");
+        const btnScan = document.getElementById("tabScanBtn");
+        const btnRemaining = document.getElementById("tabRemainingBtn");
+
+        if (bottomNav && scanSection && remainingSection) {
+          bottomNav.classList.remove("d-none");
+          remainingSection.classList.add("d-none");
+          remainingSection.classList.remove("mt-5");
+          
+          btnScan.addEventListener("click", () => {
+            btnScan.classList.add("active");
+            btnRemaining.classList.remove("active");
+            scanSection.classList.remove("d-none");
+            remainingSection.classList.add("d-none");
+            barcodeInput.focus();
+            optimizedScroll(document.body, { behavior: "smooth", block: "start" });
+          });
+          
+          btnRemaining.addEventListener("click", () => {
+            btnRemaining.classList.add("active");
+            btnScan.classList.remove("active");
+            remainingSection.classList.remove("d-none");
+            scanSection.classList.add("d-none");
+            optimizedScroll(document.body, { behavior: "smooth", block: "start" });
+          });
+        }
+      }
+
       // Logout logic
       const logoutBtn = document.getElementById("logoutBtn");
       if (logoutBtn) {
@@ -1805,16 +1906,7 @@
         });
       });
 
-      // Focus the barcode input when Enter key is pressed anywhere
-      document.addEventListener("keypress", (event) => {
-        if (
-          event.key === "Enter" &&
-          document.activeElement !== barcodeInput
-        ) {
-          event.preventDefault();
-          barcodeInput.focus();
-        }
-      });
+
 
       // Event listeners
       document
@@ -2465,6 +2557,12 @@
       remainingTableHeaders.innerHTML = "";
       columnToggleButtons.innerHTML = "";
 
+      // Serial # Header for Scanned Products
+      const thIndex = document.createElement("th");
+      thIndex.textContent = "#";
+      thIndex.style.width = "40px";
+      tableHeaders.appendChild(thIndex);
+
       headers.forEach((header, index) => {
         // Add header cells to both tables
         const th = document.createElement("th");
@@ -2474,6 +2572,14 @@
         const thRemaining = document.createElement("th");
         thRemaining.textContent = header;
         remainingTableHeaders.appendChild(thRemaining);
+        
+        // Add "Received Qty" immediately after Quantity column (index 2)
+        if (index === 2) {
+          const thRx = document.createElement("th");
+          thRx.textContent = "Received Qty";
+          thRx.classList.add("received-qty-column");
+          tableHeaders.appendChild(thRx);
+        }
 
         // Create toggle buttons for columns
         const button = document.createElement("button");
@@ -2632,13 +2738,26 @@
       // Check if the barcode is already scanned
       if (scannedBarcodes.has(barcode)) {
         const row = scannedBarcodes.get(barcode);
-        row.classList.add("bg-warning");
+        
+        // Move to the bottom of the table without duplicating data
+        const tableBody = document.getElementById("productTableBody");
+        tableBody.appendChild(row);
+        reindexScannedTable();
+        
+        // Ensure Tabbed Scan pane is visible if enabled
+        if (AppSettings.get().tabbedScanningMode) {
+          document.getElementById("tabScanBtn").click();
+        }
+
         row.scrollIntoView({ behavior: "smooth", block: "center" });
+        row.classList.add("duplicate-row");
         setTimeout(() => {
-          row.classList.remove("bg-warning");
-        }, 1000);
+          row.classList.remove("duplicate-row");
+        }, 3000);
+        
         // Speak the quantity again when the same code is entered
-        const quantityCell = row.querySelector("td:nth-child(3)");
+        // Note: quantity cell is the 4th cell now due to the # column
+        const quantityCell = row.querySelector("td:nth-child(4)");
         if (quantityCell) {
           speakQuantity(quantityCell.textContent);
         }
@@ -2672,19 +2791,57 @@
       event.target.value = ""; // Clear the input field for next scan
     }
 
-    function addRowToScannedTable(row, barcode, speak = true, source = 'scan', timestamp = null, skipSave = false) {
+    function reindexScannedTable() {
+      const tableBody = document.getElementById("productTableBody");
+      Array.from(tableBody.rows).forEach((row, index) => {
+        const indexCell = row.cells[0];
+        if (indexCell && indexCell.classList.contains("serial-column")) {
+          indexCell.textContent = index + 1;
+        }
+      });
+    }
+
+    function addRowToScannedTable(row, barcode, speak = true, source = 'scan', timestamp = null, skipSave = false, receivedQty = "") {
       const tableBody = document.getElementById("productTableBody");
       const tr = document.createElement("tr");
+      
+      tr.dataset.barcode = barcode;
+      
+      const tdIndex = document.createElement("td");
+      tdIndex.classList.add("serial-column");
+      tdIndex.style.fontWeight = "bold";
+      tr.appendChild(tdIndex);
+      
+      const enableManualInput = document.body.classList.contains("enable-manual-input");
 
       row.forEach((cell, index) => {
         const td = document.createElement("td");
         td.textContent = cell;
+        td.classList.add("data-cell");
 
         if (index === 2) {
           td.classList.add("highlight-column");
         }
 
         tr.appendChild(td);
+        
+        // Inject "Received Qty" input after "Quantity" column (index 2)
+        if (index === 2) {
+          const tdRx = document.createElement("td");
+          tdRx.classList.add("received-qty-column");
+          
+          const rxInput = document.createElement("input");
+          rxInput.type = "number";
+          rxInput.value = receivedQty;
+          rxInput.className = "form-control form-control-sm received-qty-input";
+          
+          if (!enableManualInput) {
+            rxInput.setAttribute("readonly", "readonly");
+          }
+          
+          tdRx.appendChild(rxInput);
+          tr.appendChild(tdRx);
+        }
       });
 
       if (!timestamp) timestamp = getFormattedTimestamp();
@@ -2729,6 +2886,10 @@
 
       tableBody.appendChild(tr);
 
+      if (!skipSave) {
+        reindexScannedTable();
+      }
+
       // Replace with optimized scrolling using requestAnimationFrame
       if (focusEnabled) {
         optimizedScroll(tr, { behavior: "smooth", block: "center" });
@@ -2757,6 +2918,7 @@
 
       scannedBarcodes.delete(barcode);
       row.parentElement.removeChild(row);
+      reindexScannedTable();
 
       saveProgress();
       updateStatistics();
@@ -2876,17 +3038,25 @@
     }
 
     function saveProgress() {
-      const scannedRows = [...scannedBarcodes.entries()].map(
-        ([barcode, row]) => {
-          const rowData = [];
-          row.querySelectorAll("td").forEach((cell, index) => {
-            if (index < excelData[0].length) {
-              rowData.push(cell.textContent);
-            }
-          });
-          return { barcode, data: rowData, source: row.dataset.source || 'scan', timestamp: row.dataset.timestamp || "" };
+      const tableBody = document.getElementById("productTableBody");
+      if (!tableBody) return;
+      
+      const scannedRows = Array.from(tableBody.rows).map(row => {
+        const barcode = row.dataset.barcode;
+        
+        // Extract core spreadsheet data
+        const dataCells = row.querySelectorAll("td.data-cell");
+        const rowData = Array.from(dataCells).map(td => td.textContent);
+        
+        // Extract Received Qty input string
+        let receivedQty = "";
+        const rxInput = row.querySelector(".received-qty-input");
+        if (rxInput) {
+          receivedQty = rxInput.value;
         }
-      );
+        
+        return { barcode, data: rowData, receivedQty, source: row.dataset.source || 'scan', timestamp: row.dataset.timestamp || "" };
+      });
 
       localStorage.setItem("scannedProducts", JSON.stringify(scannedRows));
       localStorage.setItem("remainingNotes", JSON.stringify(remainingNotes));
@@ -2914,8 +3084,8 @@
       if (productTableBody) productTableBody.innerHTML = "";
 
       // Restore scanned rows WITHOUT triggering saveProgress() or updateStatistics() on each row
-      savedScannedProducts.forEach(({ barcode, data: scannedRowData, source, timestamp }) => {
-        addRowToScannedTable(scannedRowData, barcode, false, source || 'scan', timestamp, true); // true = skipSave
+      savedScannedProducts.forEach(({ barcode, data: scannedRowData, receivedQty, source, timestamp }) => {
+        addRowToScannedTable(scannedRowData, barcode, false, source || 'scan', timestamp, true, receivedQty || ""); // true = skipSave
       });
 
       // Dynamically derive remainingProducts from master list directly to completely avoid state fragmentation

@@ -17,7 +17,10 @@
     scale: 1,                  // 0.7 – 1.3
     zebra: true,
     language: 'ar',            // 'ar' | 'en'  ← Arabic is default
-    columnFilterEnabled: false
+    columnFilterEnabled: false,
+    tabbedScanningMode: false,
+    showReceivedQtyColumn: true,
+    enableManualInput: true
   };
 
   /* ── CSS value maps ──────────────────────────────────────────────────── */
@@ -178,6 +181,12 @@
       "Misc Toggles": "مفاتيح متنوعة",
       "Focus on Added: On": "التركيز التلقائي: قيد التشغيل",
       "Voice: Off": "الصوت: معطل",
+      "Enable Tabbed View": "تفعيل عرض التبويبات",
+      "Tabbed View allows switching between Scan and Remaining screens": "يتيح عرض التبويبات التبديل بين شاشة الفحص والمتبقي",
+      "Show Received Quantity Column": "عرض عمود الكمية المستلمة",
+      "Displays the Received Qty column in the Scanned Products table": "يعرض عمود الكمية المستلمة في جدول المنتجات الممسوحة",
+      "Enable Manual Input": "تفعيل الإدخال اليدوي",
+      "Allows typing numbers directly into the Received Qty column": "يسمح بكتابة الأرقام مباشرة في عمود الكمية المستلمة",
       "Reset to Default Settings": "إعادة تعيين للافتراضي",
       "Close Sidebar": "إغلاق القائمة الجانبية",
       "Open Data Import": "استيراد البيانات",
