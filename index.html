@@ -2746,7 +2746,10 @@
         
         // Ensure Tabbed Scan pane is visible if enabled
         if (AppSettings.get().tabbedScanningMode) {
-          document.getElementById("tabScanBtn").click();
+          const tabScanBtn = document.getElementById("tabScanBtn");
+          if (tabScanBtn && !tabScanBtn.classList.contains("active")) {
+            tabScanBtn.click();
+          }
         }
 
         row.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -2754,6 +2757,15 @@
         setTimeout(() => {
           row.classList.remove("duplicate-row");
         }, 3000);
+        
+        // Make it focus on the row moved (specifically the qty input if available)
+        const rxInput = row.querySelector(".received-qty-input");
+        if (rxInput && !rxInput.hasAttribute("readonly")) {
+          rxInput.focus();
+        } else {
+          row.tabIndex = -1;
+          row.focus();
+        }
         
         // Speak the quantity again when the same code is entered
         // Note: quantity cell is the 4th cell now due to the # column
