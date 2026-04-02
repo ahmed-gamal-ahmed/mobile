@@ -288,33 +288,45 @@
     }
     .tabbed-nav {
       position: fixed;
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      background: #fff;
-      box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+      bottom: 15px;
+      left: 15px;
+      width: auto;
+      max-width: fit-content;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.15);
       display: flex;
-      z-index: 1040;
+      z-index: 1060;
+      border-radius: 12px;
+      padding: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      transition: bottom 0.3s ease;
     }
     .tabbed-nav .tab-btn {
-      flex: 1;
-      padding: 15px;
-      font-weight: bold;
-      font-size: 1.1rem;
+      flex: none;
+      padding: 6px 12px;
+      font-weight: 700;
+      font-size: 0.8rem;
       border: none;
-      background: #f8f9fa;
+      background: transparent;
       color: #6c757d;
       transition: all 0.2s;
-      border-top: 3px solid transparent;
-      border-right: 1px solid #dee2e6;
+      border-radius: 8px;
+      margin: 0 2px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      min-height: auto;
+      min-width: auto;
     }
-    .tabbed-nav .tab-btn:last-child {
-      border-right: none;
+    .tabbed-nav .tab-btn i {
+      font-size: 0.9rem;
     }
     .tabbed-nav .tab-btn.active {
-      background: #fff;
-      color: #0d6efd;
-      border-top: 3px solid #0d6efd;
+      background: #0d6efd;
+      color: #fff;
+      box-shadow: 0 2px 6px rgba(13,110,253,0.3);
     }
     .duplicate-row {
       background-color: #fff3cd !important;
@@ -344,29 +356,33 @@
       width: 100%;
       background: #fff;
       border-top: 2px solid #0d6efd;
-      padding: 10px 16px;
+      padding: 6px 12px;
       z-index: 1050;
-      box-shadow: 0 -4px 16px rgba(0,0,0,0.13);
+      box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
     }
     body.fixed-input-bar #fixedInputBar {
       display: block;
     }
+    /* Hide in "Remaining" tab when Tabbed Mode is active */
+    body.tabbed-scanning-mode.showing-remaining-tab #fixedInputBar {
+      display: none !important;
+    }
     body.fixed-input-bar {
       padding-bottom: 80px !important;
     }
-    body.tabbed-scanning-mode.fixed-input-bar {
-      padding-bottom: 140px !important;
+    body.tabbed-scanning-mode.fixed-input-bar:not(.showing-remaining-tab) #bottomTabNav {
+      bottom: 75px; /* Stay above the fixed input bar */
     }
     body.tabbed-scanning-mode.fixed-input-bar #fixedInputBar {
-      bottom: 60px;
+      padding-bottom: 6px !important; /* Keep original padding */
     }
     #fixedInputBar .fixed-barcode-input {
-      font-size: 16px;
-      border-radius: 12px;
+      font-size: 14px;
+      border-radius: 8px;
       border: 2px solid #0d6efd;
-      padding: 10px 14px;
+      padding: 6px 10px;
       width: 100%;
-      box-shadow: 0 2px 8px rgba(13,110,253,0.12);
+      box-shadow: 0 1px 4px rgba(13,110,253,0.1);
       outline: none;
     }
     #fixedInputBar .fixed-barcode-input:focus {
@@ -374,10 +390,10 @@
       box-shadow: 0 0 0 3px rgba(13,110,253,0.25);
     }
     #fixedInputBar .fixed-input-label {
-      font-size: 0.75rem;
+      font-size: 0.65rem;
       font-weight: 700;
       color: #0d6efd;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
       display: block;
     }
   </style>
@@ -1939,15 +1955,23 @@
           btnScan.addEventListener("click", () => {
             btnScan.classList.add("active");
             btnRemaining.classList.remove("active");
+            document.body.classList.remove("showing-remaining-tab");
             scanSection.classList.remove("d-none");
             remainingSection.classList.add("d-none");
-            barcodeInput.focus();
+            
+            // Auto-focus the best input for scanning
+            const activeInput = document.body.classList.contains("fixed-input-bar")
+              ? document.getElementById("fixedBarcodeInput")
+              : document.getElementById("barcodeInput");
+            if (activeInput) activeInput.focus();
+            
             optimizedScroll(document.body, { behavior: "smooth", block: "start" });
           });
           
           btnRemaining.addEventListener("click", () => {
             btnRemaining.classList.add("active");
             btnScan.classList.remove("active");
+            document.body.classList.add("showing-remaining-tab");
             remainingSection.classList.remove("d-none");
             scanSection.classList.add("d-none");
             optimizedScroll(document.body, { behavior: "smooth", block: "start" });
