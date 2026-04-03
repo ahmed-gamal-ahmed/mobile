@@ -1,0 +1,10 @@
+{
+  "name": "productinventorypwa",
+  "version": "1.0.0",
+  "description": "Inventory PWA with Vercel API",
+  "dependencies": {
+    "firebase-admin": "^12.7.0",
+    "googleapis": "^144.0.0"
+  },
+  "private": true
+}

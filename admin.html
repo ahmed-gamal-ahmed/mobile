@@ -421,6 +421,31 @@
               </div>
             </div>
           </div>
+
+          <!-- Option C: Private Google Sheet (Cloud Function) -->
+          <div class="col-12">
+            <div class="card h-100 shadow-sm border-0">
+              <div class="card-header bg-dark text-white fw-bold"><i class="bi bi-lock-fill"></i> Import from Private Google Sheet</div>
+              <div class="card-body">
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                  <button class="btn btn-primary" id="assignPrivateLoadSheetsBtn">
+                    <i class="bi bi-list-ul"></i> Load Sheets
+                  </button>
+                  <button class="btn btn-outline-secondary" id="assignPrivateRefreshSheetsBtn" title="Refresh private sheet list">
+                    <i class="bi bi-arrow-clockwise"></i>
+                  </button>
+                </div>
+                <div id="assignPrivateSheetSelectorContainer" class="d-none">
+                  <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                      <thead class="table-dark"><tr><th>Sheet Name</th><th style="width:120px;">Action</th></tr></thead>
+                      <tbody id="assignPrivateSheetSelectorBody"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="section-divider"></div>
@@ -622,6 +647,8 @@
     const db   = firebase.firestore();
 
     const FIREBASE_API_KEY = "AIzaSyDRE4VFqnr5Y_1AlaPUDcGoZ7njAOmL0T0";
+    const PRIVATE_SHEETS_BASE_URL = "/api";
+    const PRIVATE_SHEETS_CACHE_TTL_MS = 5 * 60 * 1000;
 
     let currentAdmin = null;
     let allUsers = [];
@@ -629,6 +656,7 @@
     let pendingAssignment = null; // { excelData: [], fileName: "" }
     let currentAdminWorkbook = null;
     let assignGoogleWorkbook = null;
+    let privateSheetsCacheAdmin = { ts: 0, names: [] };
     let allDrivers = [];
     let driversSnapshotUnsub = null;
 
@@ -1615,6 +1643,135 @@
         tbody.appendChild(tr);
       });
     }
+
+    function getAdminPrivateSheetCache(forceRefresh) {
+      const now = Date.now();
+      if (!forceRefresh && privateSheetsCacheAdmin.names.length > 0 && (now - privateSheetsCacheAdmin.ts) < PRIVATE_SHEETS_CACHE_TTL_MS) {
+        return privateSheetsCacheAdmin.names;
+      }
+      if (!forceRefresh) {
+        try {
+          const raw = localStorage.getItem("adminPrivateSheetsCache");
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && Array.isArray(parsed.names) && typeof parsed.ts === "number" && (now - parsed.ts) < PRIVATE_SHEETS_CACHE_TTL_MS) {
+              privateSheetsCacheAdmin = parsed;
+              return parsed.names;
+            }
+          }
+        } catch (_) {}
+      }
+      return null;
+    }
+
+    function setAdminPrivateSheetCache(names) {
+      privateSheetsCacheAdmin = { ts: Date.now(), names: Array.isArray(names) ? names : [] };
+      try {
+        localStorage.setItem("adminPrivateSheetsCache", JSON.stringify(privateSheetsCacheAdmin));
+      } catch (_) {}
+    }
+
+    async function fetchAdminPrivateSheetNames(forceRefresh = false) {
+      const cached = getAdminPrivateSheetCache(forceRefresh);
+      if (cached) return cached;
+      const user = firebase.auth().currentUser;
+      if (!user) throw new Error("Please login again.");
+      const token = await user.getIdToken();
+      const res = await fetch(`${PRIVATE_SHEETS_BASE_URL}/getSheetNames`, {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "API error");
+      const names = Array.isArray(body.sheetNames) ? body.sheetNames : [];
+      setAdminPrivateSheetCache(names);
+      return names;
+    }
+
+    async function fetchAdminPrivateSheetData(sheetName) {
+      const user = firebase.auth().currentUser;
+      if (!user) throw new Error("Please login again.");
+      const token = await user.getIdToken();
+      const res = await fetch(`${PRIVATE_SHEETS_BASE_URL}/importSheet`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ sheetName })
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "API error");
+      return Array.isArray(body.values) ? body.values : [];
+    }
+
+    function renderAdminPrivateSheetSelector(names) {
+      const container = document.getElementById("assignPrivateSheetSelectorContainer");
+      const tbody = document.getElementById("assignPrivateSheetSelectorBody");
+      tbody.innerHTML = "";
+      names.forEach((name) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td class="align-middle fw-semibold">${escHtml(name)}</td><td></td>`;
+        const btn = document.createElement("button");
+        btn.className = "btn btn-success btn-sm w-100";
+        btn.innerHTML = `<i class="bi bi-file-earmark-spreadsheet"></i> Import`;
+        btn.addEventListener("click", async () => {
+          const original = btn.innerHTML;
+          btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span>`;
+          btn.disabled = true;
+          try {
+            const parsed = await fetchAdminPrivateSheetData(name);
+            const filtered = parsed.filter(r => Array.isArray(r) && r.some(c => c !== null && c !== undefined && c !== ""));
+            if (filtered.length === 0) {
+              alert("Sheet not found or empty.");
+              return;
+            }
+            pendingAssignment = { excelData: filtered, fileName: name };
+            document.getElementById("assignFilePreview").textContent =
+              `✅ ${name} — ${Math.max(0, filtered.length - 1)} data rows`;
+            document.getElementById("assignFilePreview").classList.remove("d-none");
+            updateAssignPreview();
+          } catch (err) {
+            alert("Could not import private sheet: " + err.message);
+          } finally {
+            btn.innerHTML = original;
+            btn.disabled = false;
+          }
+        });
+        tr.querySelector("td:last-child").appendChild(btn);
+        tbody.appendChild(tr);
+      });
+      container.classList.toggle("d-none", names.length === 0);
+    }
+
+    document.getElementById("assignPrivateLoadSheetsBtn").addEventListener("click", async () => {
+      const btn = document.getElementById("assignPrivateLoadSheetsBtn");
+      const orig = btn.innerHTML;
+      btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Loading...`;
+      btn.disabled = true;
+      try {
+        const names = await fetchAdminPrivateSheetNames(false);
+        if (!names.length) {
+          alert("No private sheets found.");
+          return;
+        }
+        renderAdminPrivateSheetSelector(names);
+      } catch (err) {
+        alert("Unable to load private sheets: " + err.message);
+      } finally {
+        btn.innerHTML = orig;
+        btn.disabled = false;
+      }
+    });
+
+    document.getElementById("assignPrivateRefreshSheetsBtn").addEventListener("click", async () => {
+      try {
+        const names = await fetchAdminPrivateSheetNames(true);
+        renderAdminPrivateSheetSelector(names);
+      } catch (err) {
+        alert("Unable to refresh private sheets: " + err.message);
+      }
+    });
 
     // Google Sheets (Option B)
     document.getElementById("assignLoadSheetBtn").addEventListener("click", () => {
