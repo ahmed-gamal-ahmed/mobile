@@ -21,7 +21,8 @@
     tabbedScanningMode: false,
     showReceivedQtyColumn: true,
     enableManualInput: true,
-    fixedInputBar: false
+    fixedInputBar: false,
+    voiceMode: 'off'            // 'off' | 'en' | 'ar'
   };
 
   /* ── CSS value maps ──────────────────────────────────────────────────── */
@@ -182,6 +183,8 @@
       "Misc Toggles": "مفاتيح متنوعة",
       "Focus on Added: On": "التركيز التلقائي: قيد التشغيل",
       "Voice: Off": "الصوت: معطل",
+      "Driver": "السائق",
+      "Driver Name": "اسم السائق",
       "Enable Tabbed View": "تفعيل عرض التبويبات",
       "Tabbed View allows switching between Scan and Remaining screens": "يتيح عرض التبويبات التبديل بين شاشة الفحص والمتبقي",
       "Show Received Quantity Column": "عرض عمود الكمية المستلمة",
@@ -247,7 +250,34 @@
       "Sheet URL": "رابط الجدول",
       "Assign to User": "تعيين للمستخدم",
       "Force Assignment": "فرض التعيين",
-      "Select a user": "اختر مستخدم"
+      "Select a user": "اختر مستخدم",
+
+      // Driver management (admin + index)
+      "Drivers": "السائقين",
+      "Add Driver": "إضافة سائق",
+      "Add driver name": "اسم السائق",
+      "Edit Driver": "تعديل السائق",
+      "Deactivate": "تعطيل",
+      "Restore": "استعادة",
+      "Remove permanently": "حذف نهائي",
+      "Show deleted drivers": "عرض السائقين المحذوفين",
+      "No drivers yet. Add one above.": "لا يوجد سائقون بعد. أضف سائقاً أعلاه.",
+      "— Select —": "— اختر —",
+      "Select driver": "اختر السائق",
+      "Enter driver name (offline)": "أدخل اسم السائق (بدون اتصال)",
+      "Driver name (offline / manual)": "اسم السائق (يدوي / بدون اتصال)",
+      "Saving…": "جاري الحفظ…",
+      "Saved": "تم الحفظ",
+      "Driver updated": "تم تحديث السائق",
+      "Failed to save driver": "فشل حفظ السائق",
+      "Driver deactivated": "تم تعطيل السائق",
+      "Driver restored": "تمت استعادة السائق",
+      "Permanently delete this driver?": "حذف هذا السائق نهائياً؟",
+      "Driver removed": "تم حذف السائق",
+      "Enter driver name": "أدخل اسم السائق",
+      "Please select a driver.": "يرجى اختيار سائق.",
+      "Deactivate this driver? They will be hidden from dropdowns.": "تعطيل هذا السائق؟ سيُخفى من القوائم.",
+      "Driver added.": "تمت إضافة السائق."
     },
 
     translationObserver: null,

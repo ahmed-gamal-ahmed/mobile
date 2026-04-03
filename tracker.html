@@ -179,6 +179,7 @@
               <tr>
                 <th>Operation Name</th>
                 <th>Auditors</th>
+                <th>Driver</th>
                 <th>Date &amp; Time</th>
                 <th class="text-center">Total</th>
                 <th class="text-center">Scanned</th>
@@ -187,7 +188,7 @@
               </tr>
             </thead>
             <tbody id="opsTableBody">
-              <tr><td colspan="7" class="text-center text-muted py-4">
+              <tr><td colspan="8" class="text-center text-muted py-4">
                 <span class="spinner-border spinner-border-sm me-2"></span>Loading operations...
               </td></tr>
             </tbody>
@@ -272,7 +273,7 @@
         applyFilters();
       } catch (err) {
         document.getElementById("opsTableBody").innerHTML =
-          `<tr><td colspan="7" class="text-center text-danger py-4">Failed to load operations: ${escHtml(err.message)}</td></tr>`;
+          `<tr><td colspan="8" class="text-center text-danger py-4">Failed to load operations: ${escHtml(err.message)}</td></tr>`;
       }
     }
 
@@ -336,13 +337,17 @@
       tbody.innerHTML = "";
 
       if (!ops || ops.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No operations found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">No operations found.</td></tr>`;
         return;
       }
 
       ops.forEach(op => {
         const dateStr = op.timestamp ? new Date(op.timestamp).toLocaleString() : "—";
         const auditors = (op.auditors && op.auditors.length) ? op.auditors.join(", ") : "—";
+        const driverName = (() => {
+          const n = (op.driverName || op.driver || "").toString().trim();
+          return n || "—";
+        })();
         const rowId = "op-row-" + op.id;
         const detailsId = "op-details-" + op.id;
 
@@ -352,6 +357,7 @@
         tr.innerHTML = `
           <td class="fw-semibold">${escHtml(op.operationName || "—")}</td>
           <td class="fs-small">${escHtml(auditors)}</td>
+          <td class="fs-small">${escHtml(driverName)}</td>
           <td class="fs-small">${dateStr}</td>
           <td class="text-center">${op.totalProducts || 0}</td>
           <td class="text-center text-success fw-bold">${op.scannedCount || 0}</td>
@@ -371,7 +377,7 @@
         detailsTr.id = detailsId;
         detailsTr.className = "details-row d-none";
         const td = document.createElement("td");
-        td.colSpan = 7;
+        td.colSpan = 8;
         td.innerHTML = buildDetailsHTML(op);
         detailsTr.appendChild(td);
         tbody.appendChild(detailsTr);
@@ -409,7 +415,10 @@
       const pct = total > 0 ? Math.round((scanned / total) * 100) : 0;
 
       // Progress bar
+      const driverDisp = (op.driverName || op.driver || "").toString().trim() || "—";
+
       let html = `<div class="details-inner">
+        <div class="mb-2 small"><strong>Driver:</strong> ${escHtml(driverDisp)}</div>
         <div class="mb-3">
           <div class="d-flex justify-content-between small fw-bold mb-1">
             <span class="text-success">Scanned: ${scanned} / ${total}</span>

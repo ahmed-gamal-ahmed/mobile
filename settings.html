@@ -33,8 +33,9 @@
 
     /* ── Navbar ── */
     .navbar {
-      background: linear-gradient(135deg, #0d6efd, #6610f2);
-      box-shadow: 0 2px 20px rgba(13, 110, 253, 0.4);
+      background: linear-gradient(135deg, rgba(13, 110, 253, 0.95), rgba(102, 16, 242, 0.92));
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
     }
     .navbar-brand {
       font-weight: 800;
@@ -46,7 +47,7 @@
     /* ── Page Hero ── */
     .settings-hero {
       text-align: center;
-      padding: 2rem 0 1.5rem;
+      padding: 1.5rem 0 1.25rem;
       color: #fff;
     }
     .settings-hero h1 {
@@ -62,24 +63,24 @@
 
     /* ── Section Cards ── */
     .settings-card {
-      background: rgba(255, 255, 255, 0.05);
-      backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(13, 27, 42, 0.08);
+      border-radius: 18px;
       padding: 24px;
       margin-bottom: 20px;
       transition: transform 0.2s ease, box-shadow 0.2s ease;
+      color: #1f2937;
     }
     .settings-card:hover {
       transform: translateY(-2px);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 14px 34px rgba(15, 23, 42, 0.14);
     }
     .settings-card .card-section-title {
       font-size: 0.75rem;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 1.5px;
-      color: #a0cfff;
+      color: #0d6efd;
       margin-bottom: 20px;
       display: flex;
       align-items: center;
@@ -95,8 +96,8 @@
       align-items: center;
       justify-content: space-between;
       padding: 14px 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-      color: #fff;
+      border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+      color: #1f2937;
       gap: 16px;
     }
     .setting-row:last-child {
@@ -113,13 +114,13 @@
     }
     .setting-description {
       font-size: 0.78rem;
-      opacity: 0.6;
+      color: #6b7280;
       margin-top: 2px;
     }
     .setting-value-badge {
-      background: rgba(13, 110, 253, 0.3);
-      border: 1px solid rgba(13, 110, 253, 0.5);
-      color: #7eb8ff;
+      background: rgba(13, 110, 253, 0.12);
+      border: 1px solid rgba(13, 110, 253, 0.2);
+      color: #0d6efd;
       font-size: 0.8rem;
       font-weight: 700;
       padding: 3px 12px;
@@ -142,7 +143,7 @@
       font-size: 0.72rem;
       opacity: 0.5;
       margin-top: 2px;
-      color: #fff;
+      color: #64748b;
     }
 
     /* ── Toggle Switch ── */
@@ -158,27 +159,27 @@
 
     /* ── Select Dropdown ── */
     .form-select {
-      background-color: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      color: #fff;
+      background-color: #fff;
+      border: 1px solid #d1d5db;
+      color: #111827;
       border-radius: 8px;
       max-width: 200px;
     }
     .form-select option {
-      background-color: #1b2a4a;
-      color: #fff;
+      background-color: #fff;
+      color: #111827;
     }
     .form-select:focus {
-      background-color: rgba(255, 255, 255, 0.15);
+      background-color: #fff;
       border-color: #0d6efd;
-      color: #fff;
+      color: #111827;
       box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.3);
     }
 
     /* ── Preview Table ── */
     .preview-section {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px dashed rgba(255, 255, 255, 0.15);
+      background: #f8fafc;
+      border: 1px dashed #cbd5e1;
       border-radius: 10px;
       padding: 16px;
       margin-top: 20px;
@@ -188,7 +189,7 @@
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 1px;
-      color: #a0cfff;
+      color: #2563eb;
       margin-bottom: 12px;
     }
     .preview-table {
@@ -197,14 +198,23 @@
     }
     .preview-table th,
     .preview-table td {
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: #fff;
-      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid #dbe2ea;
+      color: #0f172a;
+      background: #fff;
       font-size: 0.82rem;
     }
     .preview-table th {
-      background: rgba(13, 110, 253, 0.2);
+      background: #dbeafe;
       font-weight: 700;
+    }
+    .settings-layout {
+      align-items: flex-start;
+    }
+    @media (max-width: 991px) {
+      #settingsMain {
+        padding-left: 12px;
+        padding-right: 12px;
+      }
     }
 
     /* ── Reset Button ── */
@@ -287,7 +297,7 @@
   </nav>
 
   <!-- Main content (hidden until auth passes) -->
-  <div id="settingsMain" class="container" style="max-width:680px; display:none;">
+  <div id="settingsMain" class="container" style="max-width:1180px; display:none;">
 
     <!-- Hero -->
     <div class="settings-hero">
@@ -295,8 +305,10 @@
       <p>Customize your display, scale, and preferences. All settings are saved automatically.</p>
     </div>
 
-    <!-- ══ CARD 1: Display Preferences ══ -->
-    <div class="settings-card">
+    <div class="row g-4 settings-layout">
+      <div class="col-12 col-lg-6">
+        <!-- ══ CARD 1: Display Preferences ══ -->
+        <div class="settings-card">
       <div class="card-section-title">
         <i class="bi bi-palette2"></i> Display Preferences
       </div>
@@ -362,10 +374,10 @@
           <input class="form-check-input" type="checkbox" id="settingsZebra" role="switch">
         </div>
       </div>
-    </div>
+        </div>
 
-    <!-- ══ CARD 2: App Scaling ══ -->
-    <div class="settings-card">
+        <!-- ══ CARD 2: App Scaling ══ -->
+        <div class="settings-card">
       <div class="card-section-title">
         <i class="bi bi-fullscreen"></i> App Scaling
       </div>
@@ -386,10 +398,12 @@
           </div>
         </div>
       </div>
-    </div>
+        </div>
+      </div>
 
-    <!-- ══ CARD 3: Language & Behavior ══ -->
-    <div class="settings-card">
+      <div class="col-12 col-lg-6">
+        <!-- ══ CARD 3: Language & Behavior ══ -->
+        <div class="settings-card">
       <div class="card-section-title">
         <i class="bi bi-translate"></i> Language & Behavior
       </div>
@@ -403,6 +417,18 @@
         <select class="form-select" id="settingsLanguage">
           <option value="en">English (LTR)</option>
           <option value="ar">Arabic (RTL)</option>
+        </select>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Voice Mode</div>
+          <div class="setting-description">Select how quantities are spoken during scanning</div>
+        </div>
+        <select class="form-select" id="settingsVoiceMode">
+          <option value="off">Off (no voice)</option>
+          <option value="en">English (speak quantities in English)</option>
+          <option value="ar">Arabic (speak quantities in Arabic)</option>
         </select>
       </div>
 
@@ -459,10 +485,10 @@
           <input class="form-check-input" type="checkbox" id="settingsFixedInputBar" role="switch">
         </div>
       </div>
-    </div>
+        </div>
 
-    <!-- ══ CARD 4: Table View Options (Legacy Restore) ══ -->
-    <div class="settings-card">
+        <!-- ══ CARD 4: Table View Options (Legacy Restore) ══ -->
+        <div class="settings-card">
       <div class="card-section-title">
         <i class="bi bi-layout-wtf"></i> Advanced Table Options
       </div>
@@ -499,10 +525,10 @@
           <input class="form-check-input" type="checkbox" id="settingsTimestampColumn" role="switch">
         </div>
       </div>
-    </div>
+        </div>
 
-    <!-- ══ CARD 5: Navigation ══ -->
-    <div class="settings-card">
+        <!-- ══ CARD 5: Navigation ══ -->
+        <div class="settings-card">
       <div class="card-section-title">
         <i class="bi bi-grid-3x3-gap"></i> Navigation
       </div>
@@ -516,6 +542,8 @@
         <a id="adminDashboardLink" href="admin.html" class="btn btn-warning fw-bold d-none">
           <i class="bi bi-speedometer2"></i> Admin Dashboard
         </a>
+      </div>
+        </div>
       </div>
     </div>
 
@@ -563,6 +591,7 @@
 
       document.getElementById("settingsZebra").checked = s.zebra !== false;
       document.getElementById("settingsLanguage").value = s.language || "ar";
+      document.getElementById("settingsVoiceMode").value = s.voiceMode || "off";
       document.getElementById("settingsColumnFilter").checked = !!s.columnFilterEnabled;
       document.getElementById("settingsTabbedScanningMode").checked = !!s.tabbedScanningMode;
       document.getElementById("settingsShowReceivedQtyColumn").checked = s.showReceivedQtyColumn !== false;
@@ -631,6 +660,10 @@
     // ── Wire up: Language ─────────────────────────────────────────────────────
     document.getElementById("settingsLanguage").addEventListener("change", (e) => {
       updateSettingAndSave("language", e.target.value);
+    });
+
+    document.getElementById("settingsVoiceMode").addEventListener("change", (e) => {
+      updateSettingAndSave("voiceMode", e.target.value);
     });
 
     // ── Wire up: Column Filter ────────────────────────────────────────────────

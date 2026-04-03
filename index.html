@@ -61,7 +61,7 @@
       color: white;
       padding: 20px;
       transition: left 0.3s ease;
-      z-index: 1050;
+      z-index: 1060;
     }
 
     #sidebar.open {
@@ -75,21 +75,8 @@
       }
 
       body.sidebar-open {
-        margin-left: 0;
         overflow: hidden;
         /* Prevent body scroll when sidebar is open */
-      }
-
-      /* Overlay when sidebar is open */
-      body.sidebar-open:before {
-        content: '';
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 1040;
       }
     }
 
@@ -160,7 +147,19 @@
     }
 
     body.sidebar-open {
-      margin-left: 250px;
+      overflow: hidden;
+    }
+
+    /* Overlay when sidebar is open */
+    body.sidebar-open:before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1055;
     }
 
     .sidebar {
@@ -265,7 +264,7 @@
       }
 
       body.sidebar-open {
-        margin-left: 0;
+        overflow: hidden;
       }
 
       .container {
@@ -517,6 +516,9 @@
     </div>
     <!-- Online Review Operations Section -->
     <div class="mb-3">
+      <label for="driverSelect" class="form-label fw-semibold small mb-1">Driver Name</label>
+      <select id="driverSelect" class="form-select mb-2"></select>
+      <input type="text" id="driverNameFallback" class="form-control mb-2 d-none" placeholder="Enter driver name (offline)" />
       <button id="saveReviewOperationBtn" class="btn btn-primary w-100 mb-2" title="Save Review Operation">
         <i class="bi bi-cloud-upload"></i> Save Review Operation
       </button>
@@ -713,6 +715,22 @@
         <div class="mt-3">
           <label for="fileInput" class="form-label">Upload Excel or CSV File</label>
           <input type="file" id="fileInput" class="form-control" accept=".xlsx, .xls, .csv" />
+        </div>
+        <div id="localSheetContainer" class="d-none mt-3">
+          <div class="table-responsive">
+            <table class="table table-bordered table-hover mt-3">
+              <thead class="table-dark">
+                <tr>
+                  <th>Worksheet Name</th>
+                  <th>Number of Items</th>
+                  <th style="width: 150px;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="localSheetTableBody">
+                <!-- Populate via JS -->
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -974,12 +992,12 @@
     let remainingProducts = [];
     let fileName = "Product Inventory"; // Default file name
     let currentGoogleWorkbook = null;
+    let currentLocalWorkbook = null;
     let focusEnabled = localStorage.getItem("focusEnabled") !== "false"; // State variable to track focus mode
     let hiddenColumns = []; // Track hidden columns
     let remainingNotesColumnVisible = localStorage.getItem("remainingNotesColumnVisible") === "true";
     let remainingNotes = {}; // row key (barcode) -> note text for remaining table only
     let editedBarcodes = new Map(); // Store edited barcodes
-    let voiceMode = localStorage.getItem("voiceMode") || "off"; // off, en, ar
     let speechInitialized = false;
     let barcodeNotFoundHideTimeoutId = null;
     let descriptionWarningHideTimeoutId = null;
@@ -995,6 +1013,9 @@
     let appSettings = AppSettings.get();
     // Re-sync whenever we need the latest value
     function getAppSettings() { return AppSettings.get(); }
+    function getVoiceMode() {
+      return (AppSettings.get().voiceMode || "off");
+    }
 
 
     function getFormattedTimestamp() {
@@ -1004,9 +1025,10 @@
     }
 
     function applyTimestampColumnVisibility() {
+      const forceHide = !!currentUserRestrictions.hideTimestampColumn;
       const elements = document.querySelectorAll(".timestamp-column-scanned");
       elements.forEach(el => {
-        if (timestampColumnVisible) {
+        if (timestampColumnVisible && !forceHide) {
           el.classList.remove("d-none");
         } else {
           el.classList.add("d-none");
@@ -1101,10 +1123,68 @@
         : '<i class="bi bi-bullseye"></i> Focus on Added: Off';
     }
 
+    function updateRemainingButtonVisibility() {
+      const button = document.getElementById("toggleRemainingButton");
+      if (!button) return;
+      const isTabbedMode = !!AppSettings.get().tabbedScanningMode;
+      button.style.display = isTabbedMode ? "none" : "";
+    }
+
+    function applySourceColumnVisibility() {
+      const hide = !!currentUserRestrictions.hideSourceColumn;
+      document.querySelectorAll(".source-column-scanned").forEach(el => {
+        if (hide) {
+          el.classList.add("d-none");
+        } else {
+          el.classList.remove("d-none");
+        }
+      });
+    }
+
+    function applyActionColumnVisibility() {
+      const hide = !!currentUserRestrictions.hideActionColumn || isReadOnlyMode();
+      document.querySelectorAll(".action-column").forEach(el => {
+        if (hide) {
+          el.classList.add("d-none");
+        } else {
+          el.classList.remove("d-none");
+        }
+      });
+    }
+
+    function applyUserRestrictions() {
+      const isRestrictedUser = currentUser && currentUser.role === "user";
+      const effective = isRestrictedUser ? currentUserRestrictions : normalizeRestrictions(null);
+
+      const settingsBtn = document.getElementById("navSettingsBtn");
+      if (settingsBtn) settingsBtn.style.display = effective.hideSettingsButton ? "none" : "";
+
+      const exportBtn = document.getElementById("exportButton");
+      if (exportBtn) exportBtn.style.display = effective.disableExport ? "none" : "";
+
+      const importBtn = document.getElementById("navDataImportBtn");
+      if (importBtn) importBtn.style.display = effective.disableImport ? "none" : "";
+
+      const barcodeInput = document.getElementById("barcodeInput");
+      const fixedBarcodeInput = document.getElementById("fixedBarcodeInput");
+      if (barcodeInput) barcodeInput.disabled = !!effective.readOnly;
+      if (fixedBarcodeInput) fixedBarcodeInput.disabled = !!effective.readOnly;
+
+      const toggleTimestampBtn = document.getElementById("toggleTimestampColumnButton");
+      if (toggleTimestampBtn) toggleTimestampBtn.style.display = effective.hideTimestampColumn ? "none" : "";
+
+      updateVoiceButtonText();
+      applyTimestampColumnVisibility();
+      applySourceColumnVisibility();
+      applyActionColumnVisibility();
+    }
+
     function updateVoiceButtonText() {
       const button = document.getElementById("voiceToggleButton");
       if (!button) return;
 
+      button.disabled = !!currentUserRestrictions.disableVoice;
+      const voiceMode = getVoiceMode();
       if (voiceMode === "off") {
         button.textContent = "Voice: Off";
         button.classList.remove("btn-primary", "btn-success");
@@ -1117,6 +1197,12 @@
         button.textContent = "Voice: Arabic";
         button.classList.remove("btn-secondary", "btn-primary");
         button.classList.add("btn-success");
+      }
+
+      if (currentUserRestrictions.disableVoice) {
+        button.textContent = "Voice: Disabled";
+        button.classList.remove("btn-primary", "btn-success");
+        button.classList.add("btn-secondary");
       }
     }
 
@@ -1135,6 +1221,8 @@
 
     function speakQuantity(quantity) {
       if (!("speechSynthesis" in window)) return;
+      if (currentUserRestrictions.disableVoice) return;
+      const voiceMode = getVoiceMode();
       if (voiceMode === "off") return;
       if (quantity === undefined || quantity === null) return;
 
@@ -1164,6 +1252,8 @@
 
     function speakBarcodeNotFound() {
       if (!("speechSynthesis" in window)) return;
+      if (currentUserRestrictions.disableVoice) return;
+      const voiceMode = getVoiceMode();
       if (voiceMode === "off") return;
 
       const text =
@@ -1463,6 +1553,36 @@
 
     let appInitialized = false;
     let currentUser = null;
+    /** @type {{id:string,name:string}[]} */
+    let driversIndexCache = [];
+    let currentUserRestrictions = {
+      hideTimestampColumn: false,
+      hideSourceColumn: false,
+      hideSettingsButton: false,
+      disableVoice: false,
+      disableExport: false,
+      disableImport: false,
+      readOnly: false,
+      hideActionColumn: false
+    };
+
+    function normalizeRestrictions(r) {
+      const src = r || {};
+      return {
+        hideTimestampColumn: !!src.hideTimestampColumn,
+        hideSourceColumn: !!src.hideSourceColumn,
+        hideSettingsButton: !!src.hideSettingsButton,
+        disableVoice: !!src.disableVoice,
+        disableExport: !!src.disableExport,
+        disableImport: !!src.disableImport,
+        readOnly: !!src.readOnly,
+        hideActionColumn: !!src.hideActionColumn
+      };
+    }
+
+    function isReadOnlyMode() {
+      return !!(currentUser && currentUser.role === "user" && currentUserRestrictions.readOnly);
+    }
 
     function applyRoleUI() {
       const isAdmin = currentUser && currentUser.role === "admin";
@@ -1716,12 +1836,80 @@
       });
     }
 
+    function getDriverPayloadForSave() {
+      const sel = document.getElementById("driverSelect");
+      const fb = document.getElementById("driverNameFallback");
+      if (fb && !fb.classList.contains("d-none")) {
+        const driverName = (fb.value || "").trim();
+        return { driverId: "", driverName: driverName, driver: driverName };
+      }
+      if (sel && sel.value) {
+        const opt = sel.options[sel.selectedIndex];
+        const driverId = (sel.value || "").trim();
+        const driverName = ((opt.dataset && opt.dataset.name) || opt.textContent || "").trim();
+        return { driverId: driverId, driverName: driverName, driver: driverName };
+      }
+      if (sel && !sel.classList.contains("d-none") && driversIndexCache.length > 0) {
+        return { driverId: "", driverName: "", driver: "" };
+      }
+      const fallbackName = currentUser && currentUser.displayName ? currentUser.displayName.trim() : "";
+      return { driverId: "", driverName: fallbackName, driver: fallbackName };
+    }
+
+    async function loadDriversForIndex() {
+      if (!firestoreDb) return;
+      try {
+        const snap = await firestoreDb.collection("drivers").get();
+        driversIndexCache = [];
+        snap.forEach((docSnap) => {
+          const d = docSnap.data();
+          if (d.active !== false) {
+            driversIndexCache.push({ id: docSnap.id, name: (d.name || "").toString() });
+          }
+        });
+        driversIndexCache.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+      } catch (e) {
+        console.error("loadDriversForIndex:", e);
+        driversIndexCache = [];
+      }
+      populateDriverSelectUI();
+    }
+
+    function populateDriverSelectUI() {
+      const sel = document.getElementById("driverSelect");
+      const fb = document.getElementById("driverNameFallback");
+      if (!sel) return;
+      sel.innerHTML = "";
+      const opt0 = document.createElement("option");
+      opt0.value = "";
+      opt0.textContent = "— Select —";
+      sel.appendChild(opt0);
+      driversIndexCache.forEach((d) => {
+        const o = document.createElement("option");
+        o.value = d.id;
+        o.textContent = d.name;
+        o.dataset.name = d.name;
+        sel.appendChild(o);
+      });
+      if (driversIndexCache.length === 0) {
+        sel.classList.add("d-none");
+        if (fb) {
+          fb.classList.remove("d-none");
+          if (!(fb.value || "").trim() && currentUser) fb.value = currentUser.displayName || "";
+        }
+      } else {
+        sel.classList.remove("d-none");
+        if (fb) fb.classList.add("d-none");
+      }
+    }
+
     // Silent save — no prompts, no alerts
     async function triggerSaveOperation() {
       if (!firestoreDb || !currentUser) return;
       if (!excelData || excelData.length === 0) return;
 
       const sessionDataStr = localStorage.getItem("scannedProducts") || "[]";
+      const dp = getDriverPayloadForSave();
       try {
         await firestoreDb.collection("savedOperations").add({
           operationName: fileName,
@@ -1732,6 +1920,9 @@
           auditors: [currentUser.displayName],
           createdBy: currentUser.uid,
           createdByName: currentUser.displayName,
+          driverId: dp.driverId || "",
+          driverName: dp.driverName || "",
+          driver: dp.driver || "",
           excelData: JSON.stringify(excelData),
           scannedProducts: sessionDataStr,
           remainingProducts: JSON.stringify(remainingProducts),
@@ -1814,8 +2005,17 @@
             role: (userData.role || "").toLowerCase()
           };
 
-          // Both Admin and Tracker can use index.html
-          if (currentUser.role !== "admin" && currentUser.role !== "tracker") {
+          await loadDriversForIndex();
+          const fb = document.getElementById("driverNameFallback");
+          if (fb && !fb.classList.contains("d-none")) {
+            fb.value = currentUser.displayName || "";
+          }
+          currentUserRestrictions = currentUser.role === "user"
+            ? normalizeRestrictions(userData.restrictions)
+            : normalizeRestrictions(null);
+
+          // Admin, Tracker, and User can use index.html
+          if (currentUser.role !== "admin" && currentUser.role !== "tracker" && currentUser.role !== "user") {
             await firebase.auth().signOut();
             alert("Access Denied: Unauthorized role.");
             window.location.reload();
@@ -1852,6 +2052,8 @@
 
           // Apply translations with the loaded settings
           AppSettings.applyTranslations();
+          updateRemainingButtonVisibility();
+          applyUserRestrictions();
 
           // Start assignment listener
           startAssignmentListener();
@@ -2029,7 +2231,9 @@
         });
       document
         .getElementById("voiceToggleButton")
-        .addEventListener("click", () => {
+        .addEventListener("click", async () => {
+          if (currentUserRestrictions.disableVoice) return;
+          let voiceMode = getVoiceMode();
           if (voiceMode === "off") {
             voiceMode = "en";
           } else if (voiceMode === "en") {
@@ -2037,7 +2241,8 @@
           } else {
             voiceMode = "off";
           }
-          localStorage.setItem("voiceMode", voiceMode);
+          AppSettings.save({ voiceMode }, firestoreDb, currentUser?.uid);
+          appSettings = AppSettings.get();
           updateVoiceButtonText();
         });
       document
@@ -2416,6 +2621,7 @@
 
       // Mobile-optimized sidebar toggle
       document.getElementById("openSidebarButton").addEventListener("click", () => {
+        updateRemainingButtonVisibility();
         document.getElementById("sidebar").classList.add("open");
         document.body.classList.add("sidebar-open");
       });
@@ -2439,6 +2645,63 @@
       });
     }
 
+    function renderLocalSheetList(sheetNames) {
+      const tbody = document.getElementById("localSheetTableBody");
+      tbody.innerHTML = "";
+
+      sheetNames.forEach(name => {
+        const sheet = currentLocalWorkbook.Sheets[name];
+        const parsedData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+        const validRows = parsedData.filter(row =>
+          row.some(cell => cell !== null && cell !== undefined && cell !== "")
+        );
+        const countToDisplay = Math.max(0, validRows.length - 1);
+
+        const tr = document.createElement("tr");
+
+        const tdName = document.createElement("td");
+        tdName.className = "align-middle";
+        tdName.textContent = name;
+
+        const tdCount = document.createElement("td");
+        tdCount.className = "align-middle";
+        tdCount.textContent = countToDisplay.toString();
+
+        const tdAction = document.createElement("td");
+        const btn = document.createElement("button");
+        btn.className = "btn btn-success btn-sm w-100";
+        btn.innerHTML = '<i class="bi bi-file-earmark-spreadsheet"></i> Import';
+        btn.addEventListener("click", () => {
+          if (!currentLocalWorkbook) {
+            alert("Please upload a file first.");
+            return;
+          }
+
+          const selectedSheet = currentLocalWorkbook.Sheets[name];
+          if (!selectedSheet) {
+            alert("Selected worksheet not found.");
+            return;
+          }
+
+          const selectedParsedData = XLSX.utils.sheet_to_json(selectedSheet, { header: 1 });
+          fileName = name;
+          document.getElementById("pageHeader").textContent = fileName;
+          localStorage.setItem("fileName", fileName);
+          processImportedData(selectedParsedData);
+          document.getElementById("localSheetContainer").classList.add("d-none");
+          document.getElementById("dataImportContainer").classList.add("d-none");
+          document.getElementById("mainAppContainer").classList.remove("d-none");
+          currentLocalWorkbook = null;
+        });
+        tdAction.appendChild(btn);
+
+        tr.appendChild(tdName);
+        tr.appendChild(tdCount);
+        tr.appendChild(tdAction);
+        tbody.appendChild(tr);
+      });
+    }
+
     async function handleFileUpload(event) {
       if (await hasUnsavedWork()) {
         const proceed = await showUnsavedWorkWarning();
@@ -2450,14 +2713,17 @@
       const file = event.target.files[0];
       if (!file) return;
 
-      if (file.name) {
-        fileName = file.name;
-        document.getElementById("pageHeader").textContent = fileName;
-        localStorage.setItem("fileName", fileName);
-      }
+      document.getElementById("localSheetContainer").classList.add("d-none");
+      document.getElementById("localSheetTableBody").innerHTML = "";
+      currentLocalWorkbook = null;
 
       const lowerName = file.name.toLowerCase();
       if (lowerName.endsWith(".csv")) {
+        if (file.name) {
+          fileName = file.name;
+          document.getElementById("pageHeader").textContent = fileName;
+          localStorage.setItem("fileName", fileName);
+        }
         Papa.parse(file, {
           complete: function (results) {
             processImportedData(results.data);
@@ -2475,13 +2741,27 @@
         reader.onload = (e) => {
           const data = new Uint8Array(e.target.result);
           const workbook = XLSX.read(data, { type: "array" });
-          const sheetName = workbook.SheetNames[0];
-          const sheet = workbook.Sheets[sheetName];
-          const parsedData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-          processImportedData(parsedData);
-          document.getElementById("fileInput").value = "";
-          document.getElementById("dataImportContainer").classList.add("d-none");
-          document.getElementById("mainAppContainer").classList.remove("d-none");
+          const sheetNames = workbook.SheetNames || [];
+
+          if (sheetNames.length === 1) {
+            const sheetName = sheetNames[0];
+            const sheet = workbook.Sheets[sheetName];
+            const parsedData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+            fileName = sheetName;
+            document.getElementById("pageHeader").textContent = fileName;
+            localStorage.setItem("fileName", fileName);
+            processImportedData(parsedData);
+            document.getElementById("fileInput").value = "";
+            document.getElementById("dataImportContainer").classList.add("d-none");
+            document.getElementById("mainAppContainer").classList.remove("d-none");
+          } else if (sheetNames.length > 1) {
+            currentLocalWorkbook = workbook;
+            renderLocalSheetList(sheetNames);
+            document.getElementById("localSheetContainer").classList.remove("d-none");
+            document.getElementById("fileInput").value = "";
+          } else {
+            alert("No worksheets found in this Excel file.");
+          }
         };
         reader.readAsArrayBuffer(file);
       }
@@ -2701,6 +2981,7 @@
 
       const thSource = document.createElement("th");
       thSource.textContent = "Source";
+      thSource.classList.add("source-column-scanned");
       tableHeaders.appendChild(thSource);
 
       const thAction = document.createElement("th");
@@ -2811,6 +3092,12 @@
     }
 
     function handleBarcodeSearch(event, forceSource = null) {
+      if (isReadOnlyMode()) {
+        if (event && event.target) event.target.value = "";
+        alert("Read-only mode is enabled for your account.");
+        return;
+      }
+
       let barcode = event.target.value.toString().trim();
 
       if (barcode === "") return;
@@ -3002,6 +3289,7 @@
       tr.appendChild(tdTimestamp);
 
       const tdSource = document.createElement("td");
+      tdSource.classList.add("source-column-scanned");
       if (source === 'scan') {
         tdSource.innerHTML = '<span class="badge bg-success"><i class="bi bi-upc-scan"></i> Scan</span>';
       } else {
@@ -3010,11 +3298,14 @@
       tr.appendChild(tdSource);
 
       const tdAction = document.createElement("td");
+      tdAction.classList.add("action-column");
       const returnButton = document.createElement("button");
       returnButton.textContent = "Return";
       returnButton.className = "btn btn-danger btn-sm action-column";
+      if (isReadOnlyMode()) returnButton.disabled = true;
 
       returnButton.addEventListener("click", () => {
+        if (isReadOnlyMode()) return;
         const confirmation = confirm(
           "Are you sure you want to return this product?"
         );
@@ -3030,6 +3321,8 @@
       applyHiddenColumns(tr);
 
       tableBody.appendChild(tr);
+      applySourceColumnVisibility();
+      applyActionColumnVisibility();
 
       if (!skipSave) {
         reindexScannedTable();
@@ -3090,6 +3383,7 @@
       const remainingTableBody =
         document.getElementById("remainingTableBody");
       remainingTableBody.innerHTML = "";
+      const isReadOnly = isReadOnlyMode();
 
       remainingProducts.forEach((row) => {
         const tr = document.createElement("tr");
@@ -3145,10 +3439,13 @@
         tr.appendChild(tdSearch);
 
         const tdAction = document.createElement("td");
+      tdAction.classList.add("action-column");
         const moveToScannedButton = document.createElement("button");
         moveToScannedButton.textContent = "Move";
         moveToScannedButton.className = "btn btn-success btn-sm action-column";
+        if (isReadOnly) moveToScannedButton.disabled = true;
         moveToScannedButton.addEventListener("click", () => {
+          if (isReadOnlyMode()) return;
           // When column filter is ON: Bar code is always at index 1
           // When column filter is OFF: fall back to index 0
           let primaryBarcode = AppSettings.get().columnFilterEnabled
@@ -3179,6 +3476,7 @@
       });
 
       applySearchColumnVisibility();
+      applyActionColumnVisibility();
       updateStatistics();
     }
 
@@ -3350,6 +3648,7 @@
 
     // Sidebar open/close functionality
     document.getElementById("openSidebarButton").addEventListener("click", () => {
+      updateRemainingButtonVisibility();
       document.getElementById("sidebar").classList.add("open");
       document.body.classList.add("sidebar-open");
     });
@@ -3371,7 +3670,7 @@
           searchColumnVisible,
           remainingNotesColumnVisible,
           actionColumnVisible,
-          voiceMode,
+          voiceMode: getVoiceMode(),
           focusEnabled
         }
       };
@@ -3406,7 +3705,7 @@
           }
 
           // Backup new settings system
-          const keysToPreserve = ["appSettings", "focusEnabled", "voiceMode", "searchColumnVisible", "timestampColumnVisible", "remainingNotesColumnVisible", "ignoreFirstRows"];
+          const keysToPreserve = ["appSettings", "focusEnabled", "searchColumnVisible", "timestampColumnVisible", "remainingNotesColumnVisible", "ignoreFirstRows"];
           const preservedSettings = {};
           keysToPreserve.forEach(k => preservedSettings[k] = localStorage.getItem(k));
 
@@ -3465,6 +3764,16 @@
 
       const operationName = fileName || "Unknown Operation";
       const auditorName = currentUser ? currentUser.displayName : "Auditor";
+      if (driversIndexCache.length > 0) {
+        const sel = document.getElementById("driverSelect");
+        if (sel && !sel.classList.contains("d-none") && !sel.value) {
+          alert("Please select a driver.");
+          return;
+        }
+      }
+      const dp = getDriverPayloadForSave();
+      const driverName = (dp.driverName || "").trim();
+      const driverId = (dp.driverId || "").trim();
 
       const btn = document.getElementById("saveReviewOperationBtn");
       const originalHtml = btn.innerHTML;
@@ -3480,6 +3789,9 @@
           scannedCount: scannedBarcodes.size,
           remainingCount: remainingProducts.length,
           auditors: [auditorName],
+          driverId: driverId || "",
+          driverName: driverName || "",
+          driver: driverName || "",
           createdBy: currentUser ? currentUser.uid : "unknown",
           createdByName: currentUser ? currentUser.displayName : "Unknown",
           // Payload
@@ -3639,7 +3951,7 @@
       if (!confirm(`Are you sure you want to load "${op.operationName}"? Current unsaved progress will be replaced.`)) return;
 
       try {
-        const keysToPreserve = ["appSettings", "focusEnabled", "voiceMode", "searchColumnVisible", "timestampColumnVisible", "remainingNotesColumnVisible", "ignoreFirstRows"];
+        const keysToPreserve = ["appSettings", "focusEnabled", "searchColumnVisible", "timestampColumnVisible", "remainingNotesColumnVisible", "ignoreFirstRows"];
         const preservedSettings = {};
         keysToPreserve.forEach(k => preservedSettings[k] = localStorage.getItem(k));
 
@@ -3960,6 +4272,8 @@
           }
         }
 
+        const firstMerged = selectedOps[0];
+        const mergedDriverName = (firstMerged.driverName || firstMerged.driver || "").toString().trim();
         const newOp = {
           operationName: newOperationName,
           timestamp: Date.now(),
@@ -3967,6 +4281,11 @@
           scannedCount: finalScannedArray.length,
           remainingCount: mergedRemainingProducts.length,
           auditors: Array.from(mergedAuditors),
+          createdBy: currentUser ? currentUser.uid : "unknown",
+          createdByName: currentUser ? currentUser.displayName : "Unknown",
+          driverId: (firstMerged.driverId || "").toString().trim(),
+          driverName: mergedDriverName,
+          driver: mergedDriverName,
           excelData: JSON.stringify(baseExcelData),
           scannedProducts: JSON.stringify(finalScannedArray),
           remainingProducts: JSON.stringify(mergedRemainingProducts),

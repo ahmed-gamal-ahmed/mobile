@@ -1,25 +1,67 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+    }
+
     match /users/{uid} {
       // User can read their own document
-      allow read: if request.auth != null && request.auth.uid == uid;
+      allow read: if isSignedIn() && request.auth.uid == uid;
 
       // Admin can read all user documents
-      allow read: if request.auth != null &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+      allow read: if isAdmin();
 
       // User can update ONLY their own lastSession field — not role or other fields
-      allow update: if request.auth != null &&
+      allow update: if isSignedIn() &&
         request.auth.uid == uid &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(["lastSession"]);
 
       // Admin can write everything
-      allow write: if request.auth != null &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+      allow write: if isAdmin();
 
       // Allow initial creation
-      allow create: if request.auth != null;
+      allow create: if isSignedIn();
+
+      match /preferences/{docId} {
+        allow read, write: if isSignedIn() && request.auth.uid == uid;
+      }
+    }
+
+    // Global driver catalog — all signed-in users read (dropdowns); only admins manage
+    match /drivers/{driverId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Saved inventory operations — users create; only admins update/delete (e.g. driver field, cleanup)
+    match /savedOperations/{opId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    // Admin assigns inventory to users; users may only mark status after load (see applyForceAssignment)
+    match /assignments/{targetUid} {
+      allow read: if isSignedIn() && (request.auth.uid == targetUid || isAdmin());
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        isSignedIn() &&
+        request.auth.uid == targetUid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status"])
+      );
+    }
+
+    // Shared barcode correction mappings
+    match /barcodeMappings/{docId} {
+      allow read, write: if isSignedIn();
     }
   }
 }

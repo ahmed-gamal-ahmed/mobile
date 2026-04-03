@@ -37,6 +37,20 @@
       font-size: 1.25rem;
       color: #fff !important;
     }
+    /* Horizontally scrollable tabs (mobile + narrow viewports) */
+    .nav.nav-tabs,
+    ul.nav-tabs {
+      display: flex;
+      overflow-x: auto;
+      overflow-y: hidden;
+      flex-wrap: nowrap !important; /* override Bootstrap .nav flex-wrap */
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+      max-width: 100%;
+    }
+    .nav-tabs .nav-item {
+      flex: 0 0 auto;
+    }
     .nav-tabs .nav-link {
       color: #495057;
       font-weight: 600;
@@ -45,6 +59,7 @@
       display: flex;
       align-items: center;
       gap: 6px;
+      white-space: nowrap;
     }
     .nav-tabs .nav-link.active {
       color: #0d6efd;
@@ -56,6 +71,27 @@
       border-radius: 0 12px 12px 12px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.07);
       padding: 24px;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
+    }
+    .tab-content {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+    }
+    .table-responsive {
+      max-width: 100%;
+      -webkit-overflow-scrolling: touch;
+    }
+    .table-responsive .table {
+      width: 100%;
+      max-width: 100%;
+      table-layout: auto;
+    }
+    #tab-assign .card {
+      min-height: 0;
     }
     button, .btn {
       min-height: 44px;
@@ -96,6 +132,57 @@
     }
     .sheet-select-row td { vertical-align: middle; }
     .fs-small { font-size: 0.82rem; }
+    .mobile-stack {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: space-between;
+    }
+    .mobile-stack > .form-control {
+      flex: 1 1 320px;
+      max-width: 100% !important;
+    }
+    .mobile-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .mobile-actions .btn {
+      flex: 1 1 150px;
+    }
+    .users-actions-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+    }
+    @media (max-width: 767px) {
+      body { font-size: 14px; }
+      .tab-card {
+        padding: 16px !important;
+      }
+      .stat-badge {
+        font-size: 0.75rem;
+        padding: 4px 10px;
+      }
+      .table td, .table th {
+        font-size: 0.8rem;
+      }
+      .btn {
+        font-size: 0.85rem;
+      }
+      #openCreateUserModalBtn { width: 100%; }
+      .mobile-actions {
+        flex-direction: column;
+        width: 100%;
+      }
+      .mobile-actions .btn { width: 100%; flex: 1 1 100%; }
+      .mobile-stack {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      #assignUserSelect { max-width: 100% !important; }
+      .container-fluid { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
+    }
   </style>
 </head>
 <body>
@@ -126,13 +213,18 @@
   </nav>
 
   <!-- Main Content -->
-  <div class="container-fluid px-3 pb-5" id="mainContent" style="display:none;">
+  <div class="container-fluid px-2 px-md-3 pb-5" id="mainContent" style="display:none;">
 
     <!-- Tabs -->
     <ul class="nav nav-tabs mb-0 mt-3" id="adminTabs" role="tablist">
       <li class="nav-item" role="presentation">
         <button class="nav-link active" id="tab-users-btn" data-bs-toggle="tab" data-bs-target="#tab-users" type="button" role="tab">
           <i class="bi bi-people-fill"></i> Users
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-drivers-btn" data-bs-toggle="tab" data-bs-target="#tab-drivers" type="button" role="tab">
+          <i class="bi bi-truck-front-fill"></i> Drivers
         </button>
       </li>
       <li class="nav-item" role="presentation">
@@ -157,7 +249,7 @@
             <span class="stat-badge badge bg-success" id="statTotalAdmins">Admins: 0</span>
             <span class="stat-badge badge bg-primary" id="statTotalNormal">Users: 0</span>
           </div>
-          <button class="btn btn-success fw-bold" id="openCreateUserModalBtn">
+          <button class="btn btn-success fw-bold w-100 w-md-auto" id="openCreateUserModalBtn">
             <i class="bi bi-person-plus-fill"></i> Create New User
           </button>
         </div>
@@ -183,6 +275,43 @@
         </div>
       </div>
 
+      <!-- ===================== TAB: DRIVERS (admin-only) ===================== -->
+      <div class="tab-pane fade tab-card" id="tab-drivers" role="tabpanel">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+          <h5 class="fw-bold mb-0"><i class="bi bi-truck-front-fill"></i> Drivers</h5>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="driversShowDeleted">
+            <label class="form-check-label fw-semibold" for="driversShowDeleted">Show deleted drivers</label>
+          </div>
+        </div>
+        <div id="driversAlert" class="alert d-none py-2"></div>
+        <div class="row g-3 mb-4">
+          <div class="col-md-8">
+            <label class="form-label fw-semibold">Add driver name</label>
+            <div class="input-group">
+              <input type="text" id="newDriverNameInput" class="form-control" placeholder="Enter driver name" maxlength="200" />
+              <button class="btn btn-success fw-bold" type="button" id="addDriverBtn">
+                <i class="bi bi-plus-lg"></i> Add Driver
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-bordered table-hover">
+            <thead class="table-dark">
+              <tr>
+                <th>Driver Name</th>
+                <th>Created At</th>
+                <th style="min-width:220px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="driversTableBody">
+              <tr><td colspan="3" class="text-center text-muted py-4">Loading drivers...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- ===================== TAB 2: OPERATIONS ===================== -->
       <div class="tab-pane fade tab-card" id="tab-ops" role="tabpanel">
         <div class="d-flex flex-wrap gap-2 mb-3">
@@ -191,9 +320,9 @@
           <span class="stat-badge badge bg-warning text-dark" id="opStatRemaining">Total Remaining: 0</span>
         </div>
 
-        <div class="d-flex flex-wrap gap-2 mb-3 justify-content-between">
+        <div class="mobile-stack mb-3">
           <input type="text" id="opsSearchInput" class="form-control" style="max-width:360px;" placeholder="Search by operation or user name...">
-          <div class="d-flex gap-2 flex-wrap">
+          <div class="mobile-actions">
             <button id="opsDeleteSelectedBtn" class="btn btn-danger fw-bold">
               <i class="bi bi-trash"></i> Delete Selected
             </button>
@@ -216,6 +345,7 @@
                 <th>Operation Name</th>
                 <th>Created By</th>
                 <th>Auditors</th>
+                <th>Driver</th>
                 <th>Date &amp; Time</th>
                 <th>Total</th>
                 <th>Scanned</th>
@@ -224,7 +354,7 @@
               </tr>
             </thead>
             <tbody id="opsTableBody">
-              <tr><td colspan="9" class="text-center text-muted py-4">Loading operations...</td></tr>
+              <tr><td colspan="10" class="text-center text-muted py-4">Loading operations...</td></tr>
             </tbody>
           </table>
         </div>
@@ -257,6 +387,14 @@
               <div class="card-body">
                 <label class="form-label fw-semibold">Select File</label>
                 <input type="file" id="assignFileInput" class="form-control mb-3" accept=".xlsx,.xls,.csv" />
+                <div id="assignLocalSheetSelectorContainer" class="d-none mb-3">
+                  <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                      <thead class="table-dark"><tr><th>Sheet Name</th><th>Rows</th><th style="width:90px;">Actions</th></tr></thead>
+                      <tbody id="assignLocalSheetSelectorBody"></tbody>
+                    </table>
+                  </div>
+                </div>
                 <div id="assignFilePreview" class="alert alert-info d-none py-2 small"></div>
               </div>
             </div>
@@ -388,6 +526,41 @@
               <option value="tracker">Tracker</option>
             </select>
           </div>
+          <fieldset class="border rounded p-3 mb-3">
+            <legend class="float-none w-auto px-2 fs-6 fw-bold mb-2">Feature Restrictions</legend>
+            <div class="form-check form-switch mb-2">
+              <input class="form-check-input" type="checkbox" id="restrictHideTimestampColumn">
+              <label class="form-check-label" for="restrictHideTimestampColumn">Hide Scan Time Column</label>
+            </div>
+            <div class="form-check form-switch mb-2">
+              <input class="form-check-input" type="checkbox" id="restrictHideSourceColumn">
+              <label class="form-check-label" for="restrictHideSourceColumn">Hide Source Column</label>
+            </div>
+            <div class="form-check form-switch mb-2">
+              <input class="form-check-input" type="checkbox" id="restrictHideSettingsButton">
+              <label class="form-check-label" for="restrictHideSettingsButton">Hide Settings Button</label>
+            </div>
+            <div class="form-check form-switch mb-2">
+              <input class="form-check-input" type="checkbox" id="restrictDisableVoice">
+              <label class="form-check-label" for="restrictDisableVoice">Disable Voice</label>
+            </div>
+            <div class="form-check form-switch mb-2">
+              <input class="form-check-input" type="checkbox" id="restrictDisableExport">
+              <label class="form-check-label" for="restrictDisableExport">Disable Export</label>
+            </div>
+            <div class="form-check form-switch mb-2">
+              <input class="form-check-input" type="checkbox" id="restrictDisableImport">
+              <label class="form-check-label" for="restrictDisableImport">Disable Import</label>
+            </div>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="restrictReadOnly">
+              <label class="form-check-label" for="restrictReadOnly">Read-Only Mode</label>
+            </div>
+            <div class="form-check form-switch mt-2">
+              <input class="form-check-input" type="checkbox" id="restrictHideActionColumn">
+              <label class="form-check-label" for="restrictHideActionColumn">Hide Action Column</label>
+            </div>
+          </fieldset>
           <hr>
           <div class="mb-3">
             <label class="form-label fw-bold">
@@ -403,6 +576,30 @@
           <button type="button" class="btn btn-warning" id="saveEditUserBtn">
             <span id="editUserSpinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
             <i class="bi bi-save"></i> Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Driver Modal -->
+  <div class="modal fade" id="editDriverModal" tabindex="-1" aria-labelledby="editDriverModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title" id="editDriverModalLabel"><i class="bi bi-pencil"></i> Edit Driver</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="editDriverDocId" />
+          <label class="form-label fw-bold">Driver Name</label>
+          <input type="text" class="form-control" id="editDriverNameInput" maxlength="200" placeholder="Enter driver name" />
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary fw-bold" id="saveEditDriverBtn">
+            <span id="editDriverSpinner" class="spinner-border spinner-border-sm d-none me-2" role="status"></span>
+            Save
           </button>
         </div>
       </div>
@@ -430,7 +627,10 @@
     let allUsers = [];
     let allOperations = [];
     let pendingAssignment = null; // { excelData: [], fileName: "" }
+    let currentAdminWorkbook = null;
     let assignGoogleWorkbook = null;
+    let allDrivers = [];
+    let driversSnapshotUnsub = null;
 
     // ─── Auth Guard ───────────────────────────────────────────────────────────
     auth.onAuthStateChanged(async (firebaseUser) => {
@@ -466,6 +666,7 @@
       loadUsers();
       loadOperations();
       loadAssignUsers();
+      startDriversListener();
     });
 
     // ─── Logout ────────────────────────────────────────────────────────────────
@@ -480,6 +681,257 @@
     document.getElementById("tab-assign-btn").addEventListener("shown.bs.tab", () => {
       loadAssignUsers();
     });
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // DRIVERS (Firestore `drivers` collection — admin-only page)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    function getOpDriverDisplayName(op) {
+      const nm = (op.driverName || op.driver || "").toString().trim();
+      if (nm) return nm;
+      if (op.driverId) {
+        const d = allDrivers.find(x => x.id === op.driverId);
+        if (d && d.name) return d.name;
+      }
+      return "";
+    }
+
+    function startDriversListener() {
+      if (driversSnapshotUnsub) {
+        driversSnapshotUnsub();
+        driversSnapshotUnsub = null;
+      }
+      driversSnapshotUnsub = db.collection("drivers").onSnapshot((snap) => {
+        allDrivers = [];
+        snap.forEach((docSnap) => {
+          const d = docSnap.data();
+          allDrivers.push({
+            id: docSnap.id,
+            name: (d.name || "").toString(),
+            createdAt: d.createdAt,
+            active: d.active !== false
+          });
+        });
+        allDrivers.sort((a, b) => {
+          const ma = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
+          const mb = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
+          return mb - ma;
+        });
+        renderDriversTable();
+        renderOperationsTable();
+      }, (err) => console.error("drivers listener:", err));
+    }
+
+    function showDriversAlert(msg, type) {
+      const el = document.getElementById("driversAlert");
+      if (!el) return;
+      el.className = `alert alert-${type} py-2`;
+      el.textContent = msg;
+      el.classList.remove("d-none");
+      setTimeout(() => el.classList.add("d-none"), 4000);
+    }
+
+    function renderDriversTable() {
+      const tbody = document.getElementById("driversTableBody");
+      if (!tbody) return;
+      const showDeleted = document.getElementById("driversShowDeleted") && document.getElementById("driversShowDeleted").checked;
+      tbody.innerHTML = "";
+      const list = allDrivers.filter((d) => showDeleted || d.active !== false);
+      if (list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-4">No drivers yet. Add one above.</td></tr>`;
+        return;
+      }
+      list.forEach((d) => {
+        const tr = document.createElement("tr");
+        if (d.active === false) tr.classList.add("table-secondary");
+        const created = d.createdAt && d.createdAt.toDate ? d.createdAt.toDate().toLocaleString() : "—";
+        const inactive = d.active === false;
+        const tdName = document.createElement("td");
+        tdName.className = "fw-semibold";
+        tdName.textContent = d.name || "—";
+        const tdCreated = document.createElement("td");
+        tdCreated.className = "fs-small";
+        tdCreated.textContent = created;
+        const tdAct = document.createElement("td");
+        tdAct.className = "drivers-actions-wrap";
+        if (inactive) {
+          const b1 = document.createElement("button");
+          b1.type = "button";
+          b1.className = "btn btn-sm btn-outline-success me-1 driver-restore-btn";
+          b1.dataset.id = d.id;
+          b1.innerHTML = `<i class="bi bi-arrow-counterclockwise"></i> Restore`;
+          const b2 = document.createElement("button");
+          b2.type = "button";
+          b2.className = "btn btn-sm btn-outline-danger driver-remove-btn";
+          b2.dataset.id = d.id;
+          b2.innerHTML = `<i class="bi bi-trash"></i> Remove permanently`;
+          tdAct.appendChild(b1);
+          tdAct.appendChild(b2);
+        } else {
+          const b1 = document.createElement("button");
+          b1.type = "button";
+          b1.className = "btn btn-sm btn-warning me-1 driver-edit-btn";
+          b1.dataset.id = d.id;
+          b1.innerHTML = `<i class="bi bi-pencil"></i> Edit`;
+          const b2 = document.createElement("button");
+          b2.type = "button";
+          b2.className = "btn btn-sm btn-outline-secondary driver-deactivate-btn";
+          b2.dataset.id = d.id;
+          b2.innerHTML = `<i class="bi bi-eye-slash"></i> Deactivate`;
+          tdAct.appendChild(b1);
+          tdAct.appendChild(b2);
+        }
+        tr.appendChild(tdName);
+        tr.appendChild(tdCreated);
+        tr.appendChild(tdAct);
+        tbody.appendChild(tr);
+      });
+
+      tbody.querySelectorAll(".driver-edit-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = btn.dataset.id;
+          const dr = allDrivers.find((x) => x.id === id);
+          if (!dr) return;
+          document.getElementById("editDriverDocId").value = id;
+          document.getElementById("editDriverNameInput").value = dr.name || "";
+          new bootstrap.Modal(document.getElementById("editDriverModal")).show();
+        });
+      });
+      tbody.querySelectorAll(".driver-deactivate-btn").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          if (!confirm("Deactivate this driver? They will be hidden from dropdowns.")) return;
+          btn.disabled = true;
+          try {
+            await db.collection("drivers").doc(btn.dataset.id).update({ active: false });
+            showDriversAlert("Driver deactivated", "success");
+          } catch (e) {
+            showDriversAlert(e.message, "danger");
+            btn.disabled = false;
+          }
+        });
+      });
+      tbody.querySelectorAll(".driver-restore-btn").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          btn.disabled = true;
+          try {
+            await db.collection("drivers").doc(btn.dataset.id).update({ active: true });
+            showDriversAlert("Driver restored", "success");
+          } catch (e) {
+            showDriversAlert(e.message, "danger");
+            btn.disabled = false;
+          }
+        });
+      });
+      tbody.querySelectorAll(".driver-remove-btn").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          if (!confirm("Permanently delete this driver?")) return;
+          btn.disabled = true;
+          try {
+            await db.collection("drivers").doc(btn.dataset.id).delete();
+            showDriversAlert("Driver removed", "success");
+          } catch (e) {
+            showDriversAlert(e.message, "danger");
+            btn.disabled = false;
+          }
+        });
+      });
+    }
+
+    document.getElementById("driversShowDeleted").addEventListener("change", () => renderDriversTable());
+
+    document.getElementById("addDriverBtn").addEventListener("click", async () => {
+      const inp = document.getElementById("newDriverNameInput");
+      const name = (inp.value || "").trim();
+      if (!name) {
+        showDriversAlert("Enter driver name", "warning");
+        return;
+      }
+      const btn = document.getElementById("addDriverBtn");
+      btn.disabled = true;
+      try {
+        await db.collection("drivers").add({
+          name,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          active: true
+        });
+        inp.value = "";
+        showDriversAlert("Driver added.", "success");
+      } catch (e) {
+        showDriversAlert("Failed to save driver: " + e.message, "danger");
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    document.getElementById("saveEditDriverBtn").addEventListener("click", async () => {
+      const id = document.getElementById("editDriverDocId").value;
+      const name = (document.getElementById("editDriverNameInput").value || "").trim();
+      if (!id || !name) return;
+      const sp = document.getElementById("editDriverSpinner");
+      sp.classList.remove("d-none");
+      try {
+        await db.collection("drivers").doc(id).update({ name });
+        const modalEl = document.getElementById("editDriverModal");
+        bootstrap.Modal.getInstance(modalEl).hide();
+        showDriversAlert("Driver updated", "success");
+      } catch (e) {
+        showDriversAlert(e.message, "danger");
+      } finally {
+        sp.classList.add("d-none");
+      }
+    });
+
+    function buildDriverSelectForOp(op) {
+      const td = document.createElement("td");
+      td.className = "fs-small";
+      const wrap = document.createElement("div");
+      wrap.className = "d-flex align-items-center gap-1 flex-wrap";
+      const sel = document.createElement("select");
+      sel.className = "form-select form-select-sm op-driver-select";
+      sel.dataset.opId = op.id;
+      sel.style.minWidth = "140px";
+      sel.style.maxWidth = "240px";
+
+      const optEmpty = document.createElement("option");
+      optEmpty.value = "";
+      optEmpty.textContent = "— Select —";
+      sel.appendChild(optEmpty);
+
+      let currentId = (op.driverId || "").toString().trim();
+      const activeList = allDrivers.filter((d) => d.active !== false);
+      const foundIds = new Set(activeList.map((d) => d.id));
+
+      if (currentId && !foundIds.has(currentId)) {
+        const o = document.createElement("option");
+        o.value = currentId;
+        o.textContent = (getOpDriverDisplayName(op) || currentId) + " (inactive)";
+        o.dataset.name = getOpDriverDisplayName(op) || "";
+        o.selected = true;
+        sel.appendChild(o);
+      }
+
+      activeList.forEach((d) => {
+        const o = document.createElement("option");
+        o.value = d.id;
+        o.textContent = d.name;
+        o.dataset.name = d.name;
+        if (d.id === currentId) o.selected = true;
+        sel.appendChild(o);
+      });
+
+      if (!currentId && !sel.value && optEmpty.parentNode) {
+        optEmpty.selected = true;
+      }
+
+      const status = document.createElement("span");
+      status.className = "op-driver-save-status small text-muted";
+      status.id = "op-drv-" + op.id;
+      status.style.minWidth = "1.25rem";
+      wrap.appendChild(sel);
+      wrap.appendChild(status);
+      td.appendChild(wrap);
+      return td;
+    }
 
     // ═══════════════════════════════════════════════════════════════════════════
     // TAB 1 — USERS
@@ -529,7 +981,7 @@
           <td class="fs-small">${escHtml(user.phone || "—")}</td>
           <td>${roleBadge}</td>
           <td class="fs-small">${createdAt}</td>
-          <td>
+          <td class="users-actions-wrap">
             <button class="btn btn-sm btn-warning me-1 my-1 editUserBtn" data-uid="${user.uid}"
               ${isSelf ? "disabled title='Cannot edit your own account'" : ""}>
               <i class="bi bi-pencil"></i> Edit
@@ -680,14 +1132,14 @@
 
     async function loadOperations() {
       const tbody = document.getElementById("opsTableBody");
-      tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Loading operations...</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="10" class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Loading operations...</td></tr>`;
       try {
         const snapshot = await db.collection("savedOperations").orderBy("timestamp", "desc").get();
         allOperations = [];
         snapshot.forEach(doc => allOperations.push({ id: doc.id, ...doc.data() }));
         renderOperationsTable();
       } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-danger py-4">Failed to load: ${err.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" class="text-center text-danger py-4">Failed to load: ${err.message}</td></tr>`;
       }
     }
 
@@ -719,16 +1171,46 @@
         cb.value = op.id;
         tdCb.appendChild(cb);
 
+        const tdName = document.createElement("td");
+        tdName.className = "fw-semibold";
+        tdName.textContent = op.operationName || "—";
+
+        const tdCreated = document.createElement("td");
+        tdCreated.className = "fs-small";
+        tdCreated.textContent = op.createdByName || "—";
+
+        const tdAud = document.createElement("td");
+        tdAud.className = "fs-small";
+        tdAud.textContent = auditors;
+
         tr.appendChild(tdCb);
-        tr.innerHTML += `
-          <td class="fw-semibold">${escHtml(op.operationName || "—")}</td>
-          <td class="fs-small">${escHtml(op.createdByName || "—")}</td>
-          <td class="fs-small">${escHtml(auditors)}</td>
-          <td class="fs-small">${dateStr}</td>
-          <td class="text-center">${op.totalProducts || 0}</td>
-          <td class="text-center text-success fw-bold">${op.scannedCount || 0}</td>
-          <td class="text-center text-warning fw-bold">${op.remainingCount || 0}</td>
-          <td>
+        tr.appendChild(tdName);
+        tr.appendChild(tdCreated);
+        tr.appendChild(tdAud);
+        tr.appendChild(buildDriverSelectForOp(op));
+
+        const tdDate = document.createElement("td");
+        tdDate.className = "fs-small";
+        tdDate.textContent = dateStr;
+        tr.appendChild(tdDate);
+
+        const tdTot = document.createElement("td");
+        tdTot.className = "text-center";
+        tdTot.textContent = op.totalProducts || 0;
+        tr.appendChild(tdTot);
+
+        const tdScan = document.createElement("td");
+        tdScan.className = "text-center text-success fw-bold";
+        tdScan.textContent = op.scannedCount || 0;
+        tr.appendChild(tdScan);
+
+        const tdRem = document.createElement("td");
+        tdRem.className = "text-center text-warning fw-bold";
+        tdRem.textContent = op.remainingCount || 0;
+        tr.appendChild(tdRem);
+
+        const tdAct = document.createElement("td");
+        tdAct.innerHTML = `
             <button class="btn btn-sm btn-primary me-1 my-1 opsLoadBtn" data-id="${op.id}">
               <i class="bi bi-cloud-arrow-down"></i> Load
             </button>
@@ -737,22 +1219,20 @@
             </button>
             <button class="btn btn-sm btn-danger my-1 opsDeleteBtn" data-id="${op.id}">
               <i class="bi bi-trash"></i>
-            </button>
-          </td>`;
-        // Re-insert the checkbox (it was blown away by innerHTML +=)
-        tr.querySelector("td:first-child").appendChild(cb);
+            </button>`;
+        tr.appendChild(tdAct);
+
         tbody.appendChild(tr);
       });
 
       if (shown === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">No operations found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" class="text-center text-muted py-4">No operations found.</td></tr>`;
       }
 
       document.getElementById("opStatTotal").textContent     = `Operations: ${shown}`;
       document.getElementById("opStatScanned").textContent   = `Total Scanned: ${totalScanned}`;
       document.getElementById("opStatRemaining").textContent = `Total Remaining: ${totalRemaining}`;
 
-      // Row actions
       tbody.querySelectorAll(".opsLoadBtn").forEach(btn => {
         btn.addEventListener("click", () => {
           const op = allOperations.find(o => o.id === btn.dataset.id);
@@ -772,6 +1252,37 @@
         });
       });
     }
+
+    document.getElementById("opsTableBody").addEventListener("change", async (e) => {
+      const sel = e.target.closest(".op-driver-select");
+      if (!sel) return;
+      const opId = sel.dataset.opId;
+      const opt = sel.options[sel.selectedIndex];
+      const driverId = (sel.value || "").trim();
+      const driverName = driverId ? ((opt.dataset && opt.dataset.name) || opt.textContent || "").trim() : "";
+      const status = document.getElementById("op-drv-" + opId);
+      if (status) status.innerHTML = '<span class="spinner-border spinner-border-sm text-primary" role="status"></span>';
+      try {
+        await db.collection("savedOperations").doc(opId).update({
+          driverId: driverId || "",
+          driverName: driverName || "",
+          driver: driverName || ""
+        });
+        const local = allOperations.find(o => o.id === opId);
+        if (local) {
+          local.driverId = driverId || "";
+          local.driverName = driverName || "";
+          local.driver = driverName || "";
+        }
+        if (status) {
+          status.innerHTML = '<i class="bi bi-check-lg text-success" title="Saved"></i>';
+          setTimeout(() => { status.innerHTML = ""; }, 2000);
+        }
+      } catch (err) {
+        if (status) status.innerHTML = '<i class="bi bi-x-lg text-danger"></i>';
+        showOpsAlert("Driver update failed: " + err.message, "danger");
+      }
+    });
 
     document.getElementById("opsSearchInput").addEventListener("input", renderOperationsTable);
 
@@ -843,20 +1354,25 @@
       if (selected.length === 0) { alert("Select at least one operation."); return; }
       const wb = XLSX.utils.book_new();
       selected.forEach(op => {
+        const driverName = getOpDriverDisplayName(op);
         const pExcel    = safeParseJson(op.excelData, []);
         const pScanned  = safeParseJson(op.scannedProducts, []);
         const pRemaining = safeParseJson(op.remainingProducts, []);
         const pNotes    = safeParseJson(op.remainingNotes, {});
         const headers   = pExcel[0] || [];
 
-        const sheetData = [["--- SCANNED PRODUCTS ---"], [...headers, "Scan Time", "Source"]];
+        const sheetData = [
+          ["--- SCANNED PRODUCTS ---"],
+          ["Driver", ...headers, "Scan Time", "Source"]
+        ];
         pScanned.forEach(sp => {
           const row = sp.data ? sp.data.slice(0, headers.length) : [];
+          row.unshift(driverName);
           row.push(sp.timestamp || "", sp.source || "scan");
           sheetData.push(row);
         });
-        sheetData.push([], ["--- REMAINING PRODUCTS ---"], [...headers, "Notes"]);
-        pRemaining.forEach(row => sheetData.push([...row, pNotes[String(row[0] || "")] || ""]));
+        sheetData.push([], ["--- REMAINING PRODUCTS ---"], ["Driver", ...headers, "Notes"]);
+        pRemaining.forEach(remRow => sheetData.push([driverName, ...remRow, pNotes[String(remRow[0] || "")] || ""]));
 
         let sheetName = (op.operationName || "Op").substring(0, 31).replace(/[\\/*?:\[\]]/g, "_");
         let cnt = 1, orig = sheetName;
@@ -914,6 +1430,10 @@
             .filter(row => !row.some(cell => String(cell).split("-").map(c => c.trim()).some(p => uniqueBarcodes.has(p))));
         }
 
+        const firstOp = selected[0];
+        const mergedDriverId = (firstOp.driverId || "").toString().trim();
+        const mergedDriverName = getOpDriverDisplayName(firstOp) || (firstOp.driverName || firstOp.driver || "").toString().trim();
+
         await db.collection("savedOperations").add({
           operationName:   newName,
           timestamp:        Date.now(),
@@ -921,6 +1441,9 @@
           scannedCount:     finalScanned.length,
           remainingCount:   mergedRemaining.length,
           auditors:         Array.from(mergedAuditors),
+          driverId:         mergedDriverId || "",
+          driverName:       mergedDriverName || "",
+          driver:           mergedDriverName || "",
           createdBy:        currentAdmin.uid,
           createdByName:    currentAdmin.displayName,
           excelData:        JSON.stringify(baseExcel),
@@ -947,16 +1470,18 @@
       const headers    = pExcel[0] || [];
       const wb = XLSX.utils.book_new();
 
-      const scannedData = [[...headers, "Scan Time", "Source"]];
+      const driverName = getOpDriverDisplayName(op);
+      const scannedData = [["Driver", ...headers, "Scan Time", "Source"]];
       pScanned.forEach(sp => {
         const row = sp.data ? sp.data.slice(0, headers.length) : [];
+        row.unshift(driverName);
         row.push(sp.timestamp || "", sp.source || "scan");
         scannedData.push(row);
       });
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(scannedData), "Scanned Products");
 
-      const remData = [[...headers, "Notes"]];
-      pRemaining.forEach(row => remData.push([...row, pNotes[String(row[0] || "")] || ""]));
+      const remData = [["Driver", ...headers, "Notes"]];
+      pRemaining.forEach(remRow => remData.push([driverName, ...remRow, pNotes[String(remRow[0] || "")] || ""]));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(remData), "Remaining Products");
 
       let name = (op.operationName || "Operation");
@@ -1004,18 +1529,22 @@
       if (!file) return;
       const lowerName = file.name.toLowerCase();
 
-      const readDone = (data) => {
+      document.getElementById("assignLocalSheetSelectorContainer").classList.add("d-none");
+      document.getElementById("assignLocalSheetSelectorBody").innerHTML = "";
+      currentAdminWorkbook = null;
+
+      const readDone = (data, assignmentName) => {
         const filtered = data.filter(row => row.some(c => c !== null && c !== undefined && c !== ""));
-        pendingAssignment = { excelData: filtered, fileName: file.name };
+        pendingAssignment = { excelData: filtered, fileName: assignmentName };
         document.getElementById("assignFilePreview").textContent =
-          `✅ ${file.name} — ${Math.max(0, filtered.length - 1)} data rows`;
+          `✅ ${assignmentName} — ${Math.max(0, filtered.length - 1)} data rows`;
         document.getElementById("assignFilePreview").classList.remove("d-none");
         updateAssignPreview();
       };
 
       if (lowerName.endsWith(".csv")) {
         Papa.parse(file, {
-          complete: results => readDone(results.data),
+          complete: results => readDone(results.data, file.name),
           skipEmptyLines: true,
           error: err => alert("CSV parse error: " + err.message)
         });
@@ -1023,13 +1552,69 @@
         const reader = new FileReader();
         reader.onload = evt => {
           const wb = XLSX.read(new Uint8Array(evt.target.result), { type: "array" });
-          const ws = wb.Sheets[wb.SheetNames[0]];
-          const parsed = XLSX.utils.sheet_to_json(ws, { header: 1 });
-          readDone(parsed);
+          const sheetNames = wb.SheetNames || [];
+
+          if (sheetNames.length === 1) {
+            const sheetName = sheetNames[0];
+            const ws = wb.Sheets[sheetName];
+            const parsed = XLSX.utils.sheet_to_json(ws, { header: 1 });
+            readDone(parsed, sheetName);
+          } else if (sheetNames.length > 1) {
+            currentAdminWorkbook = wb;
+            renderAdminLocalSheetList(sheetNames);
+            document.getElementById("assignLocalSheetSelectorContainer").classList.remove("d-none");
+            document.getElementById("assignFileInput").value = "";
+          } else {
+            alert("No worksheets found in this Excel file.");
+          }
         };
         reader.readAsArrayBuffer(file);
       }
     });
+
+    function renderAdminLocalSheetList(sheetNames) {
+      const tbody = document.getElementById("assignLocalSheetSelectorBody");
+      tbody.innerHTML = "";
+
+      sheetNames.forEach(name => {
+        const ws = currentAdminWorkbook.Sheets[name];
+        const parsed = XLSX.utils.sheet_to_json(ws, { header: 1 });
+        const filtered = parsed.filter(r => r.some(c => c !== null && c !== undefined && c !== ""));
+        const rowCount = Math.max(0, filtered.length - 1);
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td class="align-middle fw-semibold">${escHtml(name)}</td><td class="align-middle">${rowCount}</td><td></td>`;
+
+        const importBtn = document.createElement("button");
+        importBtn.className = "btn btn-success btn-sm w-100";
+        importBtn.innerHTML = `<i class="bi bi-file-earmark-spreadsheet"></i> Import`;
+        importBtn.addEventListener("click", () => {
+          if (!currentAdminWorkbook) {
+            alert("Please upload an Excel file first.");
+            return;
+          }
+
+          const selectedSheet = currentAdminWorkbook.Sheets[name];
+          if (!selectedSheet) {
+            alert("Selected worksheet not found.");
+            return;
+          }
+
+          const selectedParsed = XLSX.utils.sheet_to_json(selectedSheet, { header: 1 });
+          const selectedFiltered = selectedParsed.filter(r => r.some(c => c !== null && c !== undefined && c !== ""));
+          pendingAssignment = { excelData: selectedFiltered, fileName: name };
+          document.getElementById("assignFilePreview").textContent =
+            `✅ ${name} — ${Math.max(0, selectedFiltered.length - 1)} data rows`;
+          document.getElementById("assignFilePreview").classList.remove("d-none");
+          document.getElementById("assignLocalSheetSelectorContainer").classList.add("d-none");
+          currentAdminWorkbook = null;
+          updateAssignPreview();
+        });
+
+        tr.querySelector("td:last-child").appendChild(importBtn);
+        tbody.appendChild(tr);
+      });
+    }
 
     // Google Sheets (Option B)
     document.getElementById("assignLoadSheetBtn").addEventListener("click", () => {
@@ -1148,12 +1733,52 @@
 
 
     // ─── Edit User ─────────────────────────────────────────────────────────────
+    function normalizeRestrictions(r) {
+      const src = r || {};
+      return {
+        hideTimestampColumn: !!src.hideTimestampColumn,
+        hideSourceColumn: !!src.hideSourceColumn,
+        hideSettingsButton: !!src.hideSettingsButton,
+        disableVoice: !!src.disableVoice,
+        disableExport: !!src.disableExport,
+        disableImport: !!src.disableImport,
+        readOnly: !!src.readOnly,
+        hideActionColumn: !!src.hideActionColumn
+      };
+    }
+
+    function getRestrictionsFromModal() {
+      return {
+        hideTimestampColumn: document.getElementById("restrictHideTimestampColumn").checked,
+        hideSourceColumn: document.getElementById("restrictHideSourceColumn").checked,
+        hideSettingsButton: document.getElementById("restrictHideSettingsButton").checked,
+        disableVoice: document.getElementById("restrictDisableVoice").checked,
+        disableExport: document.getElementById("restrictDisableExport").checked,
+        disableImport: document.getElementById("restrictDisableImport").checked,
+        readOnly: document.getElementById("restrictReadOnly").checked,
+        hideActionColumn: document.getElementById("restrictHideActionColumn").checked
+      };
+    }
+
+    function setRestrictionsInModal(r) {
+      const normalized = normalizeRestrictions(r);
+      document.getElementById("restrictHideTimestampColumn").checked = normalized.hideTimestampColumn;
+      document.getElementById("restrictHideSourceColumn").checked = normalized.hideSourceColumn;
+      document.getElementById("restrictHideSettingsButton").checked = normalized.hideSettingsButton;
+      document.getElementById("restrictDisableVoice").checked = normalized.disableVoice;
+      document.getElementById("restrictDisableExport").checked = normalized.disableExport;
+      document.getElementById("restrictDisableImport").checked = normalized.disableImport;
+      document.getElementById("restrictReadOnly").checked = normalized.readOnly;
+      document.getElementById("restrictHideActionColumn").checked = normalized.hideActionColumn;
+    }
+
     function openEditUserModal(user) {
       document.getElementById("editUserUid").value = user.uid;
       document.getElementById("editUserDisplayName").value = user.displayName || "";
       document.getElementById("editUserEmail").value = user.email || "";
       document.getElementById("editUserPhone").value = user.phone || "";
       document.getElementById("editUserRole").value = user.role || "user";
+      setRestrictionsInModal(user.restrictions);
       document.getElementById("editUserPassword").value = "";
       document.getElementById("editUserError").classList.add("d-none");
       document.getElementById("editUserSuccess").classList.add("d-none");
@@ -1167,6 +1792,7 @@
       const email       = document.getElementById("editUserEmail").value.trim();
       const phone       = document.getElementById("editUserPhone").value.trim();
       const role        = document.getElementById("editUserRole").value;
+      const restrictions = getRestrictionsFromModal();
       const newPassword = document.getElementById("editUserPassword").value;
       const errorEl     = document.getElementById("editUserError");
       const successEl   = document.getElementById("editUserSuccess");
@@ -1190,7 +1816,7 @@
 
       try {
         // Update Firestore user document
-        await db.collection("users").doc(uid).update({ displayName, email, phone, role });
+        await db.collection("users").doc(uid).update({ displayName, email, phone, role, restrictions });
 
         // Update password via REST API if provided (avoids signing out current admin)
         if (newPassword) {
