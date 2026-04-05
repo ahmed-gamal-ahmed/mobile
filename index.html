@@ -11,6 +11,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="./manifest.json">
   <link rel="apple-touch-icon" href="./icons/logo-192.png">
+  <link rel="icon" type="image/png" href="./icons/favicon.png">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" />
   <!-- Added Bootstrap Icons -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" />
@@ -1331,6 +1332,36 @@
         clearTimeout(barcodeNotFoundHideTimeoutId);
         barcodeNotFoundHideTimeoutId = null;
       }
+    }
+
+    function addNotFoundRow(barcode) {
+      const s = window.AppSettings.get();
+      if (!s.logNotFoundBarcode) return;
+      
+      const tbody = document.getElementById("productTableBody");
+      if (!tbody) return;
+      
+      const rowId = "not-found-" + barcode;
+      if (document.getElementById(rowId)) return;
+      
+      const tr = document.createElement("tr");
+      tr.id = rowId;
+      tr.className = "not-found-row table-danger";
+      const msg = window.AppSettings.getDictionary()["Barcode not found"] || "Barcode not found";
+      tr.innerHTML = `<td colspan="100%" class="text-center text-danger fw-bold py-2">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i> ${msg}: ${barcode}
+      </td>`;
+      
+      tbody.appendChild(tr);
+      tr.scrollIntoView({ behavior: "smooth", block: "center" });
+      
+      setTimeout(() => {
+        if (tr && tr.parentNode) tr.parentNode.removeChild(tr);
+      }, 1500);
+    }
+
+    function clearNotFoundRows() {
+      document.querySelectorAll('.not-found-row').forEach(row => row.remove());
     }
 
     function showDescriptionWarning() {
@@ -3308,6 +3339,7 @@
 
       // Check if the barcode is already scanned
       if (scannedBarcodes.has(barcode)) {
+        clearNotFoundRows();
         const row = scannedBarcodes.get(barcode);
         
         // Move to the bottom of the table without duplicating data
@@ -3356,12 +3388,14 @@
         console.log("Row index found:", rowIndex);
 
         if (rowIndex >= 0) {
+          clearNotFoundRows();
           const productRow = remainingProducts[rowIndex];
           addRowToScannedTable(productRow, barcode, true, forceSource || 'scan');
           remainingProducts.splice(rowIndex, 1);
           showRemainingProducts();
         } else {
           showBarcodeNotFoundAlert();
+          addNotFoundRow(barcode);
           speakBarcodeNotFound();
           const notFoundActive = document.body.classList.contains("fixed-input-bar")
             ? document.getElementById("fixedBarcodeInput")
@@ -3424,6 +3458,10 @@
             rxInput.setAttribute("readonly", "readonly");
           }
           
+          rxInput.addEventListener("input", () => {
+            saveProgress();
+          });
+          
           tdRx.appendChild(rxInput);
           tr.appendChild(tdRx);
         }
@@ -3476,6 +3514,7 @@
       tableBody.appendChild(tr);
       applySourceColumnVisibility();
       applyActionColumnVisibility();
+      applyTimestampColumnVisibility();
 
       if (!skipSave) {
         reindexScannedTable();
@@ -3554,21 +3593,73 @@
         if (remainingNotesColumnVisible) {
           const tdNotes = document.createElement("td");
           tdNotes.classList.add("notes-column-remaining");
+          
+          const rowKey = getRowKey(row);
+          // Default to object if not already done by loadProgress migration
+          if (!remainingNotes[rowKey] || typeof remainingNotes[rowKey] === 'string') {
+            remainingNotes[rowKey] = { t: remainingNotes[rowKey] || "", s: "" };
+          }
+          const noteObj = remainingNotes[rowKey];
+
+          const wrapper = document.createElement("div");
+          wrapper.className = "d-flex gap-1";
+
+          const dict = window.AppSettings.getDictionary();
+
           const input = document.createElement("input");
           input.type = "text";
-          input.className = "form-control form-control-sm";
-          input.placeholder = "Write here...";
-          const rowKey = getRowKey(row);
-          input.value = remainingNotes[rowKey] || "";
+          input.className = "form-control form-control-sm flex-fill";
+          input.placeholder = dict["Note..."] || "Note...";
+          input.style.minWidth = "60px";
+          input.value = noteObj.t;
+          
+          const select = document.createElement("select");
+          select.className = "form-select form-select-sm flex-fill";
+          select.style.minWidth = "100px";
+          
+          const options = [
+            { v: "", l: dict["Select"] || "Select" },
+            { v: "Missing", l: dict["Missing"] || "Missing" },
+            { v: "Damage", l: dict["Damage"] || "Damage" },
+            { v: "Missing on DC", l: dict["Missing on DC"] || "Missing on DC" }
+          ];
+
+          options.forEach(opt => {
+            const o = document.createElement("option");
+            o.value = opt.v;
+            o.textContent = opt.l;
+            select.appendChild(o);
+          });
+
+          select.value = noteObj.s || "";
+
+          // Function to apply background color based on value
+          const updateSelectStyle = () => {
+            select.classList.remove("bg-danger", "bg-primary", "text-white");
+            const val = select.value;
+            if (val === "Missing") {
+              select.classList.add("bg-danger", "text-white");
+            } else if (val === "Damage") {
+              select.classList.add("bg-primary", "text-white");
+            }
+          };
+
+          updateSelectStyle();
+
           input.addEventListener("input", () => {
-            remainingNotes[rowKey] = input.value;
+            remainingNotes[rowKey].t = input.value;
             saveProgress();
           });
-          input.addEventListener("blur", () => {
-            remainingNotes[rowKey] = input.value;
+
+          select.addEventListener("change", () => {
+            remainingNotes[rowKey].s = select.value;
+            updateSelectStyle();
             saveProgress();
           });
-          tdNotes.appendChild(input);
+
+          wrapper.appendChild(input);
+          wrapper.appendChild(select);
+          tdNotes.appendChild(wrapper);
           tr.appendChild(tdNotes);
         }
 
@@ -3579,6 +3670,18 @@
         searchButton.className = "btn btn-outline-secondary btn-sm";
         searchButton.innerHTML = '<i class="bi bi-search"></i>';
         searchButton.addEventListener("click", () => {
+          if (AppSettings.get().useTalabatLink) {
+            const productId = row[3];
+            if (productId !== undefined && productId !== null && productId.toString().trim() !== "") {
+              const rawSlug = (row[0] || "product").toString().toLowerCase().trim();
+              const slug = rawSlug.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || "product";
+              const talabatUrl = `https://www.talabat.com/egypt/talabat-mart/product/${slug}/s/${encodeURIComponent(productId.toString().trim())}`;
+              window.open(talabatUrl, "_blank");
+              return;
+            }
+          }
+
+          // Fallback to Google search
           const descriptionText = (row[0] || "").toString().trim();
           if (!descriptionText) {
             showDescriptionWarning();
@@ -3600,10 +3703,15 @@
         moveToScannedButton.addEventListener("click", () => {
           if (isReadOnlyMode()) return;
           // When column filter is ON: Bar code is always at index 1
-          // When column filter is OFF: fall back to index 0
-          let primaryBarcode = AppSettings.get().columnFilterEnabled
-            ? String(row[1] || row[0] || "").split("-")[0].trim()
-            : String(row[0] || "").split("-")[0].trim();
+          // When column filter is OFF: dynamically find the barcode column from headers
+          let barcodeColIndex = 1;
+          if (!AppSettings.get().columnFilterEnabled && typeof excelData !== 'undefined' && excelData.length > 0) {
+            const hs = excelData[0].map(h => (h || "").toString().toLowerCase());
+            barcodeColIndex = hs.findIndex(h => h.includes("barcode") || h.includes("bar code") || h.includes("باركود") || h.includes("upc") || h.includes("ean"));
+            if (barcodeColIndex === -1) barcodeColIndex = 0;
+          }
+          
+          let primaryBarcode = String(row[barcodeColIndex] || row[1] || row[0] || "").split("-")[0].trim();
           if (primaryBarcode) {
             const input = document.getElementById("barcodeInput");
             if (input) {
@@ -3675,6 +3783,13 @@
       const savedScannedProducts = JSON.parse(localStorage.getItem("scannedProducts")) || [];
       remainingNotes = JSON.parse(localStorage.getItem("remainingNotes")) || {};
 
+      // Migrate legacy string notes to object format { t: text, s: status }
+      Object.keys(remainingNotes).forEach(key => {
+        if (typeof remainingNotes[key] === 'string') {
+          remainingNotes[key] = { t: remainingNotes[key], s: "" };
+        }
+      });
+
       scannedBarcodes.clear();
       const productTableBody = document.getElementById("productTableBody");
       if (productTableBody) productTableBody.innerHTML = "";
@@ -3683,6 +3798,8 @@
       savedScannedProducts.forEach(({ barcode, data: scannedRowData, receivedQty, source, timestamp }) => {
         addRowToScannedTable(scannedRowData, barcode, false, source || 'scan', timestamp, true, receivedQty || ""); // true = skipSave
       });
+
+      applyTimestampColumnVisibility();
 
       // Dynamically derive remainingProducts from master list directly to completely avoid state fragmentation
       if (excelData && excelData.length > 0) {
@@ -3760,10 +3877,15 @@
         row.querySelectorAll("td").forEach((cell) => {
           if (!cell.classList.contains("search-column-remaining") && !cell.classList.contains("action-column")) {
             const input = cell.querySelector("input");
-            if (input) {
-              rowData.push(input.value); // Grab contents of input fields (like Notes)
+            const select = cell.querySelector("select");
+            if (input && select) {
+              // Conjoin text note and status dropdown value
+              const combined = (input.value || "").trim() + (select.value ? " [" + select.value + "]" : "");
+              rowData.push(combined);
+            } else if (input) {
+              rowData.push(input.value);
             } else {
-              rowData.push(cell.textContent); // Grab standard text content
+              rowData.push(cell.textContent.trim());
             }
           }
         });
@@ -4176,7 +4298,11 @@
       remainingData.push([...headers, "Notes"]);
       parsedRemainingProducts.forEach(row => {
         const key = String(row[0] || "");
-        remainingData.push([...row, parsedNotes[key] || ""]);
+        let noteVal = parsedNotes[key] || "";
+        if (noteVal && typeof noteVal === 'object') {
+          noteVal = (noteVal.t || "") + (noteVal.s ? " [" + noteVal.s + "]" : "");
+        }
+        remainingData.push([...row, noteVal]);
       });
       const wsRemaining = XLSX.utils.aoa_to_sheet(remainingData);
       XLSX.utils.book_append_sheet(wb, wsRemaining, "Remaining Products");
@@ -4228,7 +4354,11 @@
         sheetData.push([...headers, "Notes"]);
         parsedRemainingProducts.forEach(row => {
           const key = String(row[0] || "");
-          sheetData.push([...row, parsedNotes[key] || ""]);
+          let noteVal = parsedNotes[key] || "";
+          if (noteVal && typeof noteVal === 'object') {
+            noteVal = (noteVal.t || "") + (noteVal.s ? " [" + noteVal.s + "]" : "");
+          }
+          sheetData.push([...row, noteVal]);
         });
 
         // Sheet name should be op name, max 31 chars constraint by Excel

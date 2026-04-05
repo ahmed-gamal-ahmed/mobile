@@ -22,6 +22,8 @@
     showReceivedQtyColumn: true,
     enableManualInput: true,
     fixedInputBar: false,
+    logNotFoundBarcode: false,
+    useTalabatLink: false,
     voiceMode: 'off'            // 'off' | 'en' | 'ar'
   };
 
@@ -191,6 +193,8 @@
       "Displays the Received Qty column in the Scanned Products table": "يعرض عمود الكمية المستلمة في جدول المنتجات الممسوحة",
       "Enable Manual Input": "تفعيل الإدخال اليدوي",
       "Allows typing numbers directly into the Received Qty column": "يسمح بكتابة الأرقام مباشرة في عمود الكمية المستلمة",
+      "Log Not Found Barcodes": "تسجيل الباركود غير الموجود",
+      "When ON, barcodes that are not found will be temporarily shown in red in the scanned table.": "عند التفعيل، سيتم عرض الباركود غير الموجود بشكل مؤقت باللون الأحمر في جدول الممسوحات.",
       "Reset to Default Settings": "إعادة تعيين للافتراضي",
       "Close Sidebar": "إغلاق القائمة الجانبية",
       "Open Data Import": "استيراد البيانات",
@@ -224,6 +228,13 @@
       "Remove Empty Column (Remaining)": "إزالة عمود فارغ (المتبقي)",
       "Show Search Column (Remaining)": "إظهار عمود البحث (المتبقي)",
       "Hide Search Column (Remaining)": "إخفاء عمود البحث (المتبقي)",
+      "Select": "اختر",
+      "Missing": "مفقود",
+      "Damage": "تالف",
+      "Missing on DC": "مفقود من DC",
+      "Note...": "ملاحظة...",
+      "Use Talabat Product Link": "استخدم رابط منتج طلبات",
+      "When enabled, the search button in remaining products opens the product on Talabat using the Item Number / ID from the 4th column.": "عند التمكين، سيفتح زر البحث في المنتجات المتبقية المنتج على موقع طلبات باستخدام رقم العنصر / المعرف من العمود الرابع.",
 
       // Admin & Tracker Page Additions
       "Admin Dashboard": "لوحة تحكم المسؤول",
