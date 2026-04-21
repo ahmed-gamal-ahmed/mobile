@@ -379,20 +379,6 @@
 
         <!-- Step 2 -->
         <h5 class="fw-bold mb-3"><span class="badge bg-primary me-2">2</span>Load Inventory File</h5>
-        <div class="alert alert-secondary py-2 mb-3 shadow-sm d-flex flex-column gap-2">
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" id="adminIgnoreFirstRows">
-            <label class="form-check-label fw-bold" for="adminIgnoreFirstRows">
-              Ignore first 3 rows
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" id="adminColumnFilter">
-            <label class="form-check-label fw-bold" for="adminColumnFilter">
-              Filter Columns on Import
-            </label>
-          </div>
-        </div>
         <div class="row g-3 mb-4">
 
           <!-- Option A: Upload -->
@@ -450,6 +436,14 @@
                     <i class="bi bi-arrow-clockwise"></i>
                   </button>
                 </div>
+                <div class="border rounded p-2 mb-3 bg-light">
+                  <label class="form-label fw-semibold mb-1" for="assignPrivateBaseUrlInput">Private Sheet API Base URL</label>
+                  <div class="input-group">
+                    <input type="text" id="assignPrivateBaseUrlInput" class="form-control" placeholder="/api or https://your-domain.com/api" />
+                    <button class="btn btn-outline-primary" type="button" id="assignPrivateBaseUrlSaveBtn">Save</button>
+                  </div>
+                  <div class="form-text">Used for private sheet actions (Load Sheets / Import Sheet).</div>
+                </div>
                 <div id="assignPrivateSheetSelectorContainer" class="d-none">
                   <div class="table-responsive">
                     <table class="table table-sm table-bordered">
@@ -487,6 +481,32 @@
 
     </div><!-- /tab-content -->
   </div><!-- /mainContent -->
+
+  <div class="modal fade" id="assignSheetPreviewModal" tabindex="-1" aria-labelledby="assignSheetPreviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title" id="assignSheetPreviewModalLabel"><i class="bi bi-table"></i> Sheet Preview</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="d-flex flex-wrap gap-2 mb-3">
+            <button type="button" class="btn btn-outline-primary fw-bold" id="assignToggleIgnoreRowsBtn">Ignore first 3 rows: OFF</button>
+            <button type="button" class="btn btn-outline-primary fw-bold" id="assignToggleColumnFilterBtn">Filter columns on import: OFF</button>
+          </div>
+          <div class="text-muted small mb-2" id="assignPreviewTransformHint"></div>
+          <div class="table-responsive border rounded">
+            <table class="table table-sm table-bordered mb-0">
+              <tbody id="assignSheetPreviewTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Create User Modal -->
   <div class="modal fade" id="createUserModal" tabindex="-1" aria-labelledby="createUserModalLabel" aria-hidden="true">
@@ -662,8 +682,9 @@
     const db   = firebase.firestore();
 
     const FIREBASE_API_KEY = "AIzaSyDRE4VFqnr5Y_1AlaPUDcGoZ7njAOmL0T0";
-    const PRIVATE_SHEETS_BASE_URL = "/api";
+    const DEFAULT_PRIVATE_SHEETS_BASE_URL = "/api";
     const PRIVATE_SHEETS_CACHE_TTL_MS = 5 * 60 * 1000;
+    const ADMIN_PRIVATE_BASE_URL_STORAGE_KEY = "adminPrivateSheetsBaseUrl";
 
     let currentAdmin = null;
     let allUsers = [];
@@ -674,6 +695,10 @@
     let privateSheetsCacheAdmin = { ts: 0, names: [] };
     let allDrivers = [];
     let driversSnapshotUnsub = null;
+    let pendingAssignmentRawData = null;
+    let assignPreviewOptions = { ignoreFirstRows: false, columnFilter: false };
+    let assignPreviewModal = null;
+    let privateSheetsBaseUrlAdmin = DEFAULT_PRIVATE_SHEETS_BASE_URL;
 
     // ─── Auth Guard ───────────────────────────────────────────────────────────
     auth.onAuthStateChanged(async (firebaseUser) => {
@@ -709,6 +734,7 @@
       loadUsers();
       loadOperations();
       loadAssignUsers();
+      initAdminPrivateSheetsBaseUrlSetting();
       startDriversListener();
     });
 
@@ -1566,6 +1592,114 @@
 
     document.getElementById("refreshAssignUsersBtn").addEventListener("click", loadAssignUsers);
 
+    function normalizePrivateSheetsBaseUrl(url) {
+      const cleaned = String(url || "").trim();
+      if (!cleaned) return DEFAULT_PRIVATE_SHEETS_BASE_URL;
+      return cleaned.replace(/\/+$/, "");
+    }
+
+    function setAdminPrivateSheetsBaseUrl(url) {
+      privateSheetsBaseUrlAdmin = normalizePrivateSheetsBaseUrl(url);
+      const input = document.getElementById("assignPrivateBaseUrlInput");
+      if (input) input.value = privateSheetsBaseUrlAdmin;
+      try {
+        localStorage.setItem(ADMIN_PRIVATE_BASE_URL_STORAGE_KEY, privateSheetsBaseUrlAdmin);
+      } catch (_) {}
+    }
+
+    function initAdminPrivateSheetsBaseUrlSetting() {
+      let saved = "";
+      try {
+        saved = localStorage.getItem(ADMIN_PRIVATE_BASE_URL_STORAGE_KEY) || "";
+      } catch (_) {}
+      setAdminPrivateSheetsBaseUrl(saved || DEFAULT_PRIVATE_SHEETS_BASE_URL);
+    }
+
+    function ensureAssignPreviewModal() {
+      if (!assignPreviewModal) {
+        assignPreviewModal = new bootstrap.Modal(document.getElementById("assignSheetPreviewModal"));
+      }
+      return assignPreviewModal;
+    }
+
+    function updateAssignPreviewOptionButtons() {
+      const ignoreBtn = document.getElementById("assignToggleIgnoreRowsBtn");
+      const filterBtn = document.getElementById("assignToggleColumnFilterBtn");
+      const ignoreOn = !!assignPreviewOptions.ignoreFirstRows;
+      const filterOn = !!assignPreviewOptions.columnFilter;
+      ignoreBtn.textContent = `Ignore first 3 rows: ${ignoreOn ? "ON" : "OFF"}`;
+      ignoreBtn.className = `btn fw-bold ${ignoreOn ? "btn-primary" : "btn-outline-primary"}`;
+      filterBtn.textContent = `Filter columns on import: ${filterOn ? "ON" : "OFF"}`;
+      filterBtn.className = `btn fw-bold ${filterOn ? "btn-primary" : "btn-outline-primary"}`;
+    }
+
+    function renderAssignSheetPreviewTable(processedData) {
+      const tbody = document.getElementById("assignSheetPreviewTableBody");
+      tbody.innerHTML = "";
+      if (!processedData || !processedData.length) {
+        tbody.innerHTML = `<tr><td class="text-center text-muted py-3">No preview data.</td></tr>`;
+        return;
+      }
+      const maxRows = Math.min(processedData.length, 12);
+      const maxCols = Math.max(1, Math.min(Math.max(...processedData.map(r => Array.isArray(r) ? r.length : 0)), 8));
+      for (let r = 0; r < maxRows; r++) {
+        const tr = document.createElement("tr");
+        const row = Array.isArray(processedData[r]) ? processedData[r] : [];
+        for (let c = 0; c < maxCols; c++) {
+          const cell = document.createElement(r === 0 ? "th" : "td");
+          cell.textContent = row[c] === null || row[c] === undefined ? "" : String(row[c]);
+          tr.appendChild(cell);
+        }
+        tbody.appendChild(tr);
+      }
+    }
+
+    function applyAssignmentPreviewProcessing(showErrorAlert = true) {
+      if (!pendingAssignmentRawData || !pendingAssignment) return false;
+      const processedData = processAssignmentData(pendingAssignmentRawData, assignPreviewOptions);
+      if (!processedData) {
+        pendingAssignment.excelData = [];
+        document.getElementById("assignFilePreview").classList.add("d-none");
+        updateAssignPreview();
+        if (showErrorAlert) alert("No valid rows remain after applying selected options.");
+        return false;
+      }
+      pendingAssignment.excelData = processedData;
+      const rowCount = Math.max(0, processedData.length - 1);
+      document.getElementById("assignFilePreview").textContent = `✅ ${pendingAssignment.fileName} — ${rowCount} data rows`;
+      document.getElementById("assignFilePreview").classList.remove("d-none");
+      document.getElementById("assignPreviewTransformHint").textContent =
+        `Preview rows shown: ${Math.min(processedData.length, 12)} (total data rows after processing: ${rowCount}).`;
+      renderAssignSheetPreviewTable(processedData);
+      updateAssignPreview();
+      return true;
+    }
+
+    function openAssignmentPreview(rawData, assignmentName) {
+      pendingAssignmentRawData = Array.isArray(rawData) ? rawData : [];
+      pendingAssignment = { excelData: [], fileName: assignmentName };
+      assignPreviewOptions = { ignoreFirstRows: false, columnFilter: false };
+      updateAssignPreviewOptionButtons();
+      const ok = applyAssignmentPreviewProcessing(false);
+      if (!ok) {
+        alert("Could not preview this sheet.");
+        return;
+      }
+      ensureAssignPreviewModal().show();
+    }
+
+    document.getElementById("assignToggleIgnoreRowsBtn").addEventListener("click", () => {
+      assignPreviewOptions.ignoreFirstRows = !assignPreviewOptions.ignoreFirstRows;
+      updateAssignPreviewOptionButtons();
+      applyAssignmentPreviewProcessing();
+    });
+
+    document.getElementById("assignToggleColumnFilterBtn").addEventListener("click", () => {
+      assignPreviewOptions.columnFilter = !assignPreviewOptions.columnFilter;
+      updateAssignPreviewOptionButtons();
+      applyAssignmentPreviewProcessing();
+    });
+
     // File Upload (Option A)
     document.getElementById("assignFileInput").addEventListener("change", e => {
       const file = e.target.files[0];
@@ -1576,21 +1710,7 @@
       document.getElementById("assignLocalSheetSelectorBody").innerHTML = "";
       currentAdminWorkbook = null;
 
-      const readDone = (data, assignmentName) => {
-        const processedData = processAssignmentData(data);
-        if (!processedData) {
-          document.getElementById("assignFilePreview").classList.add("d-none");
-          pendingAssignment = null;
-          updateAssignPreview();
-          return;
-        }
-        pendingAssignment = { excelData: processedData, fileName: assignmentName };
-        const rowCount = Math.max(0, processedData.length - 1);
-        document.getElementById("assignFilePreview").textContent =
-          `✅ ${assignmentName} — ${rowCount} data rows`;
-        document.getElementById("assignFilePreview").classList.remove("d-none");
-        updateAssignPreview();
-      };
+      const readDone = (data, assignmentName) => openAssignmentPreview(data, assignmentName);
 
       if (lowerName.endsWith(".csv")) {
         Papa.parse(file, {
@@ -1651,21 +1771,9 @@
           }
 
           const selectedParsed = XLSX.utils.sheet_to_json(selectedSheet, { header: 1 });
-          const processedData = processAssignmentData(selectedParsed);
-          if (!processedData) {
-            document.getElementById("assignFilePreview").classList.add("d-none");
-            pendingAssignment = null;
-            updateAssignPreview();
-            return;
-          }
-          pendingAssignment = { excelData: processedData, fileName: name };
-          const rowCount = Math.max(0, processedData.length - 1);
-          document.getElementById("assignFilePreview").textContent =
-            `✅ ${name} — ${rowCount} data rows`;
-          document.getElementById("assignFilePreview").classList.remove("d-none");
           document.getElementById("assignLocalSheetSelectorContainer").classList.add("d-none");
           currentAdminWorkbook = null;
-          updateAssignPreview();
+          openAssignmentPreview(selectedParsed, name);
         });
 
         tr.querySelector("td:last-child").appendChild(importBtn);
@@ -1706,7 +1814,7 @@
       const user = firebase.auth().currentUser;
       if (!user) throw new Error("Please login again.");
       const token = await user.getIdToken();
-      const res = await fetch(`${PRIVATE_SHEETS_BASE_URL}/getSheetNames`, {
+      const res = await fetch(`${privateSheetsBaseUrlAdmin}/getSheetNames`, {
         method: "GET",
         headers: { "Authorization": `Bearer ${token}` }
       });
@@ -1721,7 +1829,7 @@
       const user = firebase.auth().currentUser;
       if (!user) throw new Error("Please login again.");
       const token = await user.getIdToken();
-      const res = await fetch(`${PRIVATE_SHEETS_BASE_URL}/importSheet`, {
+      const res = await fetch(`${privateSheetsBaseUrlAdmin}/importSheet`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -1750,19 +1858,7 @@
           btn.disabled = true;
           try {
             const parsed = await fetchAdminPrivateSheetData(name);
-            const processedData = processAssignmentData(parsed);
-            if (!processedData) {
-              document.getElementById("assignFilePreview").classList.add("d-none");
-              pendingAssignment = null;
-              updateAssignPreview();
-              return;
-            }
-            pendingAssignment = { excelData: processedData, fileName: name };
-            const rowCount = Math.max(0, processedData.length - 1);
-            document.getElementById("assignFilePreview").textContent =
-              `✅ ${name} — ${rowCount} data rows`;
-            document.getElementById("assignFilePreview").classList.remove("d-none");
-            updateAssignPreview();
+            openAssignmentPreview(parsed, name);
           } catch (err) {
             alert("Could not import private sheet: " + err.message);
           } finally {
@@ -1805,6 +1901,13 @@
       }
     });
 
+    document.getElementById("assignPrivateBaseUrlSaveBtn").addEventListener("click", () => {
+      const input = document.getElementById("assignPrivateBaseUrlInput");
+      setAdminPrivateSheetsBaseUrl(input ? input.value : DEFAULT_PRIVATE_SHEETS_BASE_URL);
+      setAdminPrivateSheetCache([]);
+      alert(`Private sheet API link updated to: ${privateSheetsBaseUrlAdmin}`);
+    });
+
     // Google Sheets (Option B)
     document.getElementById("assignLoadSheetBtn").addEventListener("click", () => {
       const urlStr = document.getElementById("assignSheetUrl").value.trim();
@@ -1844,21 +1947,7 @@
         const importBtn = document.createElement("button");
         importBtn.className = "btn btn-success btn-sm w-100";
         importBtn.innerHTML = `<i class="bi bi-file-earmark-spreadsheet"></i> Select`;
-        importBtn.addEventListener("click", () => {
-          const processedData = processAssignmentData(parsed);
-          if (!processedData) {
-            document.getElementById("assignFilePreview").classList.add("d-none");
-            pendingAssignment = null;
-            updateAssignPreview();
-            return;
-          }
-          const rowCountFinal = Math.max(0, processedData.length - 1);
-          pendingAssignment = { excelData: processedData, fileName: `Google Sheet: ${name}` };
-          document.getElementById("assignFilePreview").textContent =
-            `✅ Google Sheet: ${name} — ${rowCountFinal} data rows`;
-          document.getElementById("assignFilePreview").classList.remove("d-none");
-          updateAssignPreview();
-        });
+        importBtn.addEventListener("click", () => openAssignmentPreview(parsed, `Google Sheet: ${name}`));
         tr.querySelector("td:last-child").appendChild(importBtn);
         tbody.appendChild(tr);
       });
@@ -1898,8 +1987,8 @@
       sp.classList.remove("d-none");
       btn.disabled = true;
 
-      const adminIgnoreFirstRows = document.getElementById("adminIgnoreFirstRows")?.checked || false;
-      const adminColumnFilter = document.getElementById("adminColumnFilter")?.checked || false;
+      const adminIgnoreFirstRows = !!assignPreviewOptions.ignoreFirstRows;
+      const adminColumnFilter = !!assignPreviewOptions.columnFilter;
 
       try {
         await db.collection("assignments").doc(uid).set({
@@ -1923,6 +2012,8 @@
         document.getElementById("assignSheetSelectorContainer").classList.add("d-none");
         document.getElementById("assignPreviewCard").classList.add("d-none");
         pendingAssignment = null;
+        pendingAssignmentRawData = null;
+        assignPreviewOptions = { ignoreFirstRows: false, columnFilter: false };
         assignGoogleWorkbook = null;
       } catch (err) {
         errEl.textContent = "Failed to assign: " + err.message;
@@ -2061,7 +2152,7 @@
       catch (_) { return fallback; }
     }
 
-    function processAssignmentData(parsedData) {
+    function processAssignmentData(parsedData, options = {}) {
       if (!parsedData || parsedData.length === 0) {
         alert("The imported file is empty.");
         return null;
@@ -2079,8 +2170,7 @@
         return null;
       }
 
-      const ignoreCheckbox = document.getElementById("adminIgnoreFirstRows");
-      if (ignoreCheckbox && ignoreCheckbox.checked) {
+      if (options.ignoreFirstRows) {
         if (processedData.length < 5) {
           alert("Cannot ignore 3 rows – file too small.");
           return null;
@@ -2089,8 +2179,7 @@
         processedData.splice(1, 3);
       }
 
-      const filterCheckbox = document.getElementById("adminColumnFilter");
-      if (filterCheckbox && filterCheckbox.checked) {
+      if (options.columnFilter) {
         const REQUIRED_COLUMNS_LOWER = ["description", "bar code", "work quantity", "item number", "location"];
         const COLUMN_DISPLAY_NAMES = ["Description", "Bar code", "Work quantity", "Item number", "Location"];
 

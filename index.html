@@ -700,15 +700,6 @@
       </button>
     </div>
 
-    <div class="alert alert-warning py-2 mb-4 d-flex align-items-center shadow-sm">
-      <div class="form-check mb-0">
-        <input class="form-check-input" type="checkbox" id="ignoreFirstRowsCheckbox">
-        <label class="form-check-label fw-bold" for="ignoreFirstRowsCheckbox">
-          Ignore first 3 rows of the file
-        </label>
-      </div>
-    </div>
-
     <!-- Offline Import Section -->
     <div class="card mb-4 shadow-sm">
       <div class="card-body">
@@ -2781,13 +2772,6 @@
       updateVoiceButtonText();
       updateFocusButtonText();
 
-      const ignoreFirstRowsCheckbox = document.getElementById("ignoreFirstRowsCheckbox");
-      if (ignoreFirstRowsCheckbox) {
-        ignoreFirstRowsCheckbox.checked = localStorage.getItem("ignoreFirstRows") === "true";
-        ignoreFirstRowsCheckbox.addEventListener("change", (e) => {
-          localStorage.setItem("ignoreFirstRows", e.target.checked);
-        });
-      }
       const emptyColBtn = document.getElementById("toggleEmptyColumnButton");
       if (emptyColBtn) {
         emptyColBtn.innerHTML = remainingNotesColumnVisible
@@ -3013,11 +2997,6 @@
     }
 
     function processImportedData(parsedData) {
-      const ignoreCheckbox = document.getElementById("ignoreFirstRowsCheckbox");
-      if (ignoreCheckbox && ignoreCheckbox.checked) {
-        parsedData = parsedData.slice(3);
-      }
-
       // Remove empty rows
       parsedData = parsedData.filter(row =>
         row.some(cell => cell !== null && cell !== undefined && cell !== '')
@@ -3798,6 +3777,7 @@
       savedScannedProducts.forEach(({ barcode, data: scannedRowData, receivedQty, source, timestamp }) => {
         addRowToScannedTable(scannedRowData, barcode, false, source || 'scan', timestamp, true, receivedQty || ""); // true = skipSave
       });
+      reindexScannedTable();
 
       applyTimestampColumnVisibility();
 
