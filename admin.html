@@ -120,6 +120,9 @@
       background: #f0fff4;
       padding: 20px;
     }
+    #assignSheetPreviewModal .modal-content {
+      box-shadow: none;
+    }
     #pageSpinner {
       position: fixed;
       inset: 0;
@@ -494,6 +497,16 @@
             <button type="button" class="btn btn-outline-primary fw-bold" id="assignToggleIgnoreRowsBtn">Ignore first 3 rows: OFF</button>
             <button type="button" class="btn btn-outline-primary fw-bold" id="assignToggleColumnFilterBtn">Filter columns on import: OFF</button>
           </div>
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold mb-1" for="assignDeleteFirstRowsInput">Delete first N rows</label>
+              <input type="number" min="0" step="1" id="assignDeleteFirstRowsInput" class="form-control" value="0" />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold mb-1" for="assignDeleteLastColsInput">Delete last N columns</label>
+              <input type="number" min="0" step="1" id="assignDeleteLastColsInput" class="form-control" value="0" />
+            </div>
+          </div>
           <div class="text-muted small mb-2" id="assignPreviewTransformHint"></div>
           <div class="table-responsive border rounded">
             <table class="table table-sm table-bordered mb-0">
@@ -696,7 +709,12 @@
     let allDrivers = [];
     let driversSnapshotUnsub = null;
     let pendingAssignmentRawData = null;
-    let assignPreviewOptions = { ignoreFirstRows: false, columnFilter: false };
+    let assignPreviewOptions = {
+      ignoreFirstRows: false,
+      columnFilter: false,
+      deleteFirstRowsCount: 0,
+      deleteLastColumnsCount: 0
+    };
     let assignPreviewModal = null;
     let privateSheetsBaseUrlAdmin = DEFAULT_PRIVATE_SHEETS_BASE_URL;
 
@@ -1617,7 +1635,7 @@
 
     function ensureAssignPreviewModal() {
       if (!assignPreviewModal) {
-        assignPreviewModal = new bootstrap.Modal(document.getElementById("assignSheetPreviewModal"));
+        assignPreviewModal = new bootstrap.Modal(document.getElementById("assignSheetPreviewModal"), { backdrop: false });
       }
       return assignPreviewModal;
     }
@@ -1625,12 +1643,16 @@
     function updateAssignPreviewOptionButtons() {
       const ignoreBtn = document.getElementById("assignToggleIgnoreRowsBtn");
       const filterBtn = document.getElementById("assignToggleColumnFilterBtn");
+      const deleteFirstRowsInput = document.getElementById("assignDeleteFirstRowsInput");
+      const deleteLastColsInput = document.getElementById("assignDeleteLastColsInput");
       const ignoreOn = !!assignPreviewOptions.ignoreFirstRows;
       const filterOn = !!assignPreviewOptions.columnFilter;
       ignoreBtn.textContent = `Ignore first 3 rows: ${ignoreOn ? "ON" : "OFF"}`;
       ignoreBtn.className = `btn fw-bold ${ignoreOn ? "btn-primary" : "btn-outline-primary"}`;
       filterBtn.textContent = `Filter columns on import: ${filterOn ? "ON" : "OFF"}`;
       filterBtn.className = `btn fw-bold ${filterOn ? "btn-primary" : "btn-outline-primary"}`;
+      if (deleteFirstRowsInput) deleteFirstRowsInput.value = String(assignPreviewOptions.deleteFirstRowsCount || 0);
+      if (deleteLastColsInput) deleteLastColsInput.value = String(assignPreviewOptions.deleteLastColumnsCount || 0);
     }
 
     function renderAssignSheetPreviewTable(processedData) {
@@ -1678,7 +1700,12 @@
     function openAssignmentPreview(rawData, assignmentName) {
       pendingAssignmentRawData = Array.isArray(rawData) ? rawData : [];
       pendingAssignment = { excelData: [], fileName: assignmentName };
-      assignPreviewOptions = { ignoreFirstRows: false, columnFilter: false };
+      assignPreviewOptions = {
+        ignoreFirstRows: false,
+        columnFilter: false,
+        deleteFirstRowsCount: 0,
+        deleteLastColumnsCount: 0
+      };
       updateAssignPreviewOptionButtons();
       const ok = applyAssignmentPreviewProcessing(false);
       if (!ok) {
@@ -1698,6 +1725,18 @@
       assignPreviewOptions.columnFilter = !assignPreviewOptions.columnFilter;
       updateAssignPreviewOptionButtons();
       applyAssignmentPreviewProcessing();
+    });
+
+    document.getElementById("assignDeleteFirstRowsInput").addEventListener("input", (e) => {
+      const val = Math.max(0, parseInt(e.target.value || "0", 10) || 0);
+      assignPreviewOptions.deleteFirstRowsCount = val;
+      applyAssignmentPreviewProcessing(false);
+    });
+
+    document.getElementById("assignDeleteLastColsInput").addEventListener("input", (e) => {
+      const val = Math.max(0, parseInt(e.target.value || "0", 10) || 0);
+      assignPreviewOptions.deleteLastColumnsCount = val;
+      applyAssignmentPreviewProcessing(false);
     });
 
     // File Upload (Option A)
@@ -1989,6 +2028,8 @@
 
       const adminIgnoreFirstRows = !!assignPreviewOptions.ignoreFirstRows;
       const adminColumnFilter = !!assignPreviewOptions.columnFilter;
+      const adminDeleteFirstRowsCount = Math.max(0, parseInt(assignPreviewOptions.deleteFirstRowsCount || 0, 10) || 0);
+      const adminDeleteLastColumnsCount = Math.max(0, parseInt(assignPreviewOptions.deleteLastColumnsCount || 0, 10) || 0);
 
       try {
         await db.collection("assignments").doc(uid).set({
@@ -1999,7 +2040,9 @@
           status:      "pending",
           forceMode:   document.getElementById("forceAssignmentToggle").checked ? "force" : "normal",
           adminIgnoreFirstRows: adminIgnoreFirstRows,
-          adminColumnFilter: adminColumnFilter
+          adminColumnFilter: adminColumnFilter,
+          adminDeleteFirstRowsCount: adminDeleteFirstRowsCount,
+          adminDeleteLastColumnsCount: adminDeleteLastColumnsCount
         });
         succEl.textContent = `✅ Inventory successfully assigned to ${userName}. They will be notified on next login.`;
         succEl.classList.remove("d-none");
@@ -2013,7 +2056,12 @@
         document.getElementById("assignPreviewCard").classList.add("d-none");
         pendingAssignment = null;
         pendingAssignmentRawData = null;
-        assignPreviewOptions = { ignoreFirstRows: false, columnFilter: false };
+        assignPreviewOptions = {
+          ignoreFirstRows: false,
+          columnFilter: false,
+          deleteFirstRowsCount: 0,
+          deleteLastColumnsCount: 0
+        };
         assignGoogleWorkbook = null;
       } catch (err) {
         errEl.textContent = "Failed to assign: " + err.message;
@@ -2168,6 +2216,28 @@
       if (processedData.length < 1) {
         alert("File has no data after removing empty rows.");
         return null;
+      }
+
+      const deleteFirstRowsCount = Math.max(0, parseInt(options.deleteFirstRowsCount || 0, 10) || 0);
+      if (deleteFirstRowsCount > 0) {
+        if (processedData.length <= deleteFirstRowsCount) {
+          alert("Cannot delete that many first rows.");
+          return null;
+        }
+        processedData = processedData.slice(deleteFirstRowsCount);
+      }
+
+      const deleteLastColumnsCount = Math.max(0, parseInt(options.deleteLastColumnsCount || 0, 10) || 0);
+      if (deleteLastColumnsCount > 0) {
+        const minCols = Math.min(...processedData.map(row => Array.isArray(row) ? row.length : 0));
+        if (minCols <= deleteLastColumnsCount) {
+          alert("Cannot delete that many last columns.");
+          return null;
+        }
+        processedData = processedData.map(row => {
+          const safeRow = Array.isArray(row) ? row : [];
+          return safeRow.slice(0, Math.max(0, safeRow.length - deleteLastColumnsCount));
+        });
       }
 
       if (options.ignoreFirstRows) {
