@@ -498,11 +498,15 @@
             <button type="button" class="btn btn-outline-primary fw-bold" id="assignToggleColumnFilterBtn">Filter columns on import: OFF</button>
           </div>
           <div class="row g-2 mb-3">
-            <div class="col-md-6">
+            <div class="col-md-4">
               <label class="form-label fw-semibold mb-1" for="assignDeleteFirstRowsInput">Delete first N rows</label>
               <input type="number" min="0" step="1" id="assignDeleteFirstRowsInput" class="form-control" value="0" />
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4">
+              <label class="form-label fw-semibold mb-1" for="assignDeleteFirstColsInput">Delete first N columns</label>
+              <input type="number" min="0" step="1" id="assignDeleteFirstColsInput" class="form-control" value="0" />
+            </div>
+            <div class="col-md-4">
               <label class="form-label fw-semibold mb-1" for="assignDeleteLastColsInput">Delete last N columns</label>
               <input type="number" min="0" step="1" id="assignDeleteLastColsInput" class="form-control" value="0" />
             </div>
@@ -713,6 +717,7 @@
       ignoreFirstRows: false,
       columnFilter: false,
       deleteFirstRowsCount: 0,
+      deleteFirstColumnsCount: 0,
       deleteLastColumnsCount: 0
     };
     let assignPreviewModal = null;
@@ -1644,6 +1649,7 @@
       const ignoreBtn = document.getElementById("assignToggleIgnoreRowsBtn");
       const filterBtn = document.getElementById("assignToggleColumnFilterBtn");
       const deleteFirstRowsInput = document.getElementById("assignDeleteFirstRowsInput");
+      const deleteFirstColsInput = document.getElementById("assignDeleteFirstColsInput");
       const deleteLastColsInput = document.getElementById("assignDeleteLastColsInput");
       const ignoreOn = !!assignPreviewOptions.ignoreFirstRows;
       const filterOn = !!assignPreviewOptions.columnFilter;
@@ -1652,6 +1658,7 @@
       filterBtn.textContent = `Filter columns on import: ${filterOn ? "ON" : "OFF"}`;
       filterBtn.className = `btn fw-bold ${filterOn ? "btn-primary" : "btn-outline-primary"}`;
       if (deleteFirstRowsInput) deleteFirstRowsInput.value = String(assignPreviewOptions.deleteFirstRowsCount || 0);
+      if (deleteFirstColsInput) deleteFirstColsInput.value = String(assignPreviewOptions.deleteFirstColumnsCount || 0);
       if (deleteLastColsInput) deleteLastColsInput.value = String(assignPreviewOptions.deleteLastColumnsCount || 0);
     }
 
@@ -1704,6 +1711,7 @@
         ignoreFirstRows: false,
         columnFilter: false,
         deleteFirstRowsCount: 0,
+        deleteFirstColumnsCount: 0,
         deleteLastColumnsCount: 0
       };
       updateAssignPreviewOptionButtons();
@@ -1730,6 +1738,12 @@
     document.getElementById("assignDeleteFirstRowsInput").addEventListener("input", (e) => {
       const val = Math.max(0, parseInt(e.target.value || "0", 10) || 0);
       assignPreviewOptions.deleteFirstRowsCount = val;
+      applyAssignmentPreviewProcessing(false);
+    });
+
+    document.getElementById("assignDeleteFirstColsInput").addEventListener("input", (e) => {
+      const val = Math.max(0, parseInt(e.target.value || "0", 10) || 0);
+      assignPreviewOptions.deleteFirstColumnsCount = val;
       applyAssignmentPreviewProcessing(false);
     });
 
@@ -2029,6 +2043,7 @@
       const adminIgnoreFirstRows = !!assignPreviewOptions.ignoreFirstRows;
       const adminColumnFilter = !!assignPreviewOptions.columnFilter;
       const adminDeleteFirstRowsCount = Math.max(0, parseInt(assignPreviewOptions.deleteFirstRowsCount || 0, 10) || 0);
+      const adminDeleteFirstColumnsCount = Math.max(0, parseInt(assignPreviewOptions.deleteFirstColumnsCount || 0, 10) || 0);
       const adminDeleteLastColumnsCount = Math.max(0, parseInt(assignPreviewOptions.deleteLastColumnsCount || 0, 10) || 0);
 
       try {
@@ -2042,6 +2057,7 @@
           adminIgnoreFirstRows: adminIgnoreFirstRows,
           adminColumnFilter: adminColumnFilter,
           adminDeleteFirstRowsCount: adminDeleteFirstRowsCount,
+          adminDeleteFirstColumnsCount: adminDeleteFirstColumnsCount,
           adminDeleteLastColumnsCount: adminDeleteLastColumnsCount
         });
         succEl.textContent = `✅ Inventory successfully assigned to ${userName}. They will be notified on next login.`;
@@ -2060,6 +2076,7 @@
           ignoreFirstRows: false,
           columnFilter: false,
           deleteFirstRowsCount: 0,
+          deleteFirstColumnsCount: 0,
           deleteLastColumnsCount: 0
         };
         assignGoogleWorkbook = null;
@@ -2225,6 +2242,19 @@
           return null;
         }
         processedData = processedData.slice(deleteFirstRowsCount);
+      }
+
+      const deleteFirstColumnsCount = Math.max(0, parseInt(options.deleteFirstColumnsCount || 0, 10) || 0);
+      if (deleteFirstColumnsCount > 0) {
+        const minCols = Math.min(...processedData.map(row => Array.isArray(row) ? row.length : 0));
+        if (minCols <= deleteFirstColumnsCount) {
+          alert("Cannot delete that many first columns.");
+          return null;
+        }
+        processedData = processedData.map(row => {
+          const safeRow = Array.isArray(row) ? row : [];
+          return safeRow.slice(deleteFirstColumnsCount);
+        });
       }
 
       const deleteLastColumnsCount = Math.max(0, parseInt(options.deleteLastColumnsCount || 0, 10) || 0);

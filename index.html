@@ -2546,13 +2546,7 @@
           return;
         }
 
-        fileName = "Google Sheet: " + selectedSheetName;
-        document.getElementById("pageHeader").textContent = fileName;
-        localStorage.setItem("fileName", fileName);
-        processImportedData(parsedData);
-        // Switch back to main UI
-        document.getElementById("dataImportContainer").classList.add("d-none");
-        document.getElementById("mainAppContainer").classList.remove("d-none");
+        openImportPreview(parsedData, "Google Sheet: " + selectedSheetName);
       }
 
       document.getElementById("sheetSearch").addEventListener("input", (e) => {
@@ -2644,12 +2638,7 @@
                 alert("Sheet not found or empty.");
                 return;
               }
-              fileName = name;
-              document.getElementById("pageHeader").textContent = fileName;
-              localStorage.setItem("fileName", fileName);
-              processImportedData(parsedData);
-              document.getElementById("dataImportContainer").classList.add("d-none");
-              document.getElementById("mainAppContainer").classList.remove("d-none");
+              openImportPreview(parsedData, name);
             } catch (err) {
               alert("Could not import private sheet: " + err.message);
             } finally {
@@ -2860,13 +2849,7 @@
           }
 
           const selectedParsedData = XLSX.utils.sheet_to_json(selectedSheet, { header: 1 });
-          fileName = name;
-          document.getElementById("pageHeader").textContent = fileName;
-          localStorage.setItem("fileName", fileName);
-          processImportedData(selectedParsedData);
-          document.getElementById("localSheetContainer").classList.add("d-none");
-          document.getElementById("dataImportContainer").classList.add("d-none");
-          document.getElementById("mainAppContainer").classList.remove("d-none");
+          openImportPreview(selectedParsedData, name);
           currentLocalWorkbook = null;
         });
         tdAction.appendChild(btn);
@@ -2897,15 +2880,11 @@
       if (lowerName.endsWith(".csv")) {
         if (file.name) {
           fileName = file.name;
-          document.getElementById("pageHeader").textContent = fileName;
-          localStorage.setItem("fileName", fileName);
         }
         Papa.parse(file, {
           complete: function (results) {
-            processImportedData(results.data);
+            openImportPreview(results.data, file.name);
             document.getElementById("fileInput").value = "";
-            document.getElementById("dataImportContainer").classList.add("d-none");
-            document.getElementById("mainAppContainer").classList.remove("d-none");
           },
           skipEmptyLines: true,
           error: function (err) {
@@ -2923,13 +2902,8 @@
             const sheetName = sheetNames[0];
             const sheet = workbook.Sheets[sheetName];
             const parsedData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-            fileName = sheetName;
-            document.getElementById("pageHeader").textContent = fileName;
-            localStorage.setItem("fileName", fileName);
-            processImportedData(parsedData);
+            openImportPreview(parsedData, sheetName);
             document.getElementById("fileInput").value = "";
-            document.getElementById("dataImportContainer").classList.add("d-none");
-            document.getElementById("mainAppContainer").classList.remove("d-none");
           } else if (sheetNames.length > 1) {
             currentLocalWorkbook = workbook;
             renderLocalSheetList(sheetNames);
@@ -4583,6 +4557,271 @@
         btn.disabled = false;
       }
     });
+    let importPreviewModal = null;
+    let pendingImportRawData = null;
+    let pendingImportFileName = "";
+    let importPreviewOptions = {
+      ignoreFirstRows: false,
+      columnFilter: false,
+      deleteFirstRowsCount: 0,
+      deleteFirstColumnsCount: 0,
+      deleteLastColumnsCount: 0
+    };
+
+    function ensureImportPreviewModal() {
+      if (!importPreviewModal) {
+        importPreviewModal = new bootstrap.Modal(document.getElementById("importSheetPreviewModal"), { backdrop: "static" });
+      }
+      return importPreviewModal;
+    }
+
+    function updateImportPreviewOptionButtons() {
+      const ignoreBtn = document.getElementById("importToggleIgnoreRowsBtn");
+      const filterBtn = document.getElementById("importToggleColumnFilterBtn");
+      const deleteFirstRowsInput = document.getElementById("importDeleteFirstRowsInput");
+      const deleteFirstColsInput = document.getElementById("importDeleteFirstColsInput");
+      const deleteLastColsInput = document.getElementById("importDeleteLastColsInput");
+      if (!ignoreBtn) return;
+      const ignoreOn = !!importPreviewOptions.ignoreFirstRows;
+      const filterOn = !!importPreviewOptions.columnFilter;
+      ignoreBtn.textContent = `Ignore first 3 rows: ${ignoreOn ? "ON" : "OFF"}`;
+      ignoreBtn.className = `btn fw-bold ${ignoreOn ? "btn-primary" : "btn-outline-primary"}`;
+      filterBtn.textContent = `Filter columns on import: ${filterOn ? "ON" : "OFF"}`;
+      filterBtn.className = `btn fw-bold ${filterOn ? "btn-primary" : "btn-outline-primary"}`;
+      if (deleteFirstRowsInput) deleteFirstRowsInput.value = String(importPreviewOptions.deleteFirstRowsCount || 0);
+      if (deleteFirstColsInput) deleteFirstColsInput.value = String(importPreviewOptions.deleteFirstColumnsCount || 0);
+      if (deleteLastColsInput) deleteLastColsInput.value = String(importPreviewOptions.deleteLastColumnsCount || 0);
+    }
+
+    function renderImportSheetPreviewTable(processedData) {
+      const tbody = document.getElementById("importSheetPreviewTableBody");
+      if (!tbody) return;
+      tbody.innerHTML = "";
+      if (!processedData || !processedData.length) {
+        tbody.innerHTML = `<tr><td class="text-center text-muted py-3">No preview data.</td></tr>`;
+        return;
+      }
+      const maxRows = Math.min(processedData.length, 12);
+      const maxCols = Math.max(1, Math.min(Math.max(...processedData.map(r => Array.isArray(r) ? r.length : 0)), 8));
+      for (let r = 0; r < maxRows; r++) {
+        const tr = document.createElement("tr");
+        const row = Array.isArray(processedData[r]) ? processedData[r] : [];
+        for (let c = 0; c < maxCols; c++) {
+          const cell = document.createElement(r === 0 ? "th" : "td");
+          cell.textContent = row[c] === null || row[c] === undefined ? "" : String(row[c]);
+          tr.appendChild(cell);
+        }
+        tbody.appendChild(tr);
+      }
+    }
+
+    function applyImportPreviewProcessing(showErrorAlert = true) {
+      if (!pendingImportRawData) return false;
+      
+      let processedData = [...pendingImportRawData];
+      processedData = processedData.filter(row =>
+        Array.isArray(row) && row.some(cell => cell !== null && cell !== undefined && cell !== '')
+      );
+      
+      if (processedData.length < 1) {
+        if (showErrorAlert) alert("File has no data after removing empty rows.");
+        return false;
+      }
+
+      const deleteFirstRowsCount = Math.max(0, parseInt(importPreviewOptions.deleteFirstRowsCount || 0, 10) || 0);
+      if (deleteFirstRowsCount > 0) {
+        if (processedData.length <= deleteFirstRowsCount) {
+          if (showErrorAlert) alert("Cannot delete that many first rows.");
+          return false;
+        }
+        processedData = processedData.slice(deleteFirstRowsCount);
+      }
+
+      const deleteFirstColumnsCount = Math.max(0, parseInt(importPreviewOptions.deleteFirstColumnsCount || 0, 10) || 0);
+      if (deleteFirstColumnsCount > 0) {
+        const minCols = Math.min(...processedData.map(row => Array.isArray(row) ? row.length : 0));
+        if (minCols <= deleteFirstColumnsCount) {
+          if (showErrorAlert) alert("Cannot delete that many first columns.");
+          return false;
+        }
+        processedData = processedData.map(row => {
+          const safeRow = Array.isArray(row) ? row : [];
+          return safeRow.slice(deleteFirstColumnsCount);
+        });
+      }
+
+      const deleteLastColumnsCount = Math.max(0, parseInt(importPreviewOptions.deleteLastColumnsCount || 0, 10) || 0);
+      if (deleteLastColumnsCount > 0) {
+        const minCols = Math.min(...processedData.map(row => Array.isArray(row) ? row.length : 0));
+        if (minCols <= deleteLastColumnsCount) {
+          if (showErrorAlert) alert("Cannot delete that many last columns.");
+          return false;
+        }
+        processedData = processedData.map(row => {
+          const safeRow = Array.isArray(row) ? row : [];
+          return safeRow.slice(0, Math.max(0, safeRow.length - deleteLastColumnsCount));
+        });
+      }
+
+      if (importPreviewOptions.ignoreFirstRows) {
+        if (processedData.length < 5) {
+          if (showErrorAlert) alert("Cannot ignore 3 rows – file too small.");
+          return false;
+        }
+        processedData.splice(1, 3);
+      }
+
+      if (importPreviewOptions.columnFilter) {
+        const REQUIRED_COLUMNS_LOWER = ["description", "bar code", "work quantity", "item number", "location"];
+        const COLUMN_DISPLAY_NAMES = ["Description", "Bar code", "Work quantity", "Item number", "Location"];
+
+        const headerRow = processedData[0];
+        const normalizedHeaders = headerRow.map(h => 
+          (h === null || h === undefined ? "" : h.toString().trim().toLowerCase())
+        );
+
+        const columnIndexMap = REQUIRED_COLUMNS_LOWER.map(colName =>
+          normalizedHeaders.findIndex(h => h === colName)
+        );
+
+        const filteredHeaders = [];
+        const validColumnIndices = [];
+
+        REQUIRED_COLUMNS_LOWER.forEach((colName, i) => {
+          if (columnIndexMap[i] !== -1) {
+            filteredHeaders.push(COLUMN_DISPLAY_NAMES[i]);
+            validColumnIndices.push({ requiredIndex: i, fileIndex: columnIndexMap[i] });
+          }
+        });
+
+        if (filteredHeaders.length === 0) {
+          if (showErrorAlert) alert("No matching columns found in the file.\n\nPlease ensure the file contains at least one of:\nDescription, Bar code, Work quantity, Item number, Location.\n\nOr turn OFF 'Filter Columns on Import' to import all columns.");
+          return false;
+        }
+
+        const filteredData = [filteredHeaders];
+        for (let rowIdx = 1; rowIdx < processedData.length; rowIdx++) {
+          const originalRow = processedData[rowIdx];
+          const filteredRow = validColumnIndices.map(({ fileIndex }) => {
+            const cell = originalRow[fileIndex];
+            return cell === null || cell === undefined ? "" : cell;
+          });
+          filteredData.push(filteredRow);
+        }
+
+        processedData = filteredData;
+      }
+
+      if (processedData.length < 2) {
+        if (showErrorAlert) alert("No valid data rows remain after applying selected options.");
+        return false;
+      }
+
+      const rowCount = Math.max(0, processedData.length - 1);
+      const hintEl = document.getElementById("importPreviewTransformHint");
+      if (hintEl) {
+        hintEl.textContent = `Preview rows shown: ${Math.min(processedData.length, 12)} (total data rows after processing: ${rowCount}).`;
+      }
+      renderImportSheetPreviewTable(processedData);
+      
+      pendingImportRawData._processed = processedData;
+      return true;
+    }
+
+    function openImportPreview(rawData, sheetName) {
+      pendingImportRawData = Array.isArray(rawData) ? rawData : [];
+      pendingImportFileName = sheetName;
+      importPreviewOptions = {
+        ignoreFirstRows: false,
+        columnFilter: AppSettings.get().columnFilterEnabled,
+        deleteFirstRowsCount: 0,
+        deleteFirstColumnsCount: 0,
+        deleteLastColumnsCount: 0
+      };
+      
+      const modalEl = document.getElementById("importSheetPreviewModal");
+      if (modalEl) {
+        updateImportPreviewOptionButtons();
+        const ok = applyImportPreviewProcessing(false);
+        if (!ok) {
+          alert("Could not preview this sheet with the current defaults. Trying with filter off.");
+          importPreviewOptions.columnFilter = false;
+          updateImportPreviewOptionButtons();
+          if (!applyImportPreviewProcessing(false)) {
+            alert("This sheet is empty or invalid.");
+            return;
+          }
+        }
+        ensureImportPreviewModal().show();
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("importToggleIgnoreRowsBtn")?.addEventListener("click", () => {
+        importPreviewOptions.ignoreFirstRows = !importPreviewOptions.ignoreFirstRows;
+        updateImportPreviewOptionButtons();
+        applyImportPreviewProcessing();
+      });
+
+      document.getElementById("importToggleColumnFilterBtn")?.addEventListener("click", () => {
+        importPreviewOptions.columnFilter = !importPreviewOptions.columnFilter;
+        updateImportPreviewOptionButtons();
+        applyImportPreviewProcessing();
+      });
+
+      document.getElementById("importDeleteFirstRowsInput")?.addEventListener("input", (e) => {
+        const val = Math.max(0, parseInt(e.target.value || "0", 10) || 0);
+        importPreviewOptions.deleteFirstRowsCount = val;
+        applyImportPreviewProcessing(false);
+      });
+
+      document.getElementById("importDeleteFirstColsInput")?.addEventListener("input", (e) => {
+        const val = Math.max(0, parseInt(e.target.value || "0", 10) || 0);
+        importPreviewOptions.deleteFirstColumnsCount = val;
+        applyImportPreviewProcessing(false);
+      });
+
+      document.getElementById("importDeleteLastColsInput")?.addEventListener("input", (e) => {
+        const val = Math.max(0, parseInt(e.target.value || "0", 10) || 0);
+        importPreviewOptions.deleteLastColumnsCount = val;
+        applyImportPreviewProcessing(false);
+      });
+
+      document.getElementById("importPreviewConfirmBtn")?.addEventListener("click", () => {
+        if (!pendingImportRawData || !pendingImportRawData._processed) return;
+        
+        fileName = pendingImportFileName;
+        document.getElementById("pageHeader").textContent = fileName;
+        localStorage.setItem("fileName", fileName);
+        
+        const finalData = pendingImportRawData._processed;
+        
+        excelData = finalData.map(normalizeRow);
+        remainingProducts = [...excelData.slice(1)];
+        localStorage.setItem("excelData", JSON.stringify(excelData));
+
+        renderTableHeaders();
+        showRemainingProducts();
+
+        const remainingSection = document.getElementById("remainingProductsSection");
+        if (remainingSection) {
+          remainingSection.classList.remove("d-none");
+          const toggleBtn = document.getElementById("toggleRemainingButton");
+          if (toggleBtn) toggleBtn.textContent = "Hide Remaining Products";
+        }
+
+        saveProgress();
+        updateStatistics();
+        
+        ensureImportPreviewModal().hide();
+        const containersToHide = ["dataImportContainer", "localSheetContainer", "sheetSelectionContainer", "privateSheetSelectionContainer"];
+        containersToHide.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.classList.add("d-none");
+        });
+        document.getElementById("mainAppContainer").classList.remove("d-none");
+      });
+    });
   </script>
 
   <!-- Unsaved Work Warning Modal -->
@@ -4604,6 +4843,48 @@
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="unsavedWorkCancelBtn">
             Cancel
           </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import Preview Modal -->
+  <div class="modal fade" id="importSheetPreviewModal" tabindex="-1" aria-labelledby="importSheetPreviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title" id="importSheetPreviewModalLabel"><i class="bi bi-table"></i> Sheet Preview</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="d-flex flex-wrap gap-2 mb-3">
+            <button type="button" class="btn btn-outline-primary fw-bold" id="importToggleIgnoreRowsBtn">Ignore first 3 rows: OFF</button>
+            <button type="button" class="btn btn-outline-primary fw-bold" id="importToggleColumnFilterBtn">Filter columns on import: OFF</button>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-md-4">
+              <label class="form-label fw-semibold mb-1" for="importDeleteFirstRowsInput">Delete first N rows</label>
+              <input type="number" min="0" step="1" id="importDeleteFirstRowsInput" class="form-control" value="0" />
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold mb-1" for="importDeleteFirstColsInput">Delete first N columns</label>
+              <input type="number" min="0" step="1" id="importDeleteFirstColsInput" class="form-control" value="0" />
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold mb-1" for="importDeleteLastColsInput">Delete last N columns</label>
+              <input type="number" min="0" step="1" id="importDeleteLastColsInput" class="form-control" value="0" />
+            </div>
+          </div>
+          <div class="text-muted small mb-2" id="importPreviewTransformHint"></div>
+          <div class="table-responsive border rounded">
+            <table class="table table-sm table-bordered mb-0">
+              <tbody id="importSheetPreviewTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-success" id="importPreviewConfirmBtn"><i class="bi bi-check-circle"></i> Confirm Import</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         </div>
       </div>
     </div>
