@@ -16,7 +16,7 @@ if (!admin.apps.length) {
   }
 }
 
-const SPREADSHEET_ID = "1AmFRDCx8avKX_EWONaRuBxCZ5r0HpAKJaj3l9Vu1Tl0";
+const SPREADSHEET_ID = "1aFFy_qXh-dNok4sn6j42RMmdF55MzX5M838zX6svWzo";
 
 async function authenticateAndAuthorize(req, requiredRoles) {
   const header = req.headers.authorization || "";
@@ -63,7 +63,7 @@ module.exports = async (req, res) => {
 
   try {
     if (!admin.apps.length) {
-       throw new Error("Firebase Admin not initialized. Check SERVICE_ACCOUNT_JSON.");
+      throw new Error("Firebase Admin not initialized. Check SERVICE_ACCOUNT_JSON.");
     }
     await authenticateAndAuthorize(req, ["admin", "user", "tracker"]);
 
