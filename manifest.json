@@ -1,7 +1,7 @@
 {
   "name": "Product Inventory PWA",
   "short_name": "Inventory",
-  "start_url": "./index.html",
+  "start_url": "./shell.html",
   "display": "standalone",
   "background_color": "#343a40",
   "theme_color": "#28a745",

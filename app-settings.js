@@ -24,7 +24,13 @@
     fixedInputBar: false,
     logNotFoundBarcode: false,
     useTalabatLink: false,
-    voiceMode: 'off'            // 'off' | 'en' | 'ar'
+    voiceMode: 'off',           // 'off' | 'en' | 'ar'
+    fitTableToScreen: false,    // When true, table rows wrap to fit viewport width
+    focusEnabled: true,
+    remainingNotesColumnVisible: false,
+    searchColumnVisible: true,
+    timestampColumnVisible: true,
+    compactView: false
   };
 
   /* ── CSS value maps ──────────────────────────────────────────────────── */
@@ -46,6 +52,14 @@
     root.style.setProperty('--app-scale',          s.scale                 || 1);
     root.dir  = s.language === 'ar' ? 'rtl' : 'ltr';
     root.lang = s.language || 'ar';
+    // Apply fit-table-to-screen class as soon as DOM is available
+    if (document.body) {
+      document.body.classList.toggle('fit-table-screen', !!s.fitTableToScreen);
+    } else {
+      document.addEventListener('DOMContentLoaded', function () {
+        document.body.classList.toggle('fit-table-screen', !!s.fitTableToScreen);
+      }, { once: true });
+    }
   }
 
   _apply(_settings); // ← runs immediately, before DOM paint
@@ -63,13 +77,13 @@
      * Save settings locally + apply CSS vars + notify other tabs.
      * Optionally pass db+uid to also persist to Firestore.
      */
-    save: function (newSettings, db, uid) {
+    save: async function (newSettings, db, uid) {
       Object.assign(_settings, newSettings);
+      if (db && uid) {
+        await this._writeFirestore(db, uid, _settings);
+      }
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(_settings));
       _apply(_settings);
-      if (db && uid) {
-        this._writeFirestore(db, uid, _settings);
-      }
     },
 
     /**

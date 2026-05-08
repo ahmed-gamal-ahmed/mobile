@@ -5,6 +5,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Product Table by Barcode</title>
+  <script>
+    if (window.parent === window && !window.location.search.includes("home=true")) {
+      window.location.replace("shell.html#inventory");
+    }
+  </script>
   <!-- PWA Meta Tags -->
   <meta name="theme-color" content="#28a745">
   <meta name="mobile-web-app-capable" content="yes">
@@ -204,14 +209,42 @@
       margin: 0 auto;
     }
 
-    /* Table Responsive Formatting — padding is driven by --app-table-density CSS var */
+    /* ── Table Responsive Formatting ────────────────────────────────────── */
+    .table-responsive {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      border-radius: 8px; /* Modern clean UI */
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05); /* Modern clean UI */
+      border: 1px solid #e9ecef;
+      background: #fff;
+      margin-bottom: 1.5rem;
+      /* Ensure the wrapper doesn't stretch past the viewport */
+      max-width: 100%;
+    }
+
+    .table-responsive .table {
+      margin-bottom: 0;
+      width: 100%;
+      background-color: #fff;
+    }
+
+    /* Sticky headers for better UX on scrolling */
+    .table-responsive .table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background-color: #212529; /* Keep the Bootstrap table-dark color */
+      color: white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      white-space: nowrap;
+    }
+
     .table td,
     .table th {
-      padding: var(--app-table-density) 0.75rem;
+      padding: var(--app-table-density, 0.75rem) 1rem;
       vertical-align: middle;
-      max-width: 350px;
       word-wrap: break-word;
-      white-space: normal;
     }
 
     /* Ensure action buttons wrap predictably */
@@ -223,25 +256,57 @@
     /* Compact table mode */
     .compact-table td,
     .compact-table th {
-      padding: 2px 4px !important;
-      font-size: 0.8rem;
+      padding: 0.4rem 0.6rem !important;
+      font-size: 0.85rem;
     }
 
     .compact-table .btn {
-      padding: 0.1rem 0.3rem;
-      font-size: 0.75rem;
+      padding: 0.15rem 0.4rem;
+      font-size: 0.8rem;
     }
 
-    /* Responsive table adjustments */
+    /* Responsive mobile table layout - forced horizontal scroll to prevent breaking */
     @media (max-width: 767px) {
-      .table-responsive {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
+      body:not(.fit-table-screen) .table-responsive .table {
+        /* Force a minimum width so columns don't squish. Enables smooth horizontal scrolling. */
+        min-width: 800px; 
+      }
+      
+      body:not(.fit-table-screen) .table td,
+      body:not(.fit-table-screen) .table th {
+        /* Keep text on one line so rows don't become extremely tall */
+        white-space: nowrap; 
+        font-size: 0.95rem; /* Optimal readability on phones */
       }
 
-      /* Ensure tables are scrollable on mobile */
-      table {
-        min-width: 100%;
+      /* Specific column width handling */
+      .table td.description-col {
+        white-space: normal; /* Allow descriptions to wrap */
+        min-width: 200px;
+      }
+    }
+
+    /* ── Fit Table to Screen mode (Legacy) ────────────────────────── */
+    body.fit-table-screen .table-responsive {
+      overflow-x: visible !important;
+    }
+    body.fit-table-screen .table {
+      table-layout: fixed !important;
+      width: 100% !important;
+      min-width: 0 !important;
+    }
+    body.fit-table-screen .table td,
+    body.fit-table-screen .table th {
+      white-space: normal !important;
+      word-break: break-word;
+      overflow-wrap: break-word;
+      font-size: 0.85rem !important; 
+    }
+    /* Hide less critical columns when fit-mode is active on mobile */
+    @media (max-width: 767px) {
+      body.fit-table-screen .table td:not(:first-child):not(:last-child):nth-child(n+5),
+      body.fit-table-screen .table th:not(:first-child):not(:last-child):nth-child(n+5) {
+        display: none;
       }
     }
 
@@ -286,6 +351,7 @@
     body.tabbed-scanning-mode {
       padding-bottom: 80px !important;
     }
+
     .tabbed-nav {
       position: fixed;
       bottom: 15px;
@@ -295,7 +361,7 @@
       background: rgba(255, 255, 255, 0.85);
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
-      box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
       display: flex;
       z-index: 1060;
       border-radius: 12px;
@@ -303,6 +369,7 @@
       border: 1px solid rgba(255, 255, 255, 0.3);
       transition: bottom 0.3s ease;
     }
+
     .tabbed-nav .tab-btn {
       flex: none;
       padding: 6px 12px;
@@ -320,14 +387,17 @@
       min-height: auto;
       min-width: auto;
     }
+
     .tabbed-nav .tab-btn i {
       font-size: 0.9rem;
     }
+
     .tabbed-nav .tab-btn.active {
       background: #0d6efd;
       color: #fff;
-      box-shadow: 0 2px 6px rgba(13,110,253,0.3);
+      box-shadow: 0 2px 6px rgba(13, 110, 253, 0.3);
     }
+
     .duplicate-row {
       background-color: #fff3cd !important;
       color: #856404 !important;
@@ -338,6 +408,7 @@
     body:not(.show-received-qty) .received-qty-column {
       display: none !important;
     }
+
     .received-qty-input {
       width: 70px;
       text-align: center;
@@ -348,6 +419,7 @@
     body.fixed-input-bar #scanSection .mb-3:first-child {
       display: none !important;
     }
+
     #fixedInputBar {
       display: none;
       position: fixed;
@@ -358,37 +430,47 @@
       border-top: 2px solid #0d6efd;
       padding: 6px 12px;
       z-index: 1050;
-      box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
+      box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
     }
+
     body.fixed-input-bar #fixedInputBar {
       display: block;
     }
+
     /* Hide in "Remaining" tab when Tabbed Mode is active */
     body.tabbed-scanning-mode.showing-remaining-tab #fixedInputBar {
       display: none !important;
     }
+
     body.fixed-input-bar {
       padding-bottom: 80px !important;
     }
+
     body.tabbed-scanning-mode.fixed-input-bar:not(.showing-remaining-tab) #bottomTabNav {
-      bottom: 75px; /* Stay above the fixed input bar */
+      bottom: 75px;
+      /* Stay above the fixed input bar */
     }
+
     body.tabbed-scanning-mode.fixed-input-bar #fixedInputBar {
-      padding-bottom: 6px !important; /* Keep original padding */
+      padding-bottom: 6px !important;
+      /* Keep original padding */
     }
+
     #fixedInputBar .fixed-barcode-input {
       font-size: 14px;
       border-radius: 8px;
       border: 2px solid #0d6efd;
       padding: 6px 10px;
       width: 100%;
-      box-shadow: 0 1px 4px rgba(13,110,253,0.1);
+      box-shadow: 0 1px 4px rgba(13, 110, 253, 0.1);
       outline: none;
     }
+
     #fixedInputBar .fixed-barcode-input:focus {
       border-color: #0a58ca;
-      box-shadow: 0 0 0 3px rgba(13,110,253,0.25);
+      box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
     }
+
     #fixedInputBar .fixed-input-label {
       font-size: 0.65rem;
       font-weight: 700;
@@ -519,7 +601,8 @@
     <div class="mb-3">
       <label for="driverSelect" class="form-label fw-semibold small mb-1">Driver Name</label>
       <select id="driverSelect" class="form-select mb-2"></select>
-      <input type="text" id="driverNameFallback" class="form-control mb-2 d-none" placeholder="Enter driver name (offline)" />
+      <input type="text" id="driverNameFallback" class="form-control mb-2 d-none"
+        placeholder="Enter driver name (offline)" />
       <button id="saveReviewOperationBtn" class="btn btn-primary w-100 mb-2" title="Save Review Operation">
         <i class="bi bi-cloud-upload"></i> Save Review Operation
       </button>
@@ -536,11 +619,11 @@
         <i class="bi bi-box-arrow-right"></i> Logout
       </button>
       <button id="adminDashboardBtn" class="btn btn-warning w-100 fw-bold mt-2 d-none" title="Admin Dashboard"
-        onclick="window.open('admin.html', '_self')">
+        onclick="(window.parent !== window ? window.parent.postMessage({switchTab:'admin'},'*') : window.location.href='admin.html')">
         <i class="bi bi-speedometer2"></i> Admin Dashboard
       </button>
       <button id="shipmentTrackerBtn" class="btn btn-info w-100 fw-bold mt-2 d-none" title="Shipment Tracker"
-        onclick="window.open('tracker.html', '_self')">
+        onclick="(window.parent !== window ? window.parent.postMessage({switchTab:'tracker'},'*') : window.location.href='tracker.html')">
         <i class="bi bi-box-seam"></i> Shipment Tracker
       </button>
     </div>
@@ -845,7 +928,8 @@
   <!-- Fixed Input Bar (Shown only when enabled in settings) -->
   <div id="fixedInputBar">
     <span class="fixed-input-label"><i class="bi bi-upc-scan"></i> Enter Barcode</span>
-    <input type="text" id="fixedBarcodeInput" class="fixed-barcode-input" placeholder="Scan or type barcode..." autocomplete="off" />
+    <input type="text" id="fixedBarcodeInput" class="fixed-barcode-input" placeholder="Scan or type barcode..."
+      autocomplete="off" />
   </div>
 
   <!-- Settings Page Component -->
@@ -972,7 +1056,8 @@
               <label class="form-check-label fw-bold" for="settingsFixedInputBar">Fixed Input Bar</label>
             </div>
             <div class="form-text text-muted small">
-              Pins the barcode input to the bottom of the screen so it stays visible while you scroll through the scanned table.
+              Pins the barcode input to the bottom of the screen so it stays visible while you scroll through the
+              scanned table.
             </div>
           </div>
         </div>
@@ -1009,17 +1094,17 @@
     const PRIVATE_SHEETS_BASE_URL = "/api";
     const PRIVATE_SHEETS_CACHE_TTL_MS = 5 * 60 * 1000;
     let privateSheetsCacheIndex = { ts: 0, names: [] };
-    let focusEnabled = localStorage.getItem("focusEnabled") !== "false"; // State variable to track focus mode
+    let focusEnabled = AppSettings.get().focusEnabled; // State variable to track focus mode
     let hiddenColumns = []; // Track hidden columns
-    let remainingNotesColumnVisible = localStorage.getItem("remainingNotesColumnVisible") === "true";
+    let remainingNotesColumnVisible = AppSettings.get().remainingNotesColumnVisible;
     let remainingNotes = {}; // row key (barcode) -> note text for remaining table only
     let editedBarcodes = new Map(); // Store edited barcodes
     let speechInitialized = false;
     let barcodeNotFoundHideTimeoutId = null;
     let descriptionWarningHideTimeoutId = null;
-    let searchColumnVisible = localStorage.getItem("searchColumnVisible") !== "false"; // default visible
-    let timestampColumnVisible = localStorage.getItem("timestampColumnVisible") !== "false"; // default true
-    let compactView = localStorage.getItem("compactView") === "true";
+    let searchColumnVisible = AppSettings.get().searchColumnVisible; // default visible
+    let timestampColumnVisible = AppSettings.get().timestampColumnVisible; // default true
+    let compactView = AppSettings.get().compactView;
     let inputMode = "scan"; // scan or search
     let firestoreDb = null;
     let assignmentUnsubscribe = null; // Holds the Firestore real-time listener unsubscribe fn
@@ -1243,29 +1328,74 @@
       }
     }
 
-    function speakQuantity(quantity) {
+    // --- Advanced Arabic Number Conversion ---
+    function numberToArabicWords(num) {
+      if (num === 0) return 'صفر';
+      const ones = ['', 'واحد', 'اثنين', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة'];
+      const tens = ['', 'عشرة', 'عشرين', 'ثلاثين', 'أربعين', 'خمسين', 'ستين', 'سبعين', 'ثمانين', 'تسعين'];
+      const hundreds = ['', 'مائة', 'مائتين', 'ثلاثمائة', 'أربعمائة', 'خمسمائة', 'ستمائة', 'سبعمائة', 'ثمانمائة', 'تسعمائة'];
+
+      const getTens = (n) => {
+        if (n < 10) return ones[n];
+        if (n === 10) return 'عشرة';
+        if (n === 11) return 'أحد عشر';
+        if (n === 12) return 'اثنا عشر';
+        if (n < 20) return ones[n - 10] + ' عشر';
+        const unit = n % 10;
+        const ten = Math.floor(n / 10);
+        if (unit === 0) return tens[ten];
+        return ones[unit] + ' و' + tens[ten];
+      };
+
+      const getHundreds = (n) => {
+        const hundred = Math.floor(n / 100);
+        const rest = n % 100;
+        let res = hundreds[hundred];
+        if (rest > 0) {
+          if (res !== '') res += ' و';
+          res += getTens(rest);
+        }
+        return res;
+      };
+
+      const getThousands = (n) => {
+        const thousand = Math.floor(n / 1000);
+        const rest = n % 1000;
+        let res = '';
+        if (thousand === 1) res = 'ألف';
+        else if (thousand === 2) res = 'ألفين';
+        else if (thousand > 2 && thousand < 11) res = getTens(thousand) + ' آلاف';
+        else if (thousand >= 11) res = getHundreds(thousand) + ' ألف';
+
+        if (rest > 0) {
+          if (res !== '') res += ' و';
+          res += getHundreds(rest);
+        }
+        return res;
+      };
+
+      if (num < 100) return getTens(num);
+      if (num < 1000) return getHundreds(num);
+      if (num < 1000000) return getThousands(num);
+      return num.toString();
+    }
+
+    function speakFeedback(arText, enText) {
       if (!("speechSynthesis" in window)) return;
       if (currentUserRestrictions.disableVoice) return;
       const voiceMode = getVoiceMode();
       if (voiceMode === "off") return;
-      if (quantity === undefined || quantity === null) return;
-
-      const text = quantity.toString();
-
+      
       const doSpeak = () => {
-        const utterance = new SpeechSynthesisUtterance(text);
-
-        if (voiceMode === "ar") {
-          utterance.lang = "ar-SA";
-        } else {
-          utterance.lang = "en-US";
-        }
-
         window.speechSynthesis.cancel();
+        const text = voiceMode === "ar" ? arText : (enText || arText);
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = voiceMode === "ar" ? "ar-EG" : "en-US";
+        utterance.rate = 1;
+        utterance.pitch = 1;
         window.speechSynthesis.speak(utterance);
       };
 
-      // On the very first use, give the engine a short moment to initialize
       if (!speechInitialized) {
         initSpeech();
         setTimeout(doSpeak, 300);
@@ -1275,32 +1405,35 @@
     }
 
     function speakBarcodeNotFound() {
-      if (!("speechSynthesis" in window)) return;
-      if (currentUserRestrictions.disableVoice) return;
-      const voiceMode = getVoiceMode();
-      if (voiceMode === "off") return;
+      speakFeedback("الباركود غير موجود", "Barcode not found");
+    }
 
-      const text =
-        voiceMode === "ar" ? "الباركود غير موجود" : "Barcode not found";
-
-      const doSpeak = () => {
-        const utterance = new SpeechSynthesisUtterance(text);
-
-        if (voiceMode === "ar") {
-          utterance.lang = "ar-SA";
-        } else {
-          utterance.lang = "en-US";
-        }
-
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(utterance);
-      };
-
-      if (!speechInitialized) {
-        initSpeech();
-        setTimeout(doSpeak, 300);
+    function speakDuplicateScan(quantity) {
+      if (quantity === undefined || quantity === null) return;
+      if (getVoiceMode() === "ar") {
+        const qtyWords = numberToArabicWords(Number(quantity));
+        speakFeedback(`${qtyWords} مكرر`, `${quantity} duplicate`);
       } else {
-        doSpeak();
+        speakFeedback(`${quantity} duplicate`, `${quantity} duplicate`);
+      }
+    }
+
+    function speakSuccessfulScan(quantity) {
+      if (quantity === undefined || quantity === null) return;
+      if (getVoiceMode() === "ar") {
+        const qtyWords = numberToArabicWords(Number(quantity));
+        speakFeedback(qtyWords, quantity.toString());
+      } else {
+        speakFeedback(quantity.toString(), quantity.toString());
+      }
+    }
+
+    function speakQuantity(quantity) {
+      if (quantity === undefined || quantity === null) return;
+      if (getVoiceMode() === "ar") {
+        speakFeedback(numberToArabicWords(Number(quantity)), quantity.toString());
+      } else {
+        speakFeedback(quantity.toString(), quantity.toString());
       }
     }
 
@@ -1336,13 +1469,13 @@
     function addNotFoundRow(barcode) {
       const s = window.AppSettings.get();
       if (!s.logNotFoundBarcode) return;
-      
+
       const tbody = document.getElementById("productTableBody");
       if (!tbody) return;
-      
+
       const rowId = "not-found-" + barcode;
       if (document.getElementById(rowId)) return;
-      
+
       const tr = document.createElement("tr");
       tr.id = rowId;
       tr.className = "not-found-row table-danger";
@@ -1350,10 +1483,10 @@
       tr.innerHTML = `<td colspan="100%" class="text-center text-danger fw-bold py-2">
         <i class="bi bi-exclamation-triangle-fill me-2"></i> ${msg}: ${barcode}
       </td>`;
-      
+
       tbody.appendChild(tr);
       tr.scrollIntoView({ behavior: "smooth", block: "center" });
-      
+
       setTimeout(() => {
         if (tr && tr.parentNode) tr.parentNode.removeChild(tr);
       }, 1500);
@@ -2103,6 +2236,13 @@
 
           // Load from Firestore (which also applies CSS vars automatically)
           await AppSettings.loadFromFirestore(firestoreDb, firebaseUser.uid);
+          
+          // Sync local state variables from loaded settings
+          focusEnabled = AppSettings.get().focusEnabled;
+          remainingNotesColumnVisible = AppSettings.get().remainingNotesColumnVisible;
+          searchColumnVisible = AppSettings.get().searchColumnVisible;
+          timestampColumnVisible = AppSettings.get().timestampColumnVisible;
+          compactView = AppSettings.get().compactView;
 
           // Apply translations with the loaded settings
           AppSettings.applyTranslations();
@@ -2149,15 +2289,33 @@
           // Hide loading screen last
           loadingScreenEl.style.display = "none";
 
-          // --- Default Redirects on Entry (unless coming 'home' via explicit link) ---
+          // Notify shell: app is ready + send role so shell shows/hides nav tabs
+          if (window.parent !== window) {
+            window.parent.postMessage({ type: 'appReady' }, '*');
+            window.parent.postMessage({ type: 'roleUpdate', role: currentUser.role || 'user' }, '*');
+          }
+
+          // --- Default Redirects on Entry (only when NOT inside shell iframe) ---
+          const isInShell = window.parent !== window;
           const isHomeShortcut = window.location.search.includes("home=true");
-          if (!isHomeShortcut) {
-            if (currentUser.role === "admin") {
-              window.location.href = "admin.html";
-              return;
-            } else if (currentUser.role === "tracker") {
+          if (!isInShell && !isHomeShortcut) {
+            // Cancel auto-redirect for admin per user request
+            // if (currentUser.role === "admin") {
+            //   window.location.href = "admin.html";
+            //   return;
+            // }
+            if (currentUser.role === "tracker") {
               window.location.href = "tracker.html";
               return;
+            }
+          } else if (isInShell && !isHomeShortcut) {
+            // Inside shell — switch to correct tab instead of reloading
+            // Cancel auto-redirect for admin
+            // if (currentUser.role === "admin") {
+            //   window.parent.postMessage({ switchTab: 'admin' }, '*');
+            // } else if (currentUser.role === "tracker") {
+            if (currentUser.role === "tracker") {
+              window.parent.postMessage({ switchTab: 'tracker' }, '*');
             }
           }
 
@@ -2186,7 +2344,7 @@
 
       // Features Initialization
       const currentSettings = AppSettings.get();
-      
+
       if (currentSettings.showReceivedQtyColumn !== false) {
         document.body.classList.add("show-received-qty");
       }
@@ -2207,23 +2365,23 @@
           bottomNav.classList.remove("d-none");
           remainingSection.classList.add("d-none");
           remainingSection.classList.remove("mt-5");
-          
+
           btnScan.addEventListener("click", () => {
             btnScan.classList.add("active");
             btnRemaining.classList.remove("active");
             document.body.classList.remove("showing-remaining-tab");
             scanSection.classList.remove("d-none");
             remainingSection.classList.add("d-none");
-            
+
             // Auto-focus the best input for scanning
             const activeInput = document.body.classList.contains("fixed-input-bar")
               ? document.getElementById("fixedBarcodeInput")
               : document.getElementById("barcodeInput");
             if (activeInput) activeInput.focus();
-            
+
             optimizedScroll(document.body, { behavior: "smooth", block: "start" });
           });
-          
+
           btnRemaining.addEventListener("click", () => {
             btnRemaining.classList.add("active");
             btnScan.classList.remove("active");
@@ -2257,12 +2415,35 @@
 
 
 
+      // Global Scanner Listener
+      document.addEventListener("keydown", function(event) {
+        if (event.ctrlKey || event.altKey || event.metaKey) return;
+        
+        // Only trigger for single printable characters or Enter
+        if (event.key.length !== 1 && event.key !== "Enter") return;
+
+        const activeElement = document.activeElement;
+        const ignoreTags = ['INPUT', 'TEXTAREA', 'SELECT'];
+        if (activeElement && ignoreTags.includes(activeElement.tagName)) return;
+        if (activeElement && activeElement.isContentEditable) return;
+
+        // Route focus to the active barcode input
+        const activeInput = document.body.classList.contains("fixed-input-bar")
+          ? document.getElementById("fixedBarcodeInput")
+          : document.getElementById("barcodeInput");
+          
+        if (activeInput && !activeInput.disabled) {
+          activeInput.focus();
+        }
+      });
+
       // Event listeners
       document
         .getElementById("fileInput")
         .addEventListener("change", handleFileUpload);
       barcodeInput.addEventListener("keypress", function (event) {
         if (event.key === "Enter") {
+          event.preventDefault(); // Prevents keyboard from dismissing on mobile
           handleBarcodeSearch(event);
         }
       });
@@ -2280,7 +2461,7 @@
         .getElementById("toggleFocusButton")
         .addEventListener("click", () => {
           focusEnabled = !focusEnabled;
-          localStorage.setItem("focusEnabled", focusEnabled);
+          AppSettings.save({ focusEnabled }, firestoreDb, currentUser?.uid);
           updateFocusButtonText();
         });
       document
@@ -2303,7 +2484,7 @@
         .getElementById("toggleEmptyColumnButton")
         .addEventListener("click", () => {
           remainingNotesColumnVisible = !remainingNotesColumnVisible;
-          localStorage.setItem("remainingNotesColumnVisible", remainingNotesColumnVisible);
+          AppSettings.save({ remainingNotesColumnVisible }, firestoreDb, currentUser?.uid);
           const btn = document.getElementById("toggleEmptyColumnButton");
           btn.innerHTML = remainingNotesColumnVisible
             ? '<i class="bi bi-dash-square"></i> Remove Empty Column (Remaining)'
@@ -2317,7 +2498,7 @@
         .getElementById("toggleSearchColumnButton")
         .addEventListener("click", () => {
           searchColumnVisible = !searchColumnVisible;
-          localStorage.setItem("searchColumnVisible", searchColumnVisible);
+          AppSettings.save({ searchColumnVisible }, firestoreDb, currentUser?.uid);
           const btn = document.getElementById("toggleSearchColumnButton");
           if (btn) {
             btn.innerHTML = searchColumnVisible
@@ -2329,7 +2510,7 @@
 
       document.getElementById("toggleTimestampColumnButton").addEventListener("click", () => {
         timestampColumnVisible = !timestampColumnVisible;
-        localStorage.setItem("timestampColumnVisible", timestampColumnVisible);
+        AppSettings.save({ timestampColumnVisible }, firestoreDb, currentUser?.uid);
         applyTimestampColumnVisibility();
       });
 
@@ -2352,10 +2533,13 @@
       });
 
       document.getElementById("navSettingsBtn").addEventListener("click", () => {
-        // Navigate to the standalone settings page
         document.getElementById("sidebar").classList.remove("open");
         document.body.classList.remove("sidebar-open");
-        window.location.href = "settings.html";
+        if (window.parent !== window) {
+          window.parent.postMessage({ switchTab: 'settings' }, '*');
+        } else {
+          window.location.href = "settings.html";
+        }
       });
 
       document.getElementById("navMainAppFromSettingsBtn").addEventListener("click", () => {
@@ -2572,7 +2756,7 @@
                 return parsed.names;
               }
             }
-          } catch (_) {}
+          } catch (_) { }
         }
         return null;
       }
@@ -2581,7 +2765,7 @@
         privateSheetsCacheIndex = { ts: Date.now(), names: Array.isArray(names) ? names : [] };
         try {
           localStorage.setItem("indexPrivateSheetsCache", JSON.stringify(privateSheetsCacheIndex));
-        } catch (_) {}
+        } catch (_) { }
       }
 
       async function fetchIndexPrivateSheetNames(forceRefresh = false) {
@@ -3099,7 +3283,7 @@
         const thRemaining = document.createElement("th");
         thRemaining.textContent = header;
         remainingTableHeaders.appendChild(thRemaining);
-        
+
         // Add "Received Qty" immediately after Quantity column (index 2)
         if (index === 2) {
           const thRx = document.createElement("th");
@@ -3219,6 +3403,7 @@
           fixedInput._wired = true;
           fixedInput.addEventListener("keypress", function (e) {
             if (e.key === "Enter") {
+              e.preventDefault();
               // Proxy the event to handleBarcodeSearch using a compatible event-like object
               const proxy = {
                 target: fixedInput,
@@ -3236,6 +3421,13 @@
       }
     }
 
+    function normalizeBarcode(barcode) {
+      if (barcode === null || barcode === undefined) return '';
+      let str = String(barcode).trim();
+      let normalized = str.replace(/^0+/, '');
+      return normalized === '' && str.length > 0 ? '0' : normalized;
+    }
+
     function handleBarcodeSearch(event, forceSource = null) {
       if (isReadOnlyMode()) {
         if (event && event.target) event.target.value = "";
@@ -3243,23 +3435,25 @@
         return;
       }
 
-      let barcode = event.target.value.toString().trim();
+      let originalBarcode = event.target.value.toString().trim();
 
-      if (barcode === "") return;
+      if (originalBarcode === "") return;
+
+      let normalizedBarcode = normalizeBarcode(originalBarcode);
 
       // Clear any previous "not found" alert
       hideBarcodeNotFoundAlert();
 
-      console.log("Entered barcode:", barcode);
+      console.log("Entered barcode:", originalBarcode, "Normalized:", normalizedBarcode);
 
       if (inputMode === "search" && !forceSource) {
         let found = false;
-        const normalizedSearch = barcode.toLowerCase();
+        const searchTarget = normalizedBarcode.toLowerCase();
 
         // Search scanned table first
         for (let [key, row] of scannedBarcodes.entries()) {
           const itemNumberCell = row.cells[3] || row.cells[2] || row.cells[0]; // fallback
-          if (itemNumberCell && itemNumberCell.textContent.trim().toLowerCase() === normalizedSearch) {
+          if (itemNumberCell && normalizeBarcode(itemNumberCell.textContent).toLowerCase() === searchTarget) {
             row.scrollIntoView({ behavior: "smooth", block: "center" });
             row.classList.add("bg-info");
             setTimeout(() => row.classList.remove("bg-info"), 2000);
@@ -3274,7 +3468,7 @@
           Array.from(tableBody.rows).forEach(row => {
             if (found) return;
             const itemNumberCell = row.cells[3] || row.cells[2] || row.cells[0]; // fallback
-            if (itemNumberCell && itemNumberCell.textContent.trim().toLowerCase() === normalizedSearch) {
+            if (itemNumberCell && normalizeBarcode(itemNumberCell.textContent).toLowerCase() === searchTarget) {
               row.scrollIntoView({ behavior: "smooth", block: "center" });
               row.classList.add("bg-info");
               setTimeout(() => row.classList.remove("bg-info"), 2000);
@@ -3292,22 +3486,38 @@
       }
 
       // Check if there is an edited mapping for this barcode
-      if (editedBarcodes.has(barcode)) {
-        const mapped = editedBarcodes.get(barcode);
-        console.log("Using edited barcode mapping:", mapped);
-        barcode = mapped;
+      let mappedBarcode = null;
+      for (let [key, val] of editedBarcodes.entries()) {
+        if (normalizeBarcode(key) === normalizedBarcode) {
+          mappedBarcode = val;
+          break;
+        }
+      }
+
+      if (mappedBarcode !== null) {
+        console.log("Using edited barcode mapping:", mappedBarcode);
+        normalizedBarcode = normalizeBarcode(mappedBarcode);
+        originalBarcode = mappedBarcode;
       }
 
       // Check if the barcode is already scanned
-      if (scannedBarcodes.has(barcode)) {
+      let scannedMatch = null;
+      for (let [key, tr] of scannedBarcodes.entries()) {
+        if (normalizeBarcode(key) === normalizedBarcode) {
+          scannedMatch = { key, tr };
+          break;
+        }
+      }
+
+      if (scannedMatch) {
         clearNotFoundRows();
-        const row = scannedBarcodes.get(barcode);
-        
+        const row = scannedMatch.tr;
+
         // Move to the bottom of the table without duplicating data
         const tableBody = document.getElementById("productTableBody");
         tableBody.appendChild(row);
         reindexScannedTable();
-        
+
         // Ensure Tabbed Scan pane is visible if enabled (only switch if not already on scan tab)
         if (AppSettings.get().tabbedScanningMode) {
           const tabScanBtn = document.getElementById("tabScanBtn");
@@ -3322,7 +3532,7 @@
         setTimeout(() => {
           row.classList.remove("duplicate-row");
         }, 3000);
-        
+
         // Keep focus on the active input (fixed bar or main) — do NOT steal focus to the row
         const activeInput = document.body.classList.contains("fixed-input-bar")
           ? document.getElementById("fixedBarcodeInput")
@@ -3330,19 +3540,18 @@
         if (activeInput) {
           activeInput.focus();
         }
-        
-        // Speak the quantity again when the same code is entered
-        // Note: quantity cell is the 4th cell now due to the # column
+
+        // Speak the duplicate message
         const quantityCell = row.querySelector("td:nth-child(4)");
         if (quantityCell) {
-          speakQuantity(quantityCell.textContent);
+          speakDuplicateScan(quantityCell.textContent);
         }
       } else {
         // Search for the barcode in the remaining products
         const rowIndex = remainingProducts.findIndex((row) =>
           row.some((cell) => {
             if (cell === null || cell === undefined) return false;
-            return cell.toString().trim().split("-").map((c) => c.trim()).includes(barcode.toString().trim());
+            return cell.toString().trim().split("-").map((c) => normalizeBarcode(c)).includes(normalizedBarcode);
           })
         );
 
@@ -3351,12 +3560,12 @@
         if (rowIndex >= 0) {
           clearNotFoundRows();
           const productRow = remainingProducts[rowIndex];
-          addRowToScannedTable(productRow, barcode, true, forceSource || 'scan');
+          addRowToScannedTable(productRow, originalBarcode, true, forceSource || 'scan');
           remainingProducts.splice(rowIndex, 1);
           showRemainingProducts();
         } else {
           showBarcodeNotFoundAlert();
-          addNotFoundRow(barcode);
+          addNotFoundRow(originalBarcode);
           speakBarcodeNotFound();
           const notFoundActive = document.body.classList.contains("fixed-input-bar")
             ? document.getElementById("fixedBarcodeInput")
@@ -3369,6 +3578,7 @@
       }
 
       event.target.value = ""; // Clear the input field for next scan
+      event.target.focus(); // Enforce focus remains on input synchronously
     }
 
     function reindexScannedTable() {
@@ -3384,14 +3594,14 @@
     function addRowToScannedTable(row, barcode, speak = true, source = 'scan', timestamp = null, skipSave = false, receivedQty = "") {
       const tableBody = document.getElementById("productTableBody");
       const tr = document.createElement("tr");
-      
+
       tr.dataset.barcode = barcode;
-      
+
       const tdIndex = document.createElement("td");
       tdIndex.classList.add("serial-column");
       tdIndex.style.fontWeight = "bold";
       tr.appendChild(tdIndex);
-      
+
       const enableManualInput = document.body.classList.contains("enable-manual-input");
 
       row.forEach((cell, index) => {
@@ -3404,25 +3614,25 @@
         }
 
         tr.appendChild(td);
-        
+
         // Inject "Received Qty" input after "Quantity" column (index 2)
         if (index === 2) {
           const tdRx = document.createElement("td");
           tdRx.classList.add("received-qty-column");
-          
+
           const rxInput = document.createElement("input");
           rxInput.type = "number";
           rxInput.value = receivedQty;
           rxInput.className = "form-control form-control-sm received-qty-input";
-          
+
           if (!enableManualInput) {
             rxInput.setAttribute("readonly", "readonly");
           }
-          
+
           rxInput.addEventListener("input", () => {
             saveProgress();
           });
-          
+
           tdRx.appendChild(rxInput);
           tr.appendChild(tdRx);
         }
@@ -3494,7 +3704,7 @@
 
       if (speak) {
         const quantity = row[2];
-        speakQuantity(quantity);
+        speakSuccessfulScan(quantity);
       }
 
       if (!skipSave) {
@@ -3554,7 +3764,7 @@
         if (remainingNotesColumnVisible) {
           const tdNotes = document.createElement("td");
           tdNotes.classList.add("notes-column-remaining");
-          
+
           const rowKey = getRowKey(row);
           // Default to object if not already done by loadProgress migration
           if (!remainingNotes[rowKey] || typeof remainingNotes[rowKey] === 'string') {
@@ -3573,11 +3783,11 @@
           input.placeholder = dict["Note..."] || "Note...";
           input.style.minWidth = "60px";
           input.value = noteObj.t;
-          
+
           const select = document.createElement("select");
           select.className = "form-select form-select-sm flex-fill";
           select.style.minWidth = "100px";
-          
+
           const options = [
             { v: "", l: dict["Select"] || "Select" },
             { v: "Missing", l: dict["Missing"] || "Missing" },
@@ -3656,7 +3866,7 @@
         tr.appendChild(tdSearch);
 
         const tdAction = document.createElement("td");
-      tdAction.classList.add("action-column");
+        tdAction.classList.add("action-column");
         const moveToScannedButton = document.createElement("button");
         moveToScannedButton.textContent = "Move";
         moveToScannedButton.className = "btn btn-success btn-sm action-column";
@@ -3671,7 +3881,7 @@
             barcodeColIndex = hs.findIndex(h => h.includes("barcode") || h.includes("bar code") || h.includes("باركود") || h.includes("upc") || h.includes("ean"));
             if (barcodeColIndex === -1) barcodeColIndex = 0;
           }
-          
+
           let primaryBarcode = String(row[barcodeColIndex] || row[1] || row[0] || "").split("-")[0].trim();
           if (primaryBarcode) {
             const input = document.getElementById("barcodeInput");
@@ -3705,21 +3915,21 @@
     function saveProgress() {
       const tableBody = document.getElementById("productTableBody");
       if (!tableBody) return;
-      
+
       const scannedRows = Array.from(tableBody.rows).map(row => {
         const barcode = row.dataset.barcode;
-        
+
         // Extract core spreadsheet data
         const dataCells = row.querySelectorAll("td.data-cell");
         const rowData = Array.from(dataCells).map(td => td.textContent);
-        
+
         // Extract Received Qty input string
         let receivedQty = "";
         const rxInput = row.querySelector(".received-qty-input");
         if (rxInput) {
           receivedQty = rxInput.value;
         }
-        
+
         return { barcode, data: rowData, receivedQty, source: row.dataset.source || 'scan', timestamp: row.dataset.timestamp || "" };
       });
 
@@ -3805,17 +4015,27 @@
       scannedData.push([]);
 
       // Add the headers row
-      const exportHeaders = [...excelData[0], "Scan Time", "Source"];
+      const exportHeaders = [...excelData[0]];
+      // Inject Received Qty if showReceivedQtyColumn is enabled
+      if (AppSettings.get().showReceivedQtyColumn !== false) {
+        exportHeaders.splice(3, 0, "Received Qty");
+      }
+      exportHeaders.push("Scan Time", "Source");
       scannedData.push(exportHeaders);
 
       // Add scanned products data
       [...scannedBarcodes.values()].forEach((row) => {
         const rowData = [];
-        row.querySelectorAll("td").forEach((cell, index) => {
-          if (index < excelData[0].length) {
-            rowData.push(cell.textContent);
-          }
-        });
+        const dataCells = row.querySelectorAll("td.data-cell");
+        Array.from(dataCells).forEach(td => rowData.push(td.textContent));
+        
+        if (AppSettings.get().showReceivedQtyColumn !== false) {
+          let receivedQty = "";
+          const rxInput = row.querySelector(".received-qty-input");
+          if (rxInput) { receivedQty = rxInput.value; }
+          rowData.splice(3, 0, receivedQty);
+        }
+        
         rowData.push(row.dataset.timestamp || "");
         rowData.push(row.dataset.source || "scan");
         scannedData.push(rowData);
@@ -4617,12 +4837,12 @@
 
     function applyImportPreviewProcessing(showErrorAlert = true) {
       if (!pendingImportRawData) return false;
-      
+
       let processedData = [...pendingImportRawData];
       processedData = processedData.filter(row =>
         Array.isArray(row) && row.some(cell => cell !== null && cell !== undefined && cell !== '')
       );
-      
+
       if (processedData.length < 1) {
         if (showErrorAlert) alert("File has no data after removing empty rows.");
         return false;
@@ -4676,7 +4896,7 @@
         const COLUMN_DISPLAY_NAMES = ["Description", "Bar code", "Work quantity", "Item number", "Location"];
 
         const headerRow = processedData[0];
-        const normalizedHeaders = headerRow.map(h => 
+        const normalizedHeaders = headerRow.map(h =>
           (h === null || h === undefined ? "" : h.toString().trim().toLowerCase())
         );
 
@@ -4723,7 +4943,7 @@
         hintEl.textContent = `Preview rows shown: ${Math.min(processedData.length, 12)} (total data rows after processing: ${rowCount}).`;
       }
       renderImportSheetPreviewTable(processedData);
-      
+
       pendingImportRawData._processed = processedData;
       return true;
     }
@@ -4738,7 +4958,7 @@
         deleteFirstColumnsCount: 0,
         deleteLastColumnsCount: 0
       };
-      
+
       const modalEl = document.getElementById("importSheetPreviewModal");
       if (modalEl) {
         updateImportPreviewOptionButtons();
@@ -4789,13 +5009,13 @@
 
       document.getElementById("importPreviewConfirmBtn")?.addEventListener("click", () => {
         if (!pendingImportRawData || !pendingImportRawData._processed) return;
-        
+
         fileName = pendingImportFileName;
         document.getElementById("pageHeader").textContent = fileName;
         localStorage.setItem("fileName", fileName);
-        
+
         const finalData = pendingImportRawData._processed;
-        
+
         excelData = finalData.map(normalizeRow);
         remainingProducts = [...excelData.slice(1)];
         localStorage.setItem("excelData", JSON.stringify(excelData));
@@ -4812,7 +5032,7 @@
 
         saveProgress();
         updateStatistics();
-        
+
         ensureImportPreviewModal().hide();
         const containersToHide = ["dataImportContainer", "localSheetContainer", "sheetSelectionContainer", "privateSheetSelectionContainer"];
         containersToHide.forEach(id => {
@@ -4822,6 +5042,35 @@
         document.getElementById("mainAppContainer").classList.remove("d-none");
       });
     });
+
+    // ── Shell postMessage listener ────────────────────────────────────────────
+    // When running inside shell.html, the shell relays messages to this iframe.
+    window.addEventListener('message', (e) => {
+      if (!e.data || typeof e.data !== 'object') return;
+
+      // Tracker loaded an operation into localStorage — reload data & activate tracker mode
+      if (e.data.type === 'loadTrackerOperation') {
+        // Re-load all data from localStorage (updated by tracker.html before sending this message)
+        loadProgress();
+        // Activate search mode + show remaining (same as the on-load trackerMode block)
+        inputMode = 'search';
+        const modeSearch = document.getElementById('modeSearch');
+        if (modeSearch) modeSearch.checked = true;
+        const remainingSection = document.getElementById('remainingProductsSection');
+        if (remainingSection) remainingSection.classList.remove('d-none');
+        // Navigate to main app view
+        const mainAppContainer = document.getElementById('mainAppContainer');
+        const dataImportContainer = document.getElementById('dataImportContainer');
+        const barcodeManagerContainer = document.getElementById('barcodeManagerContainer');
+        const settingsContainer = document.getElementById('settingsContainer');
+        if (dataImportContainer) dataImportContainer.classList.add('d-none');
+        if (barcodeManagerContainer) barcodeManagerContainer.classList.add('d-none');
+        if (settingsContainer) settingsContainer.classList.add('d-none');
+        if (mainAppContainer) mainAppContainer.classList.remove('d-none');
+        updateStatistics();
+      }
+    });
+
   </script>
 
   <!-- Unsaved Work Warning Modal -->
@@ -4849,7 +5098,8 @@
   </div>
 
   <!-- Import Preview Modal -->
-  <div class="modal fade" id="importSheetPreviewModal" tabindex="-1" aria-labelledby="importSheetPreviewModalLabel" aria-hidden="true">
+  <div class="modal fade" id="importSheetPreviewModal" tabindex="-1" aria-labelledby="importSheetPreviewModalLabel"
+    aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
       <div class="modal-content">
         <div class="modal-header bg-primary text-white">
@@ -4858,8 +5108,10 @@
         </div>
         <div class="modal-body">
           <div class="d-flex flex-wrap gap-2 mb-3">
-            <button type="button" class="btn btn-outline-primary fw-bold" id="importToggleIgnoreRowsBtn">Ignore first 3 rows: OFF</button>
-            <button type="button" class="btn btn-outline-primary fw-bold" id="importToggleColumnFilterBtn">Filter columns on import: OFF</button>
+            <button type="button" class="btn btn-outline-primary fw-bold" id="importToggleIgnoreRowsBtn">Ignore first 3
+              rows: OFF</button>
+            <button type="button" class="btn btn-outline-primary fw-bold" id="importToggleColumnFilterBtn">Filter
+              columns on import: OFF</button>
           </div>
           <div class="row g-2 mb-3">
             <div class="col-md-4">
@@ -4883,7 +5135,8 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-success" id="importPreviewConfirmBtn"><i class="bi bi-check-circle"></i> Confirm Import</button>
+          <button type="button" class="btn btn-success" id="importPreviewConfirmBtn"><i class="bi bi-check-circle"></i>
+            Confirm Import</button>
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         </div>
       </div>
