@@ -1,9 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Settings — Inventory PWA</title>
+  <script>
+    if (window.parent === window && !window.location.search.includes("home=true")) {
+      window.location.replace("shell.html#settings");
+    }
+  </script>
   <link rel="icon" type="image/png" href="./icons/favicon.png">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" />
@@ -20,6 +26,7 @@
     html {
       zoom: var(--app-scale);
     }
+
     body {
       font-family: 'Cairo', system-ui, -apple-system, sans-serif;
       font-size: var(--app-font-size);
@@ -28,7 +35,9 @@
       padding-top: 70px;
       padding-bottom: 60px;
     }
-    .table td, .table th {
+
+    .table td,
+    .table th {
       padding: var(--app-table-density) 0.75rem !important;
     }
 
@@ -38,6 +47,7 @@
       backdrop-filter: blur(10px);
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
     }
+
     .navbar-brand {
       font-weight: 800;
       font-size: 1.2rem;
@@ -51,12 +61,14 @@
       padding: 1.5rem 0 1.25rem;
       color: #fff;
     }
+
     .settings-hero h1 {
       font-size: 2rem;
       font-weight: 800;
       letter-spacing: -0.5px;
       margin-bottom: 0.25rem;
     }
+
     .settings-hero p {
       opacity: 0.7;
       font-size: 0.95rem;
@@ -72,10 +84,12 @@
       transition: transform 0.2s ease, box-shadow 0.2s ease;
       color: #1f2937;
     }
+
     .settings-card:hover {
       transform: translateY(-2px);
       box-shadow: 0 14px 34px rgba(15, 23, 42, 0.14);
     }
+
     .settings-card .card-section-title {
       font-size: 0.75rem;
       font-weight: 700;
@@ -87,6 +101,7 @@
       align-items: center;
       gap: 8px;
     }
+
     .settings-card .card-section-title i {
       font-size: 1rem;
     }
@@ -101,23 +116,28 @@
       color: #1f2937;
       gap: 16px;
     }
+
     .setting-row:last-child {
       border-bottom: none;
       padding-bottom: 0;
     }
+
     .setting-row:first-child {
       padding-top: 0;
     }
+
     .setting-label {
       font-weight: 600;
       font-size: 0.95rem;
       flex: 1;
     }
+
     .setting-description {
       font-size: 0.78rem;
       color: #6b7280;
       margin-top: 2px;
     }
+
     .setting-value-badge {
       background: rgba(13, 110, 253, 0.12);
       border: 1px solid rgba(13, 110, 253, 0.2);
@@ -135,9 +155,11 @@
     .form-range {
       accent-color: #0d6efd;
     }
+
     .slider-wrap {
       width: 100%;
     }
+
     .slider-labels {
       display: flex;
       justify-content: space-between;
@@ -153,6 +175,7 @@
       height: 1.5em;
       cursor: pointer;
     }
+
     .form-check-input:checked {
       background-color: #0d6efd;
       border-color: #0d6efd;
@@ -166,10 +189,12 @@
       border-radius: 8px;
       max-width: 200px;
     }
+
     .form-select option {
       background-color: #fff;
       color: #111827;
     }
+
     .form-select:focus {
       background-color: #fff;
       border-color: #0d6efd;
@@ -185,6 +210,7 @@
       padding: 16px;
       margin-top: 20px;
     }
+
     .preview-section-title {
       font-size: 0.72rem;
       font-weight: 700;
@@ -193,10 +219,12 @@
       color: #2563eb;
       margin-bottom: 12px;
     }
+
     .preview-table {
       width: 100%;
       border-collapse: collapse;
     }
+
     .preview-table th,
     .preview-table td {
       border: 1px solid #dbe2ea;
@@ -204,13 +232,16 @@
       background: #fff;
       font-size: 0.82rem;
     }
+
     .preview-table th {
       background: #dbeafe;
       font-weight: 700;
     }
+
     .settings-layout {
       align-items: flex-start;
     }
+
     @media (max-width: 991px) {
       #settingsMain {
         padding-left: 12px;
@@ -228,6 +259,7 @@
       transition: all 0.2s ease;
       width: 100%;
     }
+
     .btn-reset:hover {
       background: rgba(220, 53, 69, 0.3);
       border-color: rgba(220, 53, 69, 0.6);
@@ -266,16 +298,19 @@
       z-index: 9999;
       pointer-events: none;
     }
+
     #savedToast.show {
       opacity: 1;
       transform: translateY(0);
     }
 
-    button, .btn {
+    button,
+    .btn {
       min-height: 44px;
     }
   </style>
 </head>
+
 <body>
 
   <!-- Auth loading screen -->
@@ -290,9 +325,9 @@
       <span class="navbar-brand">⚙️ Settings</span>
       <div class="d-flex align-items-center gap-2 ms-auto flex-wrap">
         <span class="text-white fw-semibold" style="font-size:0.82rem;" id="settingsUserLabel">👤 —</span>
-        <a id="backToAppBtn" href="index.html" class="btn btn-outline-light btn-sm fw-bold">
+        <button id="backToAppBtn" onclick="(window.parent !== window ? window.parent.postMessage({switchTab:'inventory'},'*') : window.location.href='index.html')" class="btn btn-outline-light btn-sm fw-bold">
           <i class="bi bi-arrow-left"></i> Back to App
-        </a>
+        </button>
       </div>
     </div>
   </nav>
@@ -310,262 +345,299 @@
       <div class="col-12 col-lg-6">
         <!-- ══ CARD 1: Display Preferences ══ -->
         <div class="settings-card">
-      <div class="card-section-title">
-        <i class="bi bi-palette2"></i> Display Preferences
-      </div>
-
-      <!-- Font Size -->
-      <div class="setting-row flex-column align-items-start">
-        <div class="d-flex justify-content-between w-100 align-items-center">
-          <div>
-            <div class="setting-label">Font Size</div>
-            <div class="setting-description">Adjusts the base text size across the app</div>
+          <div class="card-section-title">
+            <i class="bi bi-palette2"></i> Display Preferences
           </div>
-          <span class="setting-value-badge" id="fontSizeDisplay">Medium</span>
-        </div>
-        <div class="slider-wrap mt-3">
-          <input type="range" class="form-range" id="settingsFontSize" min="1" max="3" step="1" value="2">
-          <div class="slider-labels">
-            <span>Small</span><span>Medium</span><span>Large</span>
-          </div>
-        </div>
-      </div>
 
-      <!-- Table Density -->
-      <div class="setting-row flex-column align-items-start">
-        <div class="d-flex justify-content-between w-100 align-items-center">
-          <div>
-            <div class="setting-label">Table Density</div>
-            <div class="setting-description">Controls the row padding inside all tables</div>
+          <!-- Font Size -->
+          <div class="setting-row flex-column align-items-start">
+            <div class="d-flex justify-content-between w-100 align-items-center">
+              <div>
+                <div class="setting-label">Font Size</div>
+                <div class="setting-description">Adjusts the base text size across the app</div>
+              </div>
+              <span class="setting-value-badge" id="fontSizeDisplay">Medium</span>
+            </div>
+            <div class="slider-wrap mt-3">
+              <input type="range" class="form-range" id="settingsFontSize" min="1" max="3" step="1" value="2">
+              <div class="slider-labels">
+                <span>Small</span><span>Medium</span><span>Large</span>
+              </div>
+            </div>
           </div>
-          <span class="setting-value-badge" id="tableDensityDisplay">Normal</span>
-        </div>
-        <div class="slider-wrap mt-3">
-          <input type="range" class="form-range" id="settingsTableDensity" min="1" max="3" step="1" value="2">
-          <div class="slider-labels">
-            <span>Compact</span><span>Normal</span><span>Comfortable</span>
+
+          <!-- Table Density -->
+          <div class="setting-row flex-column align-items-start">
+            <div class="d-flex justify-content-between w-100 align-items-center">
+              <div>
+                <div class="setting-label">Table Density</div>
+                <div class="setting-description">Controls the row padding inside all tables</div>
+              </div>
+              <span class="setting-value-badge" id="tableDensityDisplay">Normal</span>
+            </div>
+            <div class="slider-wrap mt-3">
+              <input type="range" class="form-range" id="settingsTableDensity" min="1" max="3" step="1" value="2">
+              <div class="slider-labels">
+                <span>Compact</span><span>Normal</span><span>Comfortable</span>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      <!-- Preview Table -->
-      <div class="preview-section">
-        <div class="preview-section-title"><i class="bi bi-table"></i> Live Table Preview</div>
-        <table class="preview-table" id="previewTable">
-          <thead>
-            <tr>
-              <th>Barcode</th><th>Description</th><th>Qty</th><th>Location</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr><td>123456789</td><td>Product Alpha</td><td>50</td><td>A1-01</td></tr>
-            <tr><td>987654321</td><td>Product Beta</td><td>120</td><td>B2-05</td></tr>
-            <tr><td>555000111</td><td>Product Gamma</td><td>8</td><td>C3-11</td></tr>
-          </tbody>
-        </table>
-      </div>
+          <!-- Preview Table -->
+          <div class="preview-section">
+            <div class="preview-section-title"><i class="bi bi-table"></i> Live Table Preview</div>
+            <table class="preview-table" id="previewTable">
+              <thead>
+                <tr>
+                  <th>Barcode</th>
+                  <th>Description</th>
+                  <th>Qty</th>
+                  <th>Location</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>123456789</td>
+                  <td>Product Alpha</td>
+                  <td>50</td>
+                  <td>A1-01</td>
+                </tr>
+                <tr>
+                  <td>987654321</td>
+                  <td>Product Beta</td>
+                  <td>120</td>
+                  <td>B2-05</td>
+                </tr>
+                <tr>
+                  <td>555000111</td>
+                  <td>Product Gamma</td>
+                  <td>8</td>
+                  <td>C3-11</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-      <!-- Zebra Striping -->
-      <div class="setting-row">
-        <div>
-          <div class="setting-label">Zebra Striped Tables</div>
-          <div class="setting-description">Alternating row colors for easier reading</div>
-        </div>
-        <div class="form-check form-switch mb-0">
-          <input class="form-check-input" type="checkbox" id="settingsZebra" role="switch">
-        </div>
-      </div>
+          <!-- Zebra Striping -->
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Zebra Striped Tables</div>
+              <div class="setting-description">Alternating row colors for easier reading</div>
+            </div>
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" id="settingsZebra" role="switch">
+            </div>
+          </div>
         </div>
 
         <!-- ══ CARD 2: App Scaling ══ -->
         <div class="settings-card">
-      <div class="card-section-title">
-        <i class="bi bi-fullscreen"></i> App Scaling
-      </div>
+          <div class="card-section-title">
+            <i class="bi bi-fullscreen"></i> App Scaling
+          </div>
 
-      <!-- App Scale -->
-      <div class="setting-row flex-column align-items-start">
-        <div class="d-flex justify-content-between w-100 align-items-center">
-          <div>
-            <div class="setting-label">Global UI Scale</div>
-            <div class="setting-description">Zooms the entire app interface in or out</div>
+          <!-- App Scale -->
+          <div class="setting-row flex-column align-items-start">
+            <div class="d-flex justify-content-between w-100 align-items-center">
+              <div>
+                <div class="setting-label">Global UI Scale</div>
+                <div class="setting-description">Zooms the entire app interface in or out</div>
+              </div>
+              <span class="setting-value-badge" id="scaleDisplay">100%</span>
+            </div>
+            <div class="slider-wrap mt-3">
+              <input type="range" class="form-range" id="settingsScale" min="70" max="130" step="5" value="100">
+              <div class="slider-labels">
+                <span>70%</span><span>100%</span><span>130%</span>
+              </div>
+            </div>
           </div>
-          <span class="setting-value-badge" id="scaleDisplay">100%</span>
-        </div>
-        <div class="slider-wrap mt-3">
-          <input type="range" class="form-range" id="settingsScale" min="70" max="130" step="5" value="100">
-          <div class="slider-labels">
-            <span>70%</span><span>100%</span><span>130%</span>
-          </div>
-        </div>
-      </div>
         </div>
       </div>
 
       <div class="col-12 col-lg-6">
         <!-- ══ CARD 3: Language & Behavior ══ -->
         <div class="settings-card">
-      <div class="card-section-title">
-        <i class="bi bi-translate"></i> Language & Behavior
-      </div>
+          <div class="card-section-title">
+            <i class="bi bi-translate"></i> Language & Behavior
+          </div>
 
-      <!-- Language -->
-      <div class="setting-row">
-        <div>
-          <div class="setting-label">Language</div>
-          <div class="setting-description">Changes text direction and UI language</div>
-        </div>
-        <select class="form-select" id="settingsLanguage">
-          <option value="en">English (LTR)</option>
-          <option value="ar">Arabic (RTL)</option>
-        </select>
-      </div>
+          <!-- Language -->
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Language</div>
+              <div class="setting-description">Changes text direction and UI language</div>
+            </div>
+            <select class="form-select" id="settingsLanguage">
+              <option value="en">English (LTR)</option>
+              <option value="ar">Arabic (RTL)</option>
+            </select>
+          </div>
 
-      <div class="setting-row">
-        <div>
-          <div class="setting-label">Voice Mode</div>
-          <div class="setting-description">Select how quantities are spoken during scanning</div>
-        </div>
-        <select class="form-select" id="settingsVoiceMode">
-          <option value="off">Off (no voice)</option>
-          <option value="en">English (speak quantities in English)</option>
-          <option value="ar">Arabic (speak quantities in Arabic)</option>
-        </select>
-      </div>
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Voice Mode</div>
+              <div class="setting-description">Select how quantities are spoken during scanning</div>
+            </div>
+            <select class="form-select" id="settingsVoiceMode">
+              <option value="off">Off (no voice)</option>
+              <option value="en">English (speak quantities in English)</option>
+              <option value="ar">Arabic (speak quantities in Arabic)</option>
+            </select>
+          </div>
 
-      <div class="setting-row">
-        <div>
-          <div class="setting-label">Filter Columns on Import</div>
-          <div class="setting-description">When ON, imports only 5 key columns. When OFF, imports all.</div>
-        </div>
-        <div class="form-check form-switch mb-0">
-          <input class="form-check-input" type="checkbox" id="settingsColumnFilter" role="switch">
-        </div>
-      </div>
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Filter Columns on Import</div>
+              <div class="setting-description">When ON, imports only 5 key columns. When OFF, imports all.</div>
+            </div>
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" id="settingsColumnFilter" role="switch">
+            </div>
+          </div>
 
-      <!-- Tabbed Scanning Mode -->
-      <div class="setting-row">
-        <div>
-          <div class="setting-label">Enable Tabbed View</div>
-          <div class="setting-description">Tabbed View allows switching between Scan and Remaining screens</div>
-        </div>
-        <div class="form-check form-switch mb-0">
-          <input class="form-check-input" type="checkbox" id="settingsTabbedScanningMode" role="switch">
-        </div>
-      </div>
+          <!-- Tabbed Scanning Mode -->
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Enable Tabbed View</div>
+              <div class="setting-description">Tabbed View allows switching between Scan and Remaining screens</div>
+            </div>
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" id="settingsTabbedScanningMode" role="switch">
+            </div>
+          </div>
 
-      <!-- Received Quantity Column -->
-      <div class="setting-row">
-        <div>
-          <div class="setting-label">Show Received Quantity Column</div>
-          <div class="setting-description">Displays the Received Qty column in the Scanned Products table</div>
-        </div>
-        <div class="form-check form-switch mb-0">
-          <input class="form-check-input" type="checkbox" id="settingsShowReceivedQtyColumn" role="switch">
-        </div>
-      </div>
+          <!-- Received Quantity Column -->
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Show Received Quantity Column</div>
+              <div class="setting-description">Displays the Received Qty column in the Scanned Products table</div>
+            </div>
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" id="settingsShowReceivedQtyColumn" role="switch">
+            </div>
+          </div>
 
-      <!-- Enable Manual Input -->
-      <div class="setting-row">
-        <div>
-          <div class="setting-label">Enable Manual Input</div>
-          <div class="setting-description">Allows typing numbers directly into the Received Qty column</div>
-        </div>
-        <div class="form-check form-switch mb-0">
-          <input class="form-check-input" type="checkbox" id="settingsEnableManualInput" role="switch">
-        </div>
-      </div>
+          <!-- Enable Manual Input -->
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Enable Manual Input</div>
+              <div class="setting-description">Allows typing numbers directly into the Received Qty column</div>
+            </div>
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" id="settingsEnableManualInput" role="switch">
+            </div>
+          </div>
 
-      <!-- Fixed Input Bar -->
-      <div class="setting-row">
-        <div>
-          <div class="setting-label"><i class="bi bi-pin-angle-fill me-1 text-primary"></i>Fixed Input Bar</div>
-          <div class="setting-description">Pins the barcode input to the bottom of the screen — stays visible while scrolling through the scanned table</div>
-        </div>
-        <div class="form-check form-switch mb-0">
-          <input class="form-check-input" type="checkbox" id="settingsFixedInputBar" role="switch">
-        </div>
-      </div>
+          <!-- Fixed Input Bar -->
+          <div class="setting-row">
+            <div>
+              <div class="setting-label"><i class="bi bi-pin-angle-fill me-1 text-primary"></i>Fixed Input Bar</div>
+              <div class="setting-description">Pins the barcode input to the bottom of the screen — stays visible while
+                scrolling through the scanned table</div>
+            </div>
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" id="settingsFixedInputBar" role="switch">
+            </div>
+          </div>
 
-      <!-- Log Not Found Barcode -->
-      <div class="setting-row">
-        <div>
-          <div class="setting-label">Log Not Found Barcodes</div>
-          <div class="setting-description">When ON, barcodes that are not found will be temporarily shown in red in the scanned table.</div>
-        </div>
-        <div class="form-check form-switch mb-0">
-          <input class="form-check-input" type="checkbox" id="settingsLogNotFound" role="switch">
-        </div>
-      </div>
+          <!-- Log Not Found Barcode -->
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Log Not Found Barcodes</div>
+              <div class="setting-description">When ON, barcodes that are not found will be temporarily shown in red in
+                the scanned table.</div>
+            </div>
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" id="settingsLogNotFound" role="switch">
+            </div>
+          </div>
 
-      <!-- Talabat Product Link -->
-      <div class="setting-row">
-        <div>
-          <div class="setting-label" data-translate="Use Talabat Product Link">Use Talabat Product Link</div>
-          <div class="setting-description" data-translate="When enabled, the search button in remaining products opens the product on Talabat using the Item Number / ID from the 4th column.">When enabled, the search button in remaining products opens the product on Talabat using the Item Number / ID from the 4th column.</div>
-        </div>
-        <div class="form-check form-switch mb-0">
-          <input class="form-check-input" type="checkbox" id="settingsUseTalabatLink" role="switch">
-        </div>
-      </div>
+          <!-- Talabat Product Link -->
+          <div class="setting-row">
+            <div>
+              <div class="setting-label" data-translate="Use Talabat Product Link">Use Talabat Product Link</div>
+              <div class="setting-description"
+                data-translate="When enabled, the search button in remaining products opens the product on Talabat using the Item Number / ID from the 4th column.">
+                When enabled, the search button in remaining products opens the product on Talabat using the Item Number
+                / ID from the 4th column.</div>
+            </div>
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" id="settingsUseTalabatLink" role="switch">
+            </div>
+          </div>
         </div>
 
         <!-- ══ CARD 4: Table View Options (Legacy Restore) ══ -->
         <div class="settings-card">
-      <div class="card-section-title">
-        <i class="bi bi-layout-wtf"></i> Advanced Table Options
-      </div>
+          <div class="card-section-title">
+            <i class="bi bi-layout-wtf"></i> Advanced Table Options
+          </div>
 
-      <!-- Notes Column -->
-      <div class="setting-row">
-        <div>
-          <div class="setting-label">Show Empty Column (Notes)</div>
-          <div class="setting-description">Adds an empty column in the Remaining products table to capture notes</div>
-        </div>
-        <div class="form-check form-switch mb-0">
-          <input class="form-check-input" type="checkbox" id="settingsNotesColumn" role="switch">
-        </div>
-      </div>
+          <!-- Notes Column -->
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Show Empty Column (Notes)</div>
+              <div class="setting-description">Adds an empty column in the Remaining products table to capture notes
+              </div>
+            </div>
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" id="settingsNotesColumn" role="switch">
+            </div>
+          </div>
 
-      <!-- Search Column -->
-      <div class="setting-row">
-        <div>
-          <div class="setting-label">Show Search Column</div>
-          <div class="setting-description">Displays an internal app search mechanism column in the Remaining products table</div>
-        </div>
-        <div class="form-check form-switch mb-0">
-          <input class="form-check-input" type="checkbox" id="settingsSearchColumn" role="switch">
-        </div>
-      </div>
+          <!-- Search Column -->
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Show Search Column</div>
+              <div class="setting-description">Displays an internal app search mechanism column in the Remaining
+                products table</div>
+            </div>
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" id="settingsSearchColumn" role="switch">
+            </div>
+          </div>
 
-      <!-- Timestamp Column -->
-      <div class="setting-row">
-        <div>
-          <div class="setting-label">Show Scan Time Column</div>
-          <div class="setting-description">Displays the exact time a product was scanned in the Scanned products table</div>
-        </div>
-        <div class="form-check form-switch mb-0">
-          <input class="form-check-input" type="checkbox" id="settingsTimestampColumn" role="switch">
-        </div>
-      </div>
+          <!-- Timestamp Column -->
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Show Scan Time Column</div>
+              <div class="setting-description">Displays the exact time a product was scanned in the Scanned products
+                table</div>
+            </div>
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" id="settingsTimestampColumn" role="switch">
+            </div>
+          </div>
+
+          <!-- Fit Table to Screen -->
+          <div class="setting-row">
+            <div>
+              <div class="setting-label"><i class="bi bi-arrows-fullscreen me-1 text-primary"></i>Fit Table to Screen</div>
+              <div class="setting-description">When ON, table rows wrap to fit the screen width — no horizontal scrolling. Works on both the Inventory and Admin pages.</div>
+            </div>
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" id="settingsFitTableToScreen" role="switch">
+            </div>
+          </div>
         </div>
 
         <!-- ══ CARD 5: Navigation ══ -->
         <div class="settings-card">
-      <div class="card-section-title">
-        <i class="bi bi-grid-3x3-gap"></i> Navigation
-      </div>
-      <div class="d-grid gap-2">
-        <a href="index.html" class="btn btn-outline-light fw-bold">
-          <i class="bi bi-house"></i> Go to Inventory
-        </a>
-        <a href="tracker.html" class="btn btn-outline-info fw-bold">
-          <i class="bi bi-truck"></i> Go to Tracker
-        </a>
-        <a id="adminDashboardLink" href="admin.html" class="btn btn-warning fw-bold d-none">
-          <i class="bi bi-speedometer2"></i> Admin Dashboard
-        </a>
-      </div>
+          <div class="card-section-title">
+            <i class="bi bi-grid-3x3-gap"></i> Navigation
+          </div>
+          <div class="d-grid gap-2">
+            <button onclick="(window.parent !== window ? window.parent.postMessage({switchTab:'inventory'},'*') : window.location.href='index.html')" class="btn btn-outline-light fw-bold">
+              <i class="bi bi-house"></i> Go to Inventory
+            </button>
+            <button onclick="(window.parent !== window ? window.parent.postMessage({switchTab:'tracker'},'*') : window.location.href='tracker.html')" class="btn btn-outline-info fw-bold">
+              <i class="bi bi-truck"></i> Go to Tracker
+            </button>
+            <button id="adminDashboardLink" onclick="(window.parent !== window ? window.parent.postMessage({switchTab:'admin'},'*') : window.location.href='admin.html')" class="btn btn-warning fw-bold d-none">
+              <i class="bi bi-speedometer2"></i> Admin Dashboard
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -595,7 +667,7 @@
     };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
-    const db   = firebase.firestore();
+    const db = firebase.firestore();
 
     // ── Sync UI controls to current settings ──────────────────────────────────
     function syncUI() {
@@ -627,6 +699,9 @@
       document.getElementById("settingsNotesColumn").checked = localStorage.getItem("remainingNotesColumnVisible") === "true";
       document.getElementById("settingsSearchColumn").checked = localStorage.getItem("searchColumnVisible") === "true";
       document.getElementById("settingsTimestampColumn").checked = localStorage.getItem("timestampColumnVisible") === "true";
+
+      // Fit Table to Screen
+      document.getElementById("settingsFitTableToScreen").checked = !!s.fitTableToScreen;
 
       const pt = document.getElementById("previewTable");
       if (pt) {
@@ -740,6 +815,11 @@
       showSavedToast();
     });
 
+    // 🔥 Wire up: Fit Table to Screen 🔥
+    document.getElementById("settingsFitTableToScreen").addEventListener("change", (e) => {
+      updateSettingAndSave("fitTableToScreen", e.target.checked);
+    });
+
     // ── Reset ─────────────────────────────────────────────────────────────────
     document.getElementById("resetSettingsBtn").addEventListener("click", () => {
       if (!confirm("Reset all settings to default values?")) return;
@@ -752,7 +832,9 @@
     auth.onAuthStateChanged(async (firebaseUser) => {
       const loadingEl = document.getElementById("authLoadingScreen");
       if (!firebaseUser) {
-        window.location.href = "index.html";
+        if (window.parent === window) {
+          window.location.href = "index.html";
+        }
         return;
       }
       try {
@@ -765,7 +847,7 @@
         const data = userDoc.data();
 
         _currentUserUid = firebaseUser.uid;
-        
+
         // Show user name in navbar
         document.getElementById("settingsUserLabel").textContent = "👤 " + (data.displayName || firebaseUser.email);
 
@@ -792,4 +874,5 @@
     });
   </script>
 </body>
+
 </html>

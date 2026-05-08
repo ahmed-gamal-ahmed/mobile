@@ -1,9 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Admin Dashboard — Inventory PWA</title>
+  <script>
+    if (window.parent === window && !window.location.search.includes("home=true")) {
+      window.location.replace("shell.html#admin");
+    }
+  </script>
   <link rel="icon" type="image/png" href="./icons/favicon.png">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" />
@@ -12,7 +18,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-  
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -22,111 +28,180 @@
     html {
       zoom: var(--app-scale, 1);
     }
+
+    /* ── Base ── */
     body {
       font-family: 'Cairo', system-ui, -apple-system, sans-serif;
       font-size: var(--app-font-size, 15px);
       background: #f0f2f5;
-      padding-top: 70px;
+      padding-top: 62px;
       transition: font-size 0.3s ease;
+      -webkit-tap-highlight-color: transparent;
     }
+
+    /* ── Navbar ── */
     .navbar {
       background: linear-gradient(135deg, #0d6efd, #6610f2);
-      box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+      min-height: 56px;
+      padding: 0.4rem 0.75rem;
     }
+
     .navbar-brand {
       font-weight: 800;
-      font-size: 1.25rem;
+      font-size: 1rem;
       color: #fff !important;
+      white-space: nowrap;
     }
-    /* Horizontally scrollable tabs (mobile + narrow viewports) */
+
+    /* Navbar action buttons — shrink on mobile */
+    .navbar .btn {
+      min-height: 36px;
+      font-size: 0.78rem;
+      padding: 0.3rem 0.6rem;
+      white-space: nowrap;
+    }
+
+    /* ── Tab Nav ── */
     .nav.nav-tabs,
     ul.nav-tabs {
       display: flex;
       overflow-x: auto;
       overflow-y: hidden;
-      flex-wrap: nowrap !important; /* override Bootstrap .nav flex-wrap */
+      flex-wrap: nowrap !important;
       -webkit-overflow-scrolling: touch;
-      scrollbar-width: thin;
+      scrollbar-width: none;
       max-width: 100%;
+      border-bottom: 2px solid #dee2e6;
     }
+
+    .nav.nav-tabs::-webkit-scrollbar { display: none; }
+
     .nav-tabs .nav-item {
       flex: 0 0 auto;
     }
+
     .nav-tabs .nav-link {
       color: #495057;
       font-weight: 600;
+      font-size: 0.82rem;
       border-radius: 8px 8px 0 0;
-      min-height: 48px;
+      min-height: 44px;
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       white-space: nowrap;
+      padding: 0.5rem 0.75rem;
+      border: none;
+      border-bottom: 3px solid transparent;
     }
+
     .nav-tabs .nav-link.active {
       color: #0d6efd;
       border-bottom: 3px solid #0d6efd;
-      background: #fff;
+      background: transparent;
     }
+
+    /* ── Tab Cards ── */
     .tab-card {
       background: #fff;
-      border-radius: 0 12px 12px 12px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.07);
-      padding: 24px;
+      border-radius: 0 0 12px 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.07);
+      padding: 16px;
       width: 100%;
       max-width: 100%;
       min-width: 0;
       box-sizing: border-box;
     }
+
     .tab-content {
       width: 100%;
       max-width: 100%;
       min-width: 0;
     }
+
+    /* ── Tables ── */
     .table-responsive {
-      max-width: 100%;
-      -webkit-overflow-scrolling: touch;
-    }
-    .table-responsive .table {
       width: 100%;
-      max-width: 100%;
-      table-layout: auto;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      border: 1px solid #e9ecef;
+      background: #fff;
+      margin-bottom: 1.5rem;
     }
-    #tab-assign .card {
-      min-height: 0;
+
+    .table-responsive .table {
+      margin-bottom: 0;
+      width: 100%;
+      background-color: #fff;
+      font-size: 0.85rem;
     }
-    button, .btn {
-      min-height: 44px;
+
+    .table-responsive .table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background-color: #212529; 
+      color: white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      white-space: nowrap;
     }
-    .table td, .table th {
-      padding: var(--app-table-density, 0.5rem) 0.5rem !important;
+
+    .table td,
+    .table th {
+      padding: var(--app-table-density, 0.5rem) 0.75rem !important;
       vertical-align: middle;
       transition: padding 0.3s ease;
     }
-    .badge-role-admin { background-color: #198754; }
-    .badge-role-user  { background-color: #0d6efd; }
+
+    @media (max-width: 767px) {
+      .table-responsive .table {
+        min-width: 800px; /* Force scroll */
+      }
+      .table td, .table th {
+        white-space: nowrap;
+        font-size: 0.95rem;
+      }
+    }
+
+    /* ── Buttons ── */
+    button, .btn {
+      min-height: 40px;
+      touch-action: manipulation;
+    }
+
+    /* ── Badges ── */
+    .badge-role-admin  { background-color: #198754; }
+    .badge-role-user   { background-color: #0d6efd; }
+
     .stat-badge {
-      font-size: 0.95rem;
-      padding: 8px 16px;
+      font-size: 0.82rem;
+      padding: 6px 12px;
       border-radius: 8px;
       font-weight: 600;
     }
+
+    /* ── Misc ── */
     .section-divider {
       border-top: 2px dashed #dee2e6;
-      margin: 24px 0;
+      margin: 20px 0;
     }
+
     .preview-card {
       border: 2px solid #198754;
       border-radius: 10px;
       background: #f0fff4;
-      padding: 20px;
+      padding: 16px;
     }
-    #assignSheetPreviewModal .modal-content {
-      box-shadow: none;
-    }
+
+    #assignSheetPreviewModal .modal-content { box-shadow: none; }
+
     #pageSpinner {
       position: fixed;
       inset: 0;
-      background: rgba(255,255,255,0.9);
+      background: rgba(255, 255, 255, 0.95);
       z-index: 9999;
       display: flex;
       align-items: center;
@@ -134,61 +209,161 @@
       flex-direction: column;
       gap: 16px;
     }
+
     .sheet-select-row td { vertical-align: middle; }
-    .fs-small { font-size: 0.82rem; }
+    .fs-small { font-size: 0.8rem; }
+
+    /* ── Action button groups ── */
     .mobile-stack {
       display: flex;
       flex-wrap: wrap;
       gap: 0.5rem;
-      justify-content: space-between;
+      align-items: flex-start;
     }
+
     .mobile-stack > .form-control {
-      flex: 1 1 320px;
+      flex: 1 1 200px;
+      min-width: 0;
       max-width: 100% !important;
     }
+
     .mobile-actions {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.5rem;
+      gap: 0.4rem;
     }
+
     .mobile-actions .btn {
-      flex: 1 1 150px;
+      flex: 1 1 auto;
+      white-space: nowrap;
     }
+
     .users-actions-wrap {
       display: flex;
       flex-wrap: wrap;
       gap: 0.35rem;
     }
+
+    /* ── User select full width on mobile ── */
+    #assignUserSelect {
+      width: 100%;
+      max-width: 100% !important;
+    }
+
+    /* ── Operations table: hide less-important columns on mobile ── */
+    @media (max-width: 575px) {
+      .ops-col-auditors,
+      .ops-col-driver,
+      .ops-col-created { display: none; }
+    }
+
+    /* ── Small phones ── */
     @media (max-width: 767px) {
-      body { font-size: 14px; }
-      .tab-card {
-        padding: 16px !important;
-      }
-      .stat-badge {
-        font-size: 0.75rem;
-        padding: 4px 10px;
-      }
-      .table td, .table th {
-        font-size: 0.8rem;
-      }
-      .btn {
-        font-size: 0.85rem;
-      }
+      body { font-size: 13px; padding-top: 56px; }
+
+      .tab-card { padding: 12px !important; }
+
+      .navbar-brand { font-size: 0.9rem; }
+
+      .stat-badge { font-size: 0.72rem; padding: 4px 8px; }
+
+      .table td, .table th { font-size: 0.78rem; }
+
+      .btn { font-size: 0.82rem; }
+
+      /* Create user button full width on mobile */
       #openCreateUserModalBtn { width: 100%; }
+
+      /* Action buttons stack vertically */
       .mobile-actions {
-        flex-direction: column;
         width: 100%;
       }
-      .mobile-actions .btn { width: 100%; flex: 1 1 100%; }
+
+      .mobile-actions .btn {
+        flex: 1 1 calc(50% - 0.4rem);
+      }
+
       .mobile-stack {
         flex-direction: column;
         align-items: stretch;
       }
-      #assignUserSelect { max-width: 100% !important; }
-      .container-fluid { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
+
+      /* Assign steps */
+      #tab-assign .row > [class*="col-"] {
+        padding-left: 0;
+        padding-right: 0;
+      }
+
+      .container-fluid {
+        padding-left: 0.4rem !important;
+        padding-right: 0.4rem !important;
+      }
+
+      /* Inputs and selects */
+      input, select, .form-control, .form-select {
+        font-size: 16px !important; /* prevents iOS zoom */
+      }
+
+      /* Modal full screen on mobile */
+      .modal-dialog {
+        margin: 0 !important;
+        max-width: 100% !important;
+      }
+
+      .modal-content {
+        border-radius: 0 !important;
+        min-height: 100vh;
+      }
+
+      /* nav buttons in navbar wrap nicely */
+      .navbar .d-flex.ms-auto {
+        gap: 4px !important;
+      }
+
+      .navbar .btn i + span,
+      .navbar .btn span { display: none; }
+
+      .navbar .btn i { margin: 0 !important; }
+    }
+
+    /* ── Tablet ── */
+    @media (min-width: 768px) {
+      .tab-card { padding: 20px; }
+      body { font-size: 14px; }
+    }
+
+    /* ── Desktop ── */
+    @media (min-width: 992px) {
+      .tab-card { padding: 24px; }
+    }
+
+    /* ── Fit Table to Screen mode ────────────────────────────────────── */
+    /* Activated by app-settings.js adding .fit-table-screen to body */
+    body.fit-table-screen .table-responsive {
+      overflow-x: visible !important;
+    }
+    body.fit-table-screen .table {
+      table-layout: fixed !important;
+      width: 100% !important;
+      min-width: 0 !important;
+    }
+    body.fit-table-screen .table td,
+    body.fit-table-screen .table th {
+      white-space: normal !important;
+      word-break: break-word;
+      overflow-wrap: break-word;
+      font-size: 0.74rem !important;
+    }
+    /* On small phones: hide even more columns in fit mode */
+    @media (max-width: 575px) {
+      body.fit-table-screen .table td:nth-child(n+4):not(:last-child),
+      body.fit-table-screen .table th:nth-child(n+4):not(:last-child) {
+        display: none;
+      }
     }
   </style>
 </head>
+
 <body>
 
   <!-- Full-page loading spinner -->
@@ -198,19 +373,19 @@
   </div>
 
   <!-- Navbar -->
-  <nav class="navbar fixed-top navbar-expand-lg">
-    <div class="container-fluid px-3">
-      <span class="navbar-brand">🛡️ Admin Dashboard</span>
-      <div class="d-flex align-items-center gap-2 ms-auto flex-wrap">
-        <span class="text-white fw-semibold fs-small" id="adminNameLabel">👤 Admin</span>
-        <a href="index.html?home=true" class="btn btn-outline-light btn-sm fw-bold">
-          <i class="bi bi-arrow-left"></i> Back to App
-        </a>
-        <a href="settings.html" class="btn btn-outline-light btn-sm fw-bold">
-          <i class="bi bi-gear"></i> Settings
-        </a>
+  <nav class="navbar fixed-top">
+    <div class="container-fluid px-2 px-sm-3">
+      <span class="navbar-brand me-auto">🛡️ <span class="d-none d-sm-inline">Admin Dashboard</span><span class="d-sm-none">Admin</span></span>
+      <div class="d-flex align-items-center gap-1 gap-sm-2 ms-2">
+        <span class="text-white fw-semibold fs-small d-none d-md-inline" id="adminNameLabel">👤 Admin</span>
+        <button onclick="(window.parent !== window ? window.parent.postMessage({switchTab:'inventory'},'*') : window.location.href='index.html?home=true')" class="btn btn-outline-light btn-sm fw-bold">
+          <i class="bi bi-arrow-left"></i> <span>Back</span>
+        </button>
+        <button onclick="(window.parent !== window ? window.parent.postMessage({switchTab:'settings'},'*') : window.location.href='settings.html')" class="btn btn-outline-light btn-sm fw-bold">
+          <i class="bi bi-gear"></i> <span class="d-none d-sm-inline">Settings</span>
+        </button>
         <button id="logoutBtn" class="btn btn-danger btn-sm fw-bold">
-          <i class="bi bi-box-arrow-right"></i> Logout
+          <i class="bi bi-box-arrow-right"></i> <span class="d-none d-sm-inline">Logout</span>
         </button>
       </div>
     </div>
@@ -222,22 +397,26 @@
     <!-- Tabs -->
     <ul class="nav nav-tabs mb-0 mt-3" id="adminTabs" role="tablist">
       <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="tab-users-btn" data-bs-toggle="tab" data-bs-target="#tab-users" type="button" role="tab">
+        <button class="nav-link active" id="tab-users-btn" data-bs-toggle="tab" data-bs-target="#tab-users"
+          type="button" role="tab">
           <i class="bi bi-people-fill"></i> Users
         </button>
       </li>
       <li class="nav-item" role="presentation">
-        <button class="nav-link" id="tab-drivers-btn" data-bs-toggle="tab" data-bs-target="#tab-drivers" type="button" role="tab">
+        <button class="nav-link" id="tab-drivers-btn" data-bs-toggle="tab" data-bs-target="#tab-drivers" type="button"
+          role="tab">
           <i class="bi bi-truck-front-fill"></i> Drivers
         </button>
       </li>
       <li class="nav-item" role="presentation">
-        <button class="nav-link" id="tab-ops-btn" data-bs-toggle="tab" data-bs-target="#tab-ops" type="button" role="tab">
+        <button class="nav-link" id="tab-ops-btn" data-bs-toggle="tab" data-bs-target="#tab-ops" type="button"
+          role="tab">
           <i class="bi bi-cloud-check-fill"></i> Operations
         </button>
       </li>
       <li class="nav-item" role="presentation">
-        <button class="nav-link" id="tab-assign-btn" data-bs-toggle="tab" data-bs-target="#tab-assign" type="button" role="tab">
+        <button class="nav-link" id="tab-assign-btn" data-bs-toggle="tab" data-bs-target="#tab-assign" type="button"
+          role="tab">
           <i class="bi bi-send-fill"></i> Import Assignment
         </button>
       </li>
@@ -273,7 +452,9 @@
               </tr>
             </thead>
             <tbody id="usersTableBody">
-              <tr><td colspan="6" class="text-center text-muted py-4">Loading users...</td></tr>
+              <tr>
+                <td colspan="6" class="text-center text-muted py-4">Loading users...</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -293,7 +474,8 @@
           <div class="col-md-8">
             <label class="form-label fw-semibold">Add driver name</label>
             <div class="input-group">
-              <input type="text" id="newDriverNameInput" class="form-control" placeholder="Enter driver name" maxlength="200" />
+              <input type="text" id="newDriverNameInput" class="form-control" placeholder="Enter driver name"
+                maxlength="200" />
               <button class="btn btn-success fw-bold" type="button" id="addDriverBtn">
                 <i class="bi bi-plus-lg"></i> Add Driver
               </button>
@@ -310,7 +492,9 @@
               </tr>
             </thead>
             <tbody id="driversTableBody">
-              <tr><td colspan="3" class="text-center text-muted py-4">Loading drivers...</td></tr>
+              <tr>
+                <td colspan="3" class="text-center text-muted py-4">Loading drivers...</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -325,7 +509,8 @@
         </div>
 
         <div class="mobile-stack mb-3">
-          <input type="text" id="opsSearchInput" class="form-control" style="max-width:360px;" placeholder="Search by operation or user name...">
+          <input type="text" id="opsSearchInput" class="form-control" style="max-width:360px;"
+            placeholder="Search by operation or user name...">
           <div class="mobile-actions">
             <button id="opsDeleteSelectedBtn" class="btn btn-danger fw-bold">
               <i class="bi bi-trash"></i> Delete Selected
@@ -347,18 +532,20 @@
               <tr>
                 <th style="width:42px;"><input type="checkbox" id="opsSelectAll" class="form-check-input"></th>
                 <th>Operation Name</th>
-                <th>Created By</th>
-                <th>Auditors</th>
-                <th>Driver</th>
+                <th class="ops-col-created">Created By</th>
+                <th class="ops-col-auditors">Auditors</th>
+                <th class="ops-col-driver">Driver</th>
                 <th>Date &amp; Time</th>
                 <th>Total</th>
                 <th>Scanned</th>
                 <th>Remaining</th>
-                <th style="min-width:220px;">Actions</th>
+                <th style="min-width:180px;">Actions</th>
               </tr>
             </thead>
             <tbody id="opsTableBody">
-              <tr><td colspan="10" class="text-center text-muted py-4">Loading operations...</td></tr>
+              <tr>
+                <td colspan="10" class="text-center text-muted py-4">Loading operations...</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -369,11 +556,11 @@
 
         <!-- Step 1 -->
         <h5 class="fw-bold mb-3"><span class="badge bg-primary me-2">1</span>Select Target User</h5>
-        <div class="d-flex gap-2 mb-4 align-items-center flex-wrap">
-          <select class="form-select" id="assignUserSelect" style="max-width:400px;">
+        <div class="d-flex gap-2 mb-4 align-items-center">
+          <select class="form-select flex-fill" id="assignUserSelect">
             <option value="">-- Select a user --</option>
           </select>
-          <button class="btn btn-outline-secondary" id="refreshAssignUsersBtn" title="Refresh user list">
+          <button class="btn btn-outline-secondary flex-shrink-0" id="refreshAssignUsersBtn" title="Refresh user list">
             <i class="bi bi-arrow-clockwise"></i>
           </button>
         </div>
@@ -387,14 +574,21 @@
           <!-- Option A: Upload -->
           <div class="col-md-6">
             <div class="card h-100 shadow-sm border-0">
-              <div class="card-header bg-dark text-white fw-bold"><i class="bi bi-file-earmark-excel"></i> Option A — Upload Excel / CSV</div>
+              <div class="card-header bg-dark text-white fw-bold"><i class="bi bi-file-earmark-excel"></i> Option A —
+                Upload Excel / CSV</div>
               <div class="card-body">
                 <label class="form-label fw-semibold">Select File</label>
                 <input type="file" id="assignFileInput" class="form-control mb-3" accept=".xlsx,.xls,.csv" />
                 <div id="assignLocalSheetSelectorContainer" class="d-none mb-3">
                   <div class="table-responsive">
                     <table class="table table-sm table-bordered">
-                      <thead class="table-dark"><tr><th>Sheet Name</th><th>Rows</th><th style="width:90px;">Actions</th></tr></thead>
+                      <thead class="table-dark">
+                        <tr>
+                          <th>Sheet Name</th>
+                          <th>Rows</th>
+                          <th style="width:90px;">Actions</th>
+                        </tr>
+                      </thead>
                       <tbody id="assignLocalSheetSelectorBody"></tbody>
                     </table>
                   </div>
@@ -407,17 +601,25 @@
           <!-- Option B: Google Sheets -->
           <div class="col-md-6">
             <div class="card h-100 shadow-sm border-0">
-              <div class="card-header bg-dark text-white fw-bold"><i class="bi bi-google"></i> Option B — Google Sheets URL</div>
+              <div class="card-header bg-dark text-white fw-bold"><i class="bi bi-google"></i> Option B — Google Sheets
+                URL</div>
               <div class="card-body">
                 <label class="form-label fw-semibold">Sheet URL</label>
-                <input type="text" id="assignSheetUrl" class="form-control mb-2" placeholder="Paste public Google Sheets link" />
+                <input type="text" id="assignSheetUrl" class="form-control mb-2"
+                  placeholder="Paste public Google Sheets link" />
                 <button class="btn btn-info w-100 mb-3" id="assignLoadSheetBtn">
                   <i class="bi bi-cloud-arrow-down"></i> Load Worksheets
                 </button>
                 <div id="assignSheetSelectorContainer" class="d-none">
                   <div class="table-responsive">
                     <table class="table table-sm table-bordered">
-                      <thead class="table-dark"><tr><th>Sheet Name</th><th>Rows</th><th style="width:90px;"></th></tr></thead>
+                      <thead class="table-dark">
+                        <tr>
+                          <th>Sheet Name</th>
+                          <th>Rows</th>
+                          <th style="width:90px;"></th>
+                        </tr>
+                      </thead>
                       <tbody id="assignSheetSelectorBody"></tbody>
                     </table>
                   </div>
@@ -429,20 +631,24 @@
           <!-- Option C: Private Google Sheet (Cloud Function) -->
           <div class="col-12">
             <div class="card h-100 shadow-sm border-0">
-              <div class="card-header bg-dark text-white fw-bold"><i class="bi bi-lock-fill"></i> Import from Private Google Sheet</div>
+              <div class="card-header bg-dark text-white fw-bold"><i class="bi bi-lock-fill"></i> Import from Private
+                Google Sheet</div>
               <div class="card-body">
                 <div class="d-flex flex-wrap gap-2 mb-3">
                   <button class="btn btn-primary" id="assignPrivateLoadSheetsBtn">
                     <i class="bi bi-list-ul"></i> Load Sheets
                   </button>
-                  <button class="btn btn-outline-secondary" id="assignPrivateRefreshSheetsBtn" title="Refresh private sheet list">
+                  <button class="btn btn-outline-secondary" id="assignPrivateRefreshSheetsBtn"
+                    title="Refresh private sheet list">
                     <i class="bi bi-arrow-clockwise"></i>
                   </button>
                 </div>
                 <div class="border rounded p-2 mb-3 bg-light">
-                  <label class="form-label fw-semibold mb-1" for="assignPrivateBaseUrlInput">Private Sheet API Base URL</label>
+                  <label class="form-label fw-semibold mb-1" for="assignPrivateBaseUrlInput">Private Sheet API Base
+                    URL</label>
                   <div class="input-group">
-                    <input type="text" id="assignPrivateBaseUrlInput" class="form-control" placeholder="/api or https://your-domain.com/api" />
+                    <input type="text" id="assignPrivateBaseUrlInput" class="form-control"
+                      placeholder="/api or https://your-domain.com/api" />
                     <button class="btn btn-outline-primary" type="button" id="assignPrivateBaseUrlSaveBtn">Save</button>
                   </div>
                   <div class="form-text">Used for private sheet actions (Load Sheets / Import Sheet).</div>
@@ -450,7 +656,12 @@
                 <div id="assignPrivateSheetSelectorContainer" class="d-none">
                   <div class="table-responsive">
                     <table class="table table-sm table-bordered">
-                      <thead class="table-dark"><tr><th>Sheet Name</th><th style="width:120px;">Action</th></tr></thead>
+                      <thead class="table-dark">
+                        <tr>
+                          <th>Sheet Name</th>
+                          <th style="width:120px;">Action</th>
+                        </tr>
+                      </thead>
                       <tbody id="assignPrivateSheetSelectorBody"></tbody>
                     </table>
                   </div>
@@ -466,8 +677,10 @@
         <h5 class="fw-bold mb-3"><span class="badge bg-primary me-2">3</span>Preview &amp; Assign</h5>
         <div id="assignPreviewCard" class="preview-card d-none mb-3">
           <div class="fw-bold fs-5 mb-2">📋 <span id="assignPreviewFileName"></span></div>
-          <div class="text-muted mb-1"><i class="bi bi-person"></i> Assigning to: <strong id="assignPreviewUserName"></strong></div>
-          <div class="text-muted mb-3"><i class="bi bi-table"></i> Rows: <strong id="assignPreviewRowCount"></strong></div>
+          <div class="text-muted mb-1"><i class="bi bi-person"></i> Assigning to: <strong
+              id="assignPreviewUserName"></strong></div>
+          <div class="text-muted mb-3"><i class="bi bi-table"></i> Rows: <strong id="assignPreviewRowCount"></strong>
+          </div>
           <button class="btn btn-success btn-lg fw-bold w-100" id="assignSendBtn">
             <span id="assignSendSpinner" class="spinner-border spinner-border-sm d-none me-2" role="status"></span>
             <i class="bi bi-send"></i> Assign to User
@@ -476,7 +689,9 @@
             <input class="form-check-input" type="checkbox" id="forceAssignmentToggle" />
             <label class="form-check-label fw-bold" for="forceAssignmentToggle">🔴 Force Assignment</label>
           </div>
-          <div class="form-text text-muted small ms-4">If enabled, the new inventory will load automatically on the user's device immediately after they save their current operation. The user can still cancel if they choose.</div>
+          <div class="form-text text-muted small ms-4">If enabled, the new inventory will load automatically on the
+            user's device immediately after they save their current operation. The user can still cancel if they choose.
+          </div>
         </div>
         <div id="assignSuccessAlert" class="alert alert-success d-none py-2"></div>
         <div id="assignErrorAlert" class="alert alert-danger d-none py-2"></div>
@@ -485,7 +700,8 @@
     </div><!-- /tab-content -->
   </div><!-- /mainContent -->
 
-  <div class="modal fade" id="assignSheetPreviewModal" tabindex="-1" aria-labelledby="assignSheetPreviewModalLabel" aria-hidden="true">
+  <div class="modal fade" id="assignSheetPreviewModal" tabindex="-1" aria-labelledby="assignSheetPreviewModalLabel"
+    aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
       <div class="modal-content">
         <div class="modal-header bg-primary text-white">
@@ -494,8 +710,10 @@
         </div>
         <div class="modal-body">
           <div class="d-flex flex-wrap gap-2 mb-3">
-            <button type="button" class="btn btn-outline-primary fw-bold" id="assignToggleIgnoreRowsBtn">Ignore first 3 rows: OFF</button>
-            <button type="button" class="btn btn-outline-primary fw-bold" id="assignToggleColumnFilterBtn">Filter columns on import: OFF</button>
+            <button type="button" class="btn btn-outline-primary fw-bold" id="assignToggleIgnoreRowsBtn">Ignore first 3
+              rows: OFF</button>
+            <button type="button" class="btn btn-outline-primary fw-bold" id="assignToggleColumnFilterBtn">Filter
+              columns on import: OFF</button>
           </div>
           <div class="row g-2 mb-3">
             <div class="col-md-4">
@@ -545,7 +763,8 @@
           </div>
           <div class="mb-3">
             <label class="form-label fw-bold">Password <span class="text-danger">*</span></label>
-            <input type="password" id="cuPassword" class="form-control form-control-lg" placeholder="Min 6 characters" />
+            <input type="password" id="cuPassword" class="form-control form-control-lg"
+              placeholder="Min 6 characters" />
           </div>
           <div class="mb-3">
             <label class="form-label fw-bold">Phone Number</label>
@@ -670,7 +889,8 @@
         <div class="modal-body">
           <input type="hidden" id="editDriverDocId" />
           <label class="form-label fw-bold">Driver Name</label>
-          <input type="text" class="form-control" id="editDriverNameInput" maxlength="200" placeholder="Enter driver name" />
+          <input type="text" class="form-control" id="editDriverNameInput" maxlength="200"
+            placeholder="Enter driver name" />
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -696,7 +916,7 @@
     };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
-    const db   = firebase.firestore();
+    const db = firebase.firestore();
 
     const FIREBASE_API_KEY = "AIzaSyDRE4VFqnr5Y_1AlaPUDcGoZ7njAOmL0T0";
     const DEFAULT_PRIVATE_SHEETS_BASE_URL = "/api";
@@ -726,16 +946,20 @@
     // ─── Auth Guard ───────────────────────────────────────────────────────────
     auth.onAuthStateChanged(async (firebaseUser) => {
       if (!firebaseUser) {
-        window.location.href = "index.html";
+        if (window.parent === window) {
+          window.location.href = "index.html";
+        }
         return;
       }
       try {
         const doc = await db.collection("users").doc(firebaseUser.uid).get();
         const role = doc.exists ? (doc.data().role || "").toLowerCase() : "";
         if (role !== "admin") {
-          await auth.signOut();
-          alert("Access Denied: Admin privileges required.");
-          window.location.href = "index.html";
+          if (window.parent === window) {
+            await auth.signOut();
+            alert("Access Denied: Admin privileges required.");
+            window.location.href = "index.html";
+          }
           return;
         }
         const data = doc.data();
@@ -1046,10 +1270,10 @@
       const tbody = document.getElementById("usersTableBody");
       tbody.innerHTML = "";
 
-      const admins   = allUsers.filter(u => u.role === "admin").length;
-      const normals  = allUsers.filter(u => u.role === "user").length;
+      const admins = allUsers.filter(u => u.role === "admin").length;
+      const normals = allUsers.filter(u => u.role === "user").length;
       const trackers = allUsers.filter(u => u.role === "tracker").length;
-      document.getElementById("statTotalUsers").textContent  = `Total: ${allUsers.length}`;
+      document.getElementById("statTotalUsers").textContent = `Total: ${allUsers.length}`;
       document.getElementById("statTotalAdmins").textContent = `Admins: ${admins}`;
       document.getElementById("statTotalNormal").textContent = `Users: ${normals} | Trackers: ${trackers}`;
 
@@ -1063,9 +1287,9 @@
         const tr = document.createElement("tr");
         const createdAt = user.createdAt ? new Date(user.createdAt).toLocaleString() : "—";
         let roleBadge;
-        if (user.role === "admin")        roleBadge = `<span class="badge bg-success">Admin</span>`;
+        if (user.role === "admin") roleBadge = `<span class="badge bg-success">Admin</span>`;
         else if (user.role === "tracker") roleBadge = `<span class="badge bg-info text-dark">Tracker</span>`;
-        else                              roleBadge = `<span class="badge bg-primary">User</span>`;
+        else roleBadge = `<span class="badge bg-primary">User</span>`;
 
         tr.innerHTML = `
           <td class="fw-semibold">${escHtml(user.displayName || "—")}</td>
@@ -1129,7 +1353,7 @@
           btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span>`;
           try {
             await db.collection("users").doc(uid).delete();
-            try { await db.collection("assignments").doc(uid).delete(); } catch(_) {}
+            try { await db.collection("assignments").doc(uid).delete(); } catch (_) { }
             showUsersAlert(`User "${name}" deleted.`, "success");
             await loadUsers();
           } catch (err) {
@@ -1249,7 +1473,7 @@
         if (term && !matchName && !matchUser) return;
 
         shown++;
-        totalScanned   += op.scannedCount   || 0;
+        totalScanned += op.scannedCount || 0;
         totalRemaining += op.remainingCount || 0;
 
         const tr = document.createElement("tr");
@@ -1321,8 +1545,8 @@
         tbody.innerHTML = `<tr><td colspan="10" class="text-center text-muted py-4">No operations found.</td></tr>`;
       }
 
-      document.getElementById("opStatTotal").textContent     = `Operations: ${shown}`;
-      document.getElementById("opStatScanned").textContent   = `Total Scanned: ${totalScanned}`;
+      document.getElementById("opStatTotal").textContent = `Operations: ${shown}`;
+      document.getElementById("opStatScanned").textContent = `Total Scanned: ${totalScanned}`;
       document.getElementById("opStatRemaining").textContent = `Total Remaining: ${totalRemaining}`;
 
       tbody.querySelectorAll(".opsLoadBtn").forEach(btn => {
@@ -1390,17 +1614,17 @@
 
     function opsLoadOperation(op) {
       if (!confirm(`Load "${op.operationName}" into the main app? Current unsaved progress will be replaced.`)) return;
-      const keysToPreserve = ["appSettings","focusEnabled","voiceMode","searchColumnVisible","timestampColumnVisible","remainingNotesColumnVisible","ignoreFirstRows"];
+      const keysToPreserve = ["appSettings", "focusEnabled", "voiceMode", "searchColumnVisible", "timestampColumnVisible", "remainingNotesColumnVisible", "ignoreFirstRows"];
       const saved = {};
       keysToPreserve.forEach(k => saved[k] = localStorage.getItem(k));
       localStorage.clear();
       keysToPreserve.forEach(k => { if (saved[k] !== null) localStorage.setItem(k, saved[k]); });
-      localStorage.setItem("excelData",         op.excelData         || "[]");
-      localStorage.setItem("fileName",          op.operationName);
+      localStorage.setItem("excelData", op.excelData || "[]");
+      localStorage.setItem("fileName", op.operationName);
       localStorage.setItem("remainingProducts", op.remainingProducts || "[]");
-      let sp = []; try { sp = JSON.parse(op.scannedProducts || "[]"); sp.forEach(i => { i.source = i.source || "scan"; }); } catch(_) {}
-      localStorage.setItem("scannedProducts",   JSON.stringify(sp));
-      localStorage.setItem("remainingNotes",    op.remainingNotes    || "{}");
+      let sp = []; try { sp = JSON.parse(op.scannedProducts || "[]"); sp.forEach(i => { i.source = i.source || "scan"; }); } catch (_) { }
+      localStorage.setItem("scannedProducts", JSON.stringify(sp));
+      localStorage.setItem("remainingNotes", op.remainingNotes || "{}");
       if (op.editedBarcodes) localStorage.setItem("editedBarcodes", op.editedBarcodes);
       window.location.href = "index.html";
     }
@@ -1447,11 +1671,11 @@
       const wb = XLSX.utils.book_new();
       selected.forEach(op => {
         const driverName = getOpDriverDisplayName(op);
-        const pExcel    = safeParseJson(op.excelData, []);
-        const pScanned  = safeParseJson(op.scannedProducts, []);
+        const pExcel = safeParseJson(op.excelData, []);
+        const pScanned = safeParseJson(op.scannedProducts, []);
         const pRemaining = safeParseJson(op.remainingProducts, []);
-        const pNotes    = safeParseJson(op.remainingNotes, {});
-        const headers   = pExcel[0] || [];
+        const pNotes = safeParseJson(op.remainingNotes, {});
+        const headers = pExcel[0] || [];
 
         const sheetData = [
           ["--- SCANNED PRODUCTS ---"],
@@ -1501,7 +1725,7 @@
             if (!uniqueBarcodes.has(bc)) {
               uniqueBarcodes.add(bc);
               item.barcode = bc;
-              item.source  = item.source || "scan";
+              item.source = item.source || "scan";
               finalScanned.push(item);
             }
           });
@@ -1527,22 +1751,22 @@
         const mergedDriverName = getOpDriverDisplayName(firstOp) || (firstOp.driverName || firstOp.driver || "").toString().trim();
 
         await db.collection("savedOperations").add({
-          operationName:   newName,
-          timestamp:        Date.now(),
-          totalProducts:    baseExcel.length > 1 ? baseExcel.length - 1 : 0,
-          scannedCount:     finalScanned.length,
-          remainingCount:   mergedRemaining.length,
-          auditors:         Array.from(mergedAuditors),
-          driverId:         mergedDriverId || "",
-          driverName:       mergedDriverName || "",
-          driver:           mergedDriverName || "",
-          createdBy:        currentAdmin.uid,
-          createdByName:    currentAdmin.displayName,
-          excelData:        JSON.stringify(baseExcel),
-          scannedProducts:  JSON.stringify(finalScanned),
+          operationName: newName,
+          timestamp: Date.now(),
+          totalProducts: baseExcel.length > 1 ? baseExcel.length - 1 : 0,
+          scannedCount: finalScanned.length,
+          remainingCount: mergedRemaining.length,
+          auditors: Array.from(mergedAuditors),
+          driverId: mergedDriverId || "",
+          driverName: mergedDriverName || "",
+          driver: mergedDriverName || "",
+          createdBy: currentAdmin.uid,
+          createdByName: currentAdmin.displayName,
+          excelData: JSON.stringify(baseExcel),
+          scannedProducts: JSON.stringify(finalScanned),
           remainingProducts: JSON.stringify(mergedRemaining),
-          remainingNotes:   JSON.stringify(mergedNotes),
-          editedBarcodes:   selected[0].editedBarcodes || "[]"
+          remainingNotes: JSON.stringify(mergedNotes),
+          editedBarcodes: selected[0].editedBarcodes || "[]"
         });
 
         document.querySelectorAll(".ops-cb:checked").forEach(cb => cb.checked = false);
@@ -1555,11 +1779,11 @@
     });
 
     function exportSingleOperation(op) {
-      const pExcel     = safeParseJson(op.excelData, []);
-      const pScanned   = safeParseJson(op.scannedProducts, []);
+      const pExcel = safeParseJson(op.excelData, []);
+      const pScanned = safeParseJson(op.scannedProducts, []);
       const pRemaining = safeParseJson(op.remainingProducts, []);
-      const pNotes     = safeParseJson(op.remainingNotes, {});
-      const headers    = pExcel[0] || [];
+      const pNotes = safeParseJson(op.remainingNotes, {});
+      const headers = pExcel[0] || [];
       const wb = XLSX.utils.book_new();
 
       const driverName = getOpDriverDisplayName(op);
@@ -1627,14 +1851,14 @@
       if (input) input.value = privateSheetsBaseUrlAdmin;
       try {
         localStorage.setItem(ADMIN_PRIVATE_BASE_URL_STORAGE_KEY, privateSheetsBaseUrlAdmin);
-      } catch (_) {}
+      } catch (_) { }
     }
 
     function initAdminPrivateSheetsBaseUrlSetting() {
       let saved = "";
       try {
         saved = localStorage.getItem(ADMIN_PRIVATE_BASE_URL_STORAGE_KEY) || "";
-      } catch (_) {}
+      } catch (_) { }
       setAdminPrivateSheetsBaseUrl(saved || DEFAULT_PRIVATE_SHEETS_BASE_URL);
     }
 
@@ -1849,7 +2073,7 @@
               return parsed.names;
             }
           }
-        } catch (_) {}
+        } catch (_) { }
       }
       return null;
     }
@@ -1858,7 +2082,7 @@
       privateSheetsCacheAdmin = { ts: Date.now(), names: Array.isArray(names) ? names : [] };
       try {
         localStorage.setItem("adminPrivateSheetsCache", JSON.stringify(privateSheetsCacheAdmin));
-      } catch (_) {}
+      } catch (_) { }
     }
 
     async function fetchAdminPrivateSheetNames(forceRefresh = false) {
@@ -2032,7 +2256,7 @@
       if (!uid || !pendingAssignment) { alert("Select a user and load a file first."); return; }
 
       const btn = document.getElementById("assignSendBtn");
-      const sp  = document.getElementById("assignSendSpinner");
+      const sp = document.getElementById("assignSendSpinner");
       const errEl = document.getElementById("assignErrorAlert");
       const succEl = document.getElementById("assignSuccessAlert");
       errEl.classList.add("d-none");
@@ -2048,12 +2272,12 @@
 
       try {
         await db.collection("assignments").doc(uid).set({
-          assignedBy:  currentAdmin.displayName,
-          assignedAt:  Date.now(),
-          fileName:    pendingAssignment.fileName,
-          excelData:   JSON.stringify(pendingAssignment.excelData),
-          status:      "pending",
-          forceMode:   document.getElementById("forceAssignmentToggle").checked ? "force" : "normal",
+          assignedBy: currentAdmin.displayName,
+          assignedAt: Date.now(),
+          fileName: pendingAssignment.fileName,
+          excelData: JSON.stringify(pendingAssignment.excelData),
+          status: "pending",
+          forceMode: document.getElementById("forceAssignmentToggle").checked ? "force" : "normal",
           adminIgnoreFirstRows: adminIgnoreFirstRows,
           adminColumnFilter: adminColumnFilter,
           adminDeleteFirstRowsCount: adminDeleteFirstRowsCount,
@@ -2145,16 +2369,16 @@
     }
 
     document.getElementById("saveEditUserBtn").addEventListener("click", async () => {
-      const uid         = document.getElementById("editUserUid").value;
+      const uid = document.getElementById("editUserUid").value;
       const displayName = document.getElementById("editUserDisplayName").value.trim();
-      const email       = document.getElementById("editUserEmail").value.trim();
-      const phone       = document.getElementById("editUserPhone").value.trim();
-      const role        = document.getElementById("editUserRole").value;
+      const email = document.getElementById("editUserEmail").value.trim();
+      const phone = document.getElementById("editUserPhone").value.trim();
+      const role = document.getElementById("editUserRole").value;
       const restrictions = getRestrictionsFromModal();
       const newPassword = document.getElementById("editUserPassword").value;
-      const errorEl     = document.getElementById("editUserError");
-      const successEl   = document.getElementById("editUserSuccess");
-      const spinner     = document.getElementById("editUserSpinner");
+      const errorEl = document.getElementById("editUserError");
+      const successEl = document.getElementById("editUserSuccess");
+      const spinner = document.getElementById("editUserSpinner");
 
       errorEl.classList.add("d-none");
       successEl.classList.add("d-none");
@@ -2209,7 +2433,7 @@
 
     // ─── Utilities ────────────────────────────────────────────────────────────
     function escHtml(str) {
-      return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+      return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     }
 
     function safeParseJson(str, fallback) {
@@ -2284,7 +2508,7 @@
         const COLUMN_DISPLAY_NAMES = ["Description", "Bar code", "Work quantity", "Item number", "Location"];
 
         const headerRow = processedData[0];
-        const normalizedHeaders = headerRow.map(h => 
+        const normalizedHeaders = headerRow.map(h =>
           (h === null || h === undefined ? "" : h.toString().trim().toLowerCase())
         );
 
@@ -2334,4 +2558,5 @@
     }
   </script>
 </body>
+
 </html>
