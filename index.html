@@ -478,6 +478,35 @@
       margin-bottom: 2px;
       display: block;
     }
+
+    /* Hide ALL columns except the quantity column (col-2) for the scanned table */
+    body.scanned-compact-mode #productTableBody td:not(.col-2),
+    body.scanned-compact-mode #tableHeaders th:not(.col-2) {
+      display: none !important;
+    }
+
+    body.scanned-compact-mode #productTableBody .col-2,
+    body.scanned-compact-mode #tableHeaders .col-2 {
+      font-size: 15vw !important;
+      font-weight: 900 !important;
+      text-align: center !important;
+      vertical-align: middle !important;
+      padding: 3rem 1rem !important;
+      color: #0d6efd !important;
+      width: 100vw !important;
+      display: table-cell !important;
+    }
+    
+    body.scanned-compact-mode #scanSection .table-responsive {
+      border: none !important;
+      box-shadow: none !important;
+      overflow-x: hidden !important;
+    }
+    
+    body.scanned-compact-mode #scanSection .table {
+      width: 100% !important;
+      min-width: unset !important;
+    }
   </style>
 </head>
 
@@ -569,6 +598,12 @@
       <button id="toggleRemainingButton" class="btn btn-primary w-100" data-bs-toggle="tooltip"
         title="Show/Hide Remaining Products">
         <i class="bi bi-arrow-repeat"></i> Remaining Products
+      </button>
+    </div>
+
+    <div class="mb-3">
+      <button id="toggleCompactScannedBtn" class="btn btn-secondary w-100" data-bs-toggle="tooltip" title="Show Only Quantity in Tables">
+        <i class="bi bi-arrows-collapse"></i> Scanned: Quantity Only
       </button>
     </div>
 
@@ -1282,36 +1317,29 @@
       const toggleTimestampBtn = document.getElementById("toggleTimestampColumnButton");
       if (toggleTimestampBtn) toggleTimestampBtn.style.display = effective.hideTimestampColumn ? "none" : "";
 
+      updateFocusButtonText();
       updateVoiceButtonText();
-      applyTimestampColumnVisibility();
+      updateRemainingButtonVisibility();
       applySourceColumnVisibility();
       applyActionColumnVisibility();
+      applyTimestampColumnVisibility();
     }
 
     function updateVoiceButtonText() {
-      const button = document.getElementById("voiceToggleButton");
-      if (!button) return;
-
-      button.disabled = !!currentUserRestrictions.disableVoice;
-      const voiceMode = getVoiceMode();
-      if (voiceMode === "off") {
-        button.textContent = "Voice: Off";
-        button.classList.remove("btn-primary", "btn-success");
-        button.classList.add("btn-secondary");
-      } else if (voiceMode === "en") {
-        button.textContent = "Voice: English";
-        button.classList.remove("btn-secondary", "btn-success");
-        button.classList.add("btn-primary");
-      } else if (voiceMode === "ar") {
-        button.textContent = "Voice: Arabic";
-        button.classList.remove("btn-secondary", "btn-primary");
-        button.classList.add("btn-success");
+      const btn = document.getElementById("voiceToggleButton");
+      if (!btn) return;
+      const mode = getVoiceMode();
+      if (mode === "off") {
+        btn.innerHTML = '<i class="bi bi-volume-mute"></i> Voice: Off';
+      } else if (mode === "en") {
+        btn.innerHTML = '<i class="bi bi-volume-up"></i> Voice: English';
+      } else {
+        btn.innerHTML = '<i class="bi bi-volume-up-fill"></i> Voice: Arabic';
       }
-
+      
       if (currentUserRestrictions.disableVoice) {
-        button.textContent = "Voice: Disabled";
-        button.classList.remove("btn-primary", "btn-success");
-        button.classList.add("btn-secondary");
+         btn.innerHTML = '<i class="bi bi-volume-mute"></i> Voice: Disabled';
+         btn.disabled = true;
       }
     }
 
@@ -1328,74 +1356,29 @@
       }
     }
 
-    // --- Advanced Arabic Number Conversion ---
-    function numberToArabicWords(num) {
-      if (num === 0) return 'صفر';
-      const ones = ['', 'واحد', 'اثنين', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة'];
-      const tens = ['', 'عشرة', 'عشرين', 'ثلاثين', 'أربعين', 'خمسين', 'ستين', 'سبعين', 'ثمانين', 'تسعين'];
-      const hundreds = ['', 'مائة', 'مائتين', 'ثلاثمائة', 'أربعمائة', 'خمسمائة', 'ستمائة', 'سبعمائة', 'ثمانمائة', 'تسعمائة'];
-
-      const getTens = (n) => {
-        if (n < 10) return ones[n];
-        if (n === 10) return 'عشرة';
-        if (n === 11) return 'أحد عشر';
-        if (n === 12) return 'اثنا عشر';
-        if (n < 20) return ones[n - 10] + ' عشر';
-        const unit = n % 10;
-        const ten = Math.floor(n / 10);
-        if (unit === 0) return tens[ten];
-        return ones[unit] + ' و' + tens[ten];
-      };
-
-      const getHundreds = (n) => {
-        const hundred = Math.floor(n / 100);
-        const rest = n % 100;
-        let res = hundreds[hundred];
-        if (rest > 0) {
-          if (res !== '') res += ' و';
-          res += getTens(rest);
-        }
-        return res;
-      };
-
-      const getThousands = (n) => {
-        const thousand = Math.floor(n / 1000);
-        const rest = n % 1000;
-        let res = '';
-        if (thousand === 1) res = 'ألف';
-        else if (thousand === 2) res = 'ألفين';
-        else if (thousand > 2 && thousand < 11) res = getTens(thousand) + ' آلاف';
-        else if (thousand >= 11) res = getHundreds(thousand) + ' ألف';
-
-        if (rest > 0) {
-          if (res !== '') res += ' و';
-          res += getHundreds(rest);
-        }
-        return res;
-      };
-
-      if (num < 100) return getTens(num);
-      if (num < 1000) return getHundreds(num);
-      if (num < 1000000) return getThousands(num);
-      return num.toString();
-    }
-
-    function speakFeedback(arText, enText) {
+    function speakQuantity(quantity) {
       if (!("speechSynthesis" in window)) return;
       if (currentUserRestrictions.disableVoice) return;
       const voiceMode = getVoiceMode();
       if (voiceMode === "off") return;
-      
+      if (quantity === undefined || quantity === null) return;
+
+      const text = quantity.toString();
+
       const doSpeak = () => {
-        window.speechSynthesis.cancel();
-        const text = voiceMode === "ar" ? arText : (enText || arText);
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = voiceMode === "ar" ? "ar-EG" : "en-US";
-        utterance.rate = 1;
-        utterance.pitch = 1;
+
+        if (voiceMode === "ar") {
+          utterance.lang = "ar-SA";
+        } else {
+          utterance.lang = "en-US";
+        }
+
+        window.speechSynthesis.cancel();
         window.speechSynthesis.speak(utterance);
       };
 
+      // On the very first use, give the engine a short moment to initialize
       if (!speechInitialized) {
         initSpeech();
         setTimeout(doSpeak, 300);
@@ -1405,35 +1388,32 @@
     }
 
     function speakBarcodeNotFound() {
-      speakFeedback("الباركود غير موجود", "Barcode not found");
-    }
+      if (!("speechSynthesis" in window)) return;
+      if (currentUserRestrictions.disableVoice) return;
+      const voiceMode = getVoiceMode();
+      if (voiceMode === "off") return;
 
-    function speakDuplicateScan(quantity) {
-      if (quantity === undefined || quantity === null) return;
-      if (getVoiceMode() === "ar") {
-        const qtyWords = numberToArabicWords(Number(quantity));
-        speakFeedback(`${qtyWords} مكرر`, `${quantity} duplicate`);
-      } else {
-        speakFeedback(`${quantity} duplicate`, `${quantity} duplicate`);
-      }
-    }
+      const text =
+        voiceMode === "ar" ? "الباركود غير موجود" : "Barcode not found";
 
-    function speakSuccessfulScan(quantity) {
-      if (quantity === undefined || quantity === null) return;
-      if (getVoiceMode() === "ar") {
-        const qtyWords = numberToArabicWords(Number(quantity));
-        speakFeedback(qtyWords, quantity.toString());
-      } else {
-        speakFeedback(quantity.toString(), quantity.toString());
-      }
-    }
+      const doSpeak = () => {
+        const utterance = new SpeechSynthesisUtterance(text);
 
-    function speakQuantity(quantity) {
-      if (quantity === undefined || quantity === null) return;
-      if (getVoiceMode() === "ar") {
-        speakFeedback(numberToArabicWords(Number(quantity)), quantity.toString());
+        if (voiceMode === "ar") {
+          utterance.lang = "ar-SA";
+        } else {
+          utterance.lang = "en-US";
+        }
+
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
+      };
+
+      if (!speechInitialized) {
+        initSpeech();
+        setTimeout(doSpeak, 300);
       } else {
-        speakFeedback(quantity.toString(), quantity.toString());
+        doSpeak();
       }
     }
 
@@ -2124,6 +2104,98 @@
     document.addEventListener("DOMContentLoaded", () => {
       initFirebase();
 
+      // Listen for settings changes from other iframes/tabs
+      window.addEventListener('appSettingsChanged', (e) => {
+        const s = e.detail;
+        
+        // Update local variables
+        focusEnabled = s.focusEnabled;
+        remainingNotesColumnVisible = !!s.remainingNotesColumnVisible;
+        searchColumnVisible = s.searchColumnVisible !== false;
+        timestampColumnVisible = s.timestampColumnVisible !== false;
+        compactView = !!s.compactView;
+
+        // Apply column visibilities & DOM
+        updateRemainingButtonVisibility();
+        applySearchColumnVisibility();
+        applyTimestampColumnVisibility();
+
+        const btn = document.getElementById("toggleEmptyColumnButton");
+        if (btn) {
+          btn.innerHTML = remainingNotesColumnVisible
+            ? '<i class="bi bi-dash-square"></i> Remove Empty Column (Remaining)'
+            : '<i class="bi bi-plus-square"></i> Add Empty Column (Remaining)';
+        }
+
+        const searchColBtn = document.getElementById("toggleSearchColumnButton");
+        if (searchColBtn) {
+          searchColBtn.innerHTML = searchColumnVisible
+            ? '<i class="bi bi-search"></i> Hide Search Column (Remaining)'
+            : '<i class="bi bi-search"></i> Show Search Column (Remaining)';
+        }
+
+        if (excelData && excelData.length > 0) {
+          renderTableHeaders();
+          showRemainingProducts();
+        }
+
+        if (s.showReceivedQtyColumn !== false) {
+          document.body.classList.add("show-received-qty");
+        } else {
+          document.body.classList.remove("show-received-qty");
+        }
+
+        if (s.enableManualInput !== false) {
+          document.body.classList.add("enable-manual-input");
+        } else {
+          document.body.classList.remove("enable-manual-input");
+        }
+
+        if (s.fixedInputBar) {
+          applyFixedInputBar(true);
+        } else {
+          applyFixedInputBar(false);
+        }
+        
+        if (s.scannedCompactMode) {
+          document.body.classList.add("scanned-compact-mode");
+        } else {
+          document.body.classList.remove("scanned-compact-mode");
+        }
+
+        if (s.tabbedScanningMode) {
+          document.body.classList.add("tabbed-scanning-mode");
+          const bottomNav = document.getElementById("bottomTabNav");
+          if (bottomNav) bottomNav.classList.remove("d-none");
+          
+          // Switch to scan tab by default if it just got enabled
+          const scanSection = document.getElementById("scanSection");
+          const remainingSection = document.getElementById("remainingProductsSection");
+          if (scanSection && remainingSection) {
+             remainingSection.classList.add("d-none");
+             remainingSection.classList.remove("mt-5");
+             scanSection.classList.remove("d-none");
+             const btnScan = document.getElementById("tabScanBtn");
+             const btnRemaining = document.getElementById("tabRemainingBtn");
+             if (btnScan) btnScan.classList.add("active");
+             if (btnRemaining) btnRemaining.classList.remove("active");
+             document.body.classList.remove("showing-remaining-tab");
+          }
+        } else {
+          document.body.classList.remove("tabbed-scanning-mode");
+          const bottomNav = document.getElementById("bottomTabNav");
+          if (bottomNav) bottomNav.classList.add("d-none");
+          const remainingSection = document.getElementById("remainingProductsSection");
+          const scanSection = document.getElementById("scanSection");
+          if (remainingSection) {
+            remainingSection.classList.remove("d-none");
+            remainingSection.classList.add("mt-5");
+          }
+          if (scanSection) scanSection.classList.remove("d-none");
+          document.body.classList.remove("showing-remaining-tab");
+        }
+      });
+
       const loginOverlay = document.getElementById("loginOverlay");
       const loginBtn = document.getElementById("loginBtn");
       const loginEmail = document.getElementById("loginEmail");
@@ -2352,6 +2424,10 @@
         document.body.classList.add("enable-manual-input");
       }
 
+      updateFocusButtonText();
+      updateVoiceButtonText();
+      updateRemainingButtonVisibility();
+
       // Tabbed Scanning Mode Initialization
       if (currentSettings.tabbedScanningMode) {
         document.body.classList.add("tabbed-scanning-mode");
@@ -2450,6 +2526,20 @@
       document
         .getElementById("toggleRemainingButton")
         .addEventListener("click", toggleRemainingProducts);
+
+      document
+        .getElementById("toggleCompactScannedBtn")
+        .addEventListener("click", () => {
+          const isCompact = document.body.classList.toggle("scanned-compact-mode");
+          const btn = document.getElementById("toggleCompactScannedBtn");
+          if (isCompact) {
+            btn.innerHTML = '<i class="bi bi-arrows-expand"></i> Scanned: Show All';
+            btn.classList.replace("btn-secondary", "btn-warning");
+          } else {
+            btn.innerHTML = '<i class="bi bi-arrows-collapse"></i> Scanned: Quantity Only';
+            btn.classList.replace("btn-warning", "btn-secondary");
+          }
+        });
       document
         .getElementById("clearStorageButton")
         .addEventListener("click", clearLocalStorage);
@@ -2464,6 +2554,8 @@
           AppSettings.save({ focusEnabled }, firestoreDb, currentUser?.uid);
           updateFocusButtonText();
         });
+
+
       document
         .getElementById("voiceToggleButton")
         .addEventListener("click", async () => {
@@ -3192,6 +3284,15 @@
       excelData = excelData.map(normalizeRow);
       remainingProducts = [...excelData.slice(1)];
 
+      // --- CLEAR PREVIOUS SCANNED DATA ---
+      scannedBarcodes.clear();
+      remainingNotes = {};
+      const productTableBody = document.getElementById("productTableBody");
+      if (productTableBody) productTableBody.innerHTML = "";
+      localStorage.removeItem("scannedProducts");
+      localStorage.removeItem("remainingNotes");
+      // -----------------------------------
+
       localStorage.setItem("excelData", JSON.stringify(excelData));
 
       renderTableHeaders();
@@ -3278,10 +3379,12 @@
         // Add header cells to both tables
         const th = document.createElement("th");
         th.textContent = header;
+        th.classList.add("data-header", "col-" + index);
         tableHeaders.appendChild(th);
 
         const thRemaining = document.createElement("th");
         thRemaining.textContent = header;
+        thRemaining.classList.add("col-" + index);
         remainingTableHeaders.appendChild(thRemaining);
 
         // Add "Received Qty" immediately after Quantity column (index 2)
@@ -3421,13 +3524,6 @@
       }
     }
 
-    function normalizeBarcode(barcode) {
-      if (barcode === null || barcode === undefined) return '';
-      let str = String(barcode).trim();
-      let normalized = str.replace(/^0+/, '');
-      return normalized === '' && str.length > 0 ? '0' : normalized;
-    }
-
     function handleBarcodeSearch(event, forceSource = null) {
       if (isReadOnlyMode()) {
         if (event && event.target) event.target.value = "";
@@ -3435,25 +3531,23 @@
         return;
       }
 
-      let originalBarcode = event.target.value.toString().trim();
+      let barcode = event.target.value.toString().trim();
 
-      if (originalBarcode === "") return;
-
-      let normalizedBarcode = normalizeBarcode(originalBarcode);
+      if (barcode === "") return;
 
       // Clear any previous "not found" alert
       hideBarcodeNotFoundAlert();
 
-      console.log("Entered barcode:", originalBarcode, "Normalized:", normalizedBarcode);
+      console.log("Entered barcode:", barcode);
 
       if (inputMode === "search" && !forceSource) {
         let found = false;
-        const searchTarget = normalizedBarcode.toLowerCase();
+        const normalizedSearch = barcode.toLowerCase();
 
         // Search scanned table first
         for (let [key, row] of scannedBarcodes.entries()) {
           const itemNumberCell = row.cells[3] || row.cells[2] || row.cells[0]; // fallback
-          if (itemNumberCell && normalizeBarcode(itemNumberCell.textContent).toLowerCase() === searchTarget) {
+          if (itemNumberCell && itemNumberCell.textContent.trim().toLowerCase() === normalizedSearch) {
             row.scrollIntoView({ behavior: "smooth", block: "center" });
             row.classList.add("bg-info");
             setTimeout(() => row.classList.remove("bg-info"), 2000);
@@ -3468,7 +3562,7 @@
           Array.from(tableBody.rows).forEach(row => {
             if (found) return;
             const itemNumberCell = row.cells[3] || row.cells[2] || row.cells[0]; // fallback
-            if (itemNumberCell && normalizeBarcode(itemNumberCell.textContent).toLowerCase() === searchTarget) {
+            if (itemNumberCell && itemNumberCell.textContent.trim().toLowerCase() === normalizedSearch) {
               row.scrollIntoView({ behavior: "smooth", block: "center" });
               row.classList.add("bg-info");
               setTimeout(() => row.classList.remove("bg-info"), 2000);
@@ -3486,32 +3580,16 @@
       }
 
       // Check if there is an edited mapping for this barcode
-      let mappedBarcode = null;
-      for (let [key, val] of editedBarcodes.entries()) {
-        if (normalizeBarcode(key) === normalizedBarcode) {
-          mappedBarcode = val;
-          break;
-        }
-      }
-
-      if (mappedBarcode !== null) {
-        console.log("Using edited barcode mapping:", mappedBarcode);
-        normalizedBarcode = normalizeBarcode(mappedBarcode);
-        originalBarcode = mappedBarcode;
+      if (editedBarcodes.has(barcode)) {
+        const mapped = editedBarcodes.get(barcode);
+        console.log("Using edited barcode mapping:", mapped);
+        barcode = mapped;
       }
 
       // Check if the barcode is already scanned
-      let scannedMatch = null;
-      for (let [key, tr] of scannedBarcodes.entries()) {
-        if (normalizeBarcode(key) === normalizedBarcode) {
-          scannedMatch = { key, tr };
-          break;
-        }
-      }
-
-      if (scannedMatch) {
+      if (scannedBarcodes.has(barcode)) {
         clearNotFoundRows();
-        const row = scannedMatch.tr;
+        const row = scannedBarcodes.get(barcode);
 
         // Move to the bottom of the table without duplicating data
         const tableBody = document.getElementById("productTableBody");
@@ -3541,17 +3619,25 @@
           activeInput.focus();
         }
 
-        // Speak the duplicate message
+        // Speak the quantity again when the same code is entered
+        // Note: quantity cell is the 4th cell now due to the # column
         const quantityCell = row.querySelector("td:nth-child(4)");
         if (quantityCell) {
-          speakDuplicateScan(quantityCell.textContent);
+          const voiceMode = getVoiceMode();
+          let msg = quantityCell.textContent;
+          if (voiceMode === "en") {
+            msg += " repeated";
+          } else if (voiceMode === "ar") {
+            msg += " مكرر";
+          }
+          speakQuantity(msg);
         }
       } else {
         // Search for the barcode in the remaining products
         const rowIndex = remainingProducts.findIndex((row) =>
           row.some((cell) => {
             if (cell === null || cell === undefined) return false;
-            return cell.toString().trim().split("-").map((c) => normalizeBarcode(c)).includes(normalizedBarcode);
+            return cell.toString().trim().split("-").map((c) => c.trim()).includes(barcode.toString().trim());
           })
         );
 
@@ -3560,12 +3646,12 @@
         if (rowIndex >= 0) {
           clearNotFoundRows();
           const productRow = remainingProducts[rowIndex];
-          addRowToScannedTable(productRow, originalBarcode, true, forceSource || 'scan');
+          addRowToScannedTable(productRow, barcode, true, forceSource || 'scan');
           remainingProducts.splice(rowIndex, 1);
           showRemainingProducts();
         } else {
           showBarcodeNotFoundAlert();
-          addNotFoundRow(originalBarcode);
+          addNotFoundRow(barcode);
           speakBarcodeNotFound();
           const notFoundActive = document.body.classList.contains("fixed-input-bar")
             ? document.getElementById("fixedBarcodeInput")
@@ -3607,7 +3693,7 @@
       row.forEach((cell, index) => {
         const td = document.createElement("td");
         td.textContent = cell;
-        td.classList.add("data-cell");
+        td.classList.add("data-cell", "col-" + index);
 
         if (index === 2) {
           td.classList.add("highlight-column");
@@ -3704,7 +3790,7 @@
 
       if (speak) {
         const quantity = row[2];
-        speakSuccessfulScan(quantity);
+        speakQuantity(quantity);
       }
 
       if (!skipSave) {
@@ -3753,6 +3839,7 @@
         row.forEach((cell, i) => {
           const td = document.createElement("td");
           td.textContent = cell;
+          td.classList.add("col-" + i);
 
           if (i === 2) {
             td.classList.add("highlight-column");

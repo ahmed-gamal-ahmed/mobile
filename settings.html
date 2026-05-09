@@ -620,6 +620,7 @@
               <input class="form-check-input" type="checkbox" id="settingsFitTableToScreen" role="switch">
             </div>
           </div>
+
         </div>
 
         <!-- ══ CARD 5: Navigation ══ -->
@@ -696,9 +697,9 @@
       document.getElementById("settingsUseTalabatLink").checked = s.useTalabatLink;
 
       // Legacy fallback settings from localStorage (since not tracked in AppSettings) restored)
-      document.getElementById("settingsNotesColumn").checked = localStorage.getItem("remainingNotesColumnVisible") === "true";
-      document.getElementById("settingsSearchColumn").checked = localStorage.getItem("searchColumnVisible") === "true";
-      document.getElementById("settingsTimestampColumn").checked = localStorage.getItem("timestampColumnVisible") === "true";
+      document.getElementById("settingsNotesColumn").checked = !!s.remainingNotesColumnVisible;
+      document.getElementById("settingsSearchColumn").checked = s.searchColumnVisible !== false;
+      document.getElementById("settingsTimestampColumn").checked = s.timestampColumnVisible !== false;
 
       // Fit Table to Screen
       document.getElementById("settingsFitTableToScreen").checked = !!s.fitTableToScreen;
@@ -803,16 +804,13 @@
 
     // 🔥 Wire up: Legacy Table Options 🔥───────────────────────────────────────
     document.getElementById("settingsNotesColumn").addEventListener("change", (e) => {
-      localStorage.setItem("remainingNotesColumnVisible", e.target.checked);
-      showSavedToast();
+      updateSettingAndSave("remainingNotesColumnVisible", e.target.checked);
     });
     document.getElementById("settingsSearchColumn").addEventListener("change", (e) => {
-      localStorage.setItem("searchColumnVisible", e.target.checked);
-      showSavedToast();
+      updateSettingAndSave("searchColumnVisible", e.target.checked);
     });
     document.getElementById("settingsTimestampColumn").addEventListener("change", (e) => {
-      localStorage.setItem("timestampColumnVisible", e.target.checked);
-      showSavedToast();
+      updateSettingAndSave("timestampColumnVisible", e.target.checked);
     });
 
     // 🔥 Wire up: Fit Table to Screen 🔥
