@@ -30,7 +30,8 @@
     remainingNotesColumnVisible: false,
     searchColumnVisible: true,
     timestampColumnVisible: true,
-    compactView: false
+    compactView: false,
+    scannedCompactMode: false
   };
 
   /* ── CSS value maps ──────────────────────────────────────────────────── */
@@ -55,9 +56,11 @@
     // Apply fit-table-to-screen class as soon as DOM is available
     if (document.body) {
       document.body.classList.toggle('fit-table-screen', !!s.fitTableToScreen);
+      document.body.classList.toggle('scanned-compact-mode', !!s.scannedCompactMode);
     } else {
       document.addEventListener('DOMContentLoaded', function () {
         document.body.classList.toggle('fit-table-screen', !!s.fitTableToScreen);
+        document.body.classList.toggle('scanned-compact-mode', !!s.scannedCompactMode);
       }, { once: true });
     }
   }
@@ -79,11 +82,15 @@
      */
     save: async function (newSettings, db, uid) {
       Object.assign(_settings, newSettings);
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(_settings));
+      _apply(_settings);
+      // Dispatch event so the local window also reacts (storage event only fires for OTHER windows)
+      window.dispatchEvent(new CustomEvent('appSettingsChanged', { detail: _settings }));
+      
+      // Fire-and-forget Firestore write (non-blocking for the UI)
       if (db && uid) {
         await this._writeFirestore(db, uid, _settings);
       }
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(_settings));
-      _apply(_settings);
     },
 
     /**
@@ -370,4 +377,22 @@
       this.translationObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
     }
   };
+
+  /* ── Listen for changes from other tabs/iframes ──────────────────────── */
+  window.addEventListener('storage', function (e) {
+    if (e.key === SETTINGS_KEY && e.newValue) {
+      try {
+        const newSettings = JSON.parse(e.newValue);
+        Object.assign(_settings, newSettings);
+        _apply(_settings);
+        if (window.AppSettings.applyTranslations) {
+          window.AppSettings.applyTranslations();
+        }
+        window.dispatchEvent(new CustomEvent('appSettingsChanged', { detail: _settings }));
+      } catch (err) {
+        console.warn('[AppSettings] storage event parse failed:', err);
+      }
+    }
+  });
+
 })();
