@@ -1722,8 +1722,9 @@
           (op.auditors || ["Unknown"]).forEach(a => mergedAuditors.add(a));
           safeParseJson(op.scannedProducts, []).forEach(item => {
             const bc = String(item.barcode).trim();
-            if (!uniqueBarcodes.has(bc)) {
-              uniqueBarcodes.add(bc);
+            const normBc = normalizeBarcode(bc);
+            if (!uniqueBarcodes.has(normBc)) {
+              uniqueBarcodes.add(normBc);
               item.barcode = bc;
               item.source = item.source || "scan";
               finalScanned.push(item);
@@ -1738,12 +1739,17 @@
         let mergedRemaining = baseExcel.slice(1).map(row => row.map(c => (c !== null && c !== undefined) ? String(c).trim() : ""));
         const origLen = mergedRemaining.length;
         finalScanned.forEach(({ barcode }) => {
-          const idx = mergedRemaining.findIndex(row => row.some(cell => String(cell).split("-").map(c => c.trim()).includes(String(barcode).trim())));
+          const normalizedSearch = normalizeBarcode(barcode);
+          const idx = mergedRemaining.findIndex(row => row.some(cell => {
+            const cellParts = String(cell).split("-").map(c => c.trim());
+            return cellParts.includes(String(barcode).trim()) ||
+                   cellParts.some(part => normalizeBarcode(part) === normalizedSearch);
+          }));
           if (idx >= 0) mergedRemaining.splice(idx, 1);
         });
         if (origLen !== finalScanned.length + mergedRemaining.length) {
           mergedRemaining = baseExcel.slice(1).map(r => r.map(c => (c !== null && c !== undefined) ? String(c).trim() : ""))
-            .filter(row => !row.some(cell => String(cell).split("-").map(c => c.trim()).some(p => uniqueBarcodes.has(p))));
+            .filter(row => !row.some(cell => String(cell).split("-").map(c => c.trim()).some(p => uniqueBarcodes.has(p) || uniqueBarcodes.has(normalizeBarcode(p)))));
         }
 
         const firstOp = selected[0];
@@ -2439,6 +2445,15 @@
     function safeParseJson(str, fallback) {
       try { return JSON.parse(str || JSON.stringify(fallback)); }
       catch (_) { return fallback; }
+    }
+
+    /**
+     * Normalizes a barcode for comparison by converting to string, trimming
+     * whitespace, and stripping leading zeros. Handles Excel/Sheets auto-formatting.
+     * Only used internally for matching — original values are preserved for display.
+     */
+    function normalizeBarcode(barcode) {
+      return String(barcode == null ? '' : barcode).trim().replace(/^0+/, '') || '0';
     }
 
     function processAssignmentData(parsedData, options = {}) {

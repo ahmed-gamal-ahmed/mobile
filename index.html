@@ -3197,6 +3197,17 @@
       return row.map(cell => (cell === null || cell === undefined ? "" : cell.toString().trim()));
     }
 
+    /**
+     * Normalizes a barcode for comparison by converting to string, trimming
+     * whitespace, and stripping leading zeros. This handles the common issue
+     * where Excel, CSV, or Google Sheets auto-format barcode columns as numbers,
+     * removing leading zeros (e.g. "0123456789" becomes "123456789").
+     * Only used internally for matching — original values are preserved for display.
+     */
+    function normalizeBarcode(barcode) {
+      return String(barcode == null ? '' : barcode).trim().replace(/^0+/, '') || '0';
+    }
+
     const REQUIRED_COLUMNS = [
       "description",
       "bar code",
@@ -3579,17 +3590,30 @@
         return;
       }
 
-      // Check if there is an edited mapping for this barcode
+      // Check if there is an edited mapping for this barcode (exact match first, then normalized)
       if (editedBarcodes.has(barcode)) {
         const mapped = editedBarcodes.get(barcode);
         console.log("Using edited barcode mapping:", mapped);
         barcode = mapped;
+      } else {
+        // Try normalized lookup for edited barcodes (handles leading-zero mismatch)
+        const normalizedInput = normalizeBarcode(barcode);
+        for (const [origKey, mappedVal] of editedBarcodes.entries()) {
+          if (normalizeBarcode(origKey) === normalizedInput) {
+            console.log("Using normalized edited barcode mapping:", origKey, "→", mappedVal);
+            barcode = mappedVal;
+            break;
+          }
+        }
       }
 
-      // Check if the barcode is already scanned
-      if (scannedBarcodes.has(barcode)) {
+      // Normalize barcode for matching (strips leading zeros for comparison)
+      const normalizedScanBarcode = normalizeBarcode(barcode);
+
+      // Check if the barcode is already scanned (using normalized key)
+      if (scannedBarcodes.has(normalizedScanBarcode)) {
         clearNotFoundRows();
-        const row = scannedBarcodes.get(barcode);
+        const row = scannedBarcodes.get(normalizedScanBarcode);
 
         // Move to the bottom of the table without duplicating data
         const tableBody = document.getElementById("productTableBody");
@@ -3637,7 +3661,10 @@
         const rowIndex = remainingProducts.findIndex((row) =>
           row.some((cell) => {
             if (cell === null || cell === undefined) return false;
-            return cell.toString().trim().split("-").map((c) => c.trim()).includes(barcode.toString().trim());
+            const cellParts = cell.toString().trim().split("-").map((c) => c.trim());
+            // Try exact match first, then normalized match (handles leading-zero differences)
+            return cellParts.includes(barcode.toString().trim()) ||
+                   cellParts.some(part => normalizeBarcode(part) === normalizedScanBarcode);
           })
         );
 
@@ -3786,7 +3813,7 @@
         }, 1000);
       }
 
-      scannedBarcodes.set(barcode, tr);
+      scannedBarcodes.set(normalizeBarcode(barcode), tr);
 
       if (speak) {
         const quantity = row[2];
@@ -3803,7 +3830,7 @@
       remainingProducts.push(dataRow);
       showRemainingProducts();
 
-      scannedBarcodes.delete(barcode);
+      scannedBarcodes.delete(normalizeBarcode(barcode));
       row.parentElement.removeChild(row);
       reindexScannedTable();
 
@@ -4757,10 +4784,11 @@
 
           const opScanned = JSON.parse(op.scannedProducts || "[]");
           opScanned.forEach(item => {
-            const normalizedBarcode = String(item.barcode).trim();
-            if (!uniqueBarcodes.has(normalizedBarcode)) {
-              uniqueBarcodes.add(normalizedBarcode);
-              item.barcode = normalizedBarcode; // Normalize it dynamically
+            const trimmedBarcode = String(item.barcode).trim();
+            const normBarcode = normalizeBarcode(trimmedBarcode);
+            if (!uniqueBarcodes.has(normBarcode)) {
+              uniqueBarcodes.add(normBarcode);
+              item.barcode = trimmedBarcode; // Keep trimmed original for display
               item.source = item.source || 'scan'; // Default legacy elements dynamically
               finalScannedArray.push(item);
             }
@@ -4792,11 +4820,13 @@
         // Drain the remaining products dynamically using precise logic
         finalScannedArray.forEach(({ barcode }) => {
           const searchBarcode = String(barcode).trim();
+          const normalizedSearch = normalizeBarcode(searchBarcode);
           const rowIndex = mergedRemainingProducts.findIndex((row) =>
             row.some((cell) => {
               if (cell === null || cell === undefined) return false;
               const cellParts = String(cell).split("-").map((c) => c.trim());
-              return cellParts.includes(searchBarcode);
+              return cellParts.includes(searchBarcode) ||
+                     cellParts.some(part => normalizeBarcode(part) === normalizedSearch);
             })
           );
 
@@ -4817,7 +4847,7 @@
               const hasScannedMatch = row.some((cell) => {
                 if (cell === null || cell === undefined) return false;
                 const cellParts = String(cell).split("-").map((c) => c.trim());
-                return cellParts.some(part => uniqueBarcodes.has(part));
+                return cellParts.some(part => uniqueBarcodes.has(part) || uniqueBarcodes.has(normalizeBarcode(part)));
               });
               return !hasScannedMatch;
             });
