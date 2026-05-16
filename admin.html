@@ -166,6 +166,20 @@
       }
     }
 
+    body.pc-view .table-responsive .table {
+      min-width: 0 !important;
+    }
+
+    body.pc-view .table td,
+    body.pc-view .table th {
+      white-space: normal;
+    }
+
+    body.pc-view button,
+    body.pc-view .btn {
+      min-height: 38px;
+    }
+
     /* ── Buttons ── */
     button, .btn {
       min-height: 40px;
@@ -1738,18 +1752,28 @@
 
         let mergedRemaining = baseExcel.slice(1).map(row => row.map(c => (c !== null && c !== undefined) ? String(c).trim() : ""));
         const origLen = mergedRemaining.length;
+        let mergeBarcodeColIndex = 1;
+        if (baseExcel.length > 0) {
+          const mergeHeaders = baseExcel[0].map(h => (h || "").toString().toLowerCase());
+          const mergeIdx = mergeHeaders.findIndex(h => h.includes("barcode") || h.includes("bar code") || h.includes("باركود") || h.includes("upc") || h.includes("ean"));
+          if (mergeIdx !== -1) mergeBarcodeColIndex = mergeIdx;
+        }
         finalScanned.forEach(({ barcode }) => {
           const normalizedSearch = normalizeBarcode(barcode);
-          const idx = mergedRemaining.findIndex(row => row.some(cell => {
-            const cellParts = String(cell).split("-").map(c => c.trim());
-            return cellParts.includes(String(barcode).trim()) ||
-                   cellParts.some(part => normalizeBarcode(part) === normalizedSearch);
-          }));
+          const idx = mergedRemaining.findIndex(row => {
+            const cellValue = row[mergeBarcodeColIndex];
+            if (cellValue === null || cellValue === undefined) return false;
+            return normalizeBarcode(cellValue) === normalizedSearch;
+          });
           if (idx >= 0) mergedRemaining.splice(idx, 1);
         });
         if (origLen !== finalScanned.length + mergedRemaining.length) {
           mergedRemaining = baseExcel.slice(1).map(r => r.map(c => (c !== null && c !== undefined) ? String(c).trim() : ""))
-            .filter(row => !row.some(cell => String(cell).split("-").map(c => c.trim()).some(p => uniqueBarcodes.has(p) || uniqueBarcodes.has(normalizeBarcode(p)))));
+            .filter(row => {
+              const cellValue = row[mergeBarcodeColIndex];
+              if (cellValue === null || cellValue === undefined) return true;
+              return !uniqueBarcodes.has(normalizeBarcode(cellValue));
+            });
         }
 
         const firstOp = selected[0];
@@ -2453,7 +2477,7 @@
      * Only used internally for matching — original values are preserved for display.
      */
     function normalizeBarcode(barcode) {
-      return String(barcode == null ? '' : barcode).trim().replace(/^0+/, '') || '0';
+      return String(barcode).trim().replace(/^0+/, '');
     }
 
     function processAssignmentData(parsedData, options = {}) {

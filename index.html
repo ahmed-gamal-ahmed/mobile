@@ -286,6 +286,33 @@
       }
     }
 
+    /* ── PC View (desktop-style layout on mobile) ─────────────────── */
+    body.pc-view .responsive-container {
+      max-width: 100%;
+    }
+
+    body.pc-view .table-responsive .table {
+      min-width: 0 !important;
+    }
+
+    body.pc-view .table td,
+    body.pc-view .table th {
+      white-space: normal;
+    }
+
+    body.pc-view button,
+    body.pc-view .btn,
+    body.pc-view input[type="button"],
+    body.pc-view input[type="submit"] {
+      min-height: 38px;
+      min-width: auto;
+    }
+
+    body.pc-view #openSidebarButton {
+      padding: 10px 12px;
+      font-size: 18px;
+    }
+
     /* ── Fit Table to Screen mode (Legacy) ────────────────────────── */
     body.fit-table-screen .table-responsive {
       overflow-x: visible !important;
@@ -604,6 +631,13 @@
     <div class="mb-3">
       <button id="toggleCompactScannedBtn" class="btn btn-secondary w-100" data-bs-toggle="tooltip" title="Show Only Quantity in Tables">
         <i class="bi bi-arrows-collapse"></i> Scanned: Quantity Only
+      </button>
+    </div>
+
+    <div class="mb-3">
+      <button id="togglePcViewBtn" class="btn btn-outline-light w-100" data-bs-toggle="tooltip"
+        title="Switch to desktop-style layout (wider tables, PC viewport)">
+        <i class="bi bi-display"></i> <span id="togglePcViewBtnLabel">PC View: Off</span>
       </button>
     </div>
 
@@ -1165,7 +1199,28 @@
     function getFormattedTimestamp() {
       const now = new Date();
       const pad = (n) => n.toString().padStart(2, '0');
-      return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+      return `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    }
+
+    function formatTimestampForDisplay(timestamp) {
+      const raw = String(timestamp == null ? "" : timestamp).trim();
+      if (!raw) return getFormattedTimestamp();
+
+      // Already time-only (HH:MM or HH:MM:SS)
+      if (/^\d{2}:\d{2}(:\d{2})?$/.test(raw)) return raw;
+
+      // Legacy values may contain date + time ("YYYY-MM-DD HH:mm:ss")
+      const legacyTimeMatch = raw.match(/\b(\d{2}:\d{2}:\d{2})\b/);
+      if (legacyTimeMatch) return legacyTimeMatch[1];
+
+      // Final fallback for Date-like strings
+      const parsed = new Date(raw);
+      if (!Number.isNaN(parsed.getTime())) {
+        const pad = (n) => n.toString().padStart(2, '0');
+        return `${pad(parsed.getHours())}:${pad(parsed.getMinutes())}:${pad(parsed.getSeconds())}`;
+      }
+
+      return raw;
     }
 
     function applyTimestampColumnVisibility() {
@@ -1272,6 +1327,20 @@
       if (!button) return;
       const isTabbedMode = !!AppSettings.get().tabbedScanningMode;
       button.style.display = isTabbedMode ? "none" : "";
+    }
+
+    function updatePcViewButton() {
+      const btn = document.getElementById("togglePcViewBtn");
+      const label = document.getElementById("togglePcViewBtnLabel");
+      if (!btn || !label) return;
+
+      const dict = window.AppSettings.getDictionary();
+      const on = !!AppSettings.get().pcView;
+      label.textContent = on
+        ? (dict["PC View: On"] || "PC View: On")
+        : (dict["PC View: Off"] || "PC View: Off");
+      btn.classList.toggle("btn-light", on);
+      btn.classList.toggle("btn-outline-light", !on);
     }
 
     function applySourceColumnVisibility() {
@@ -1582,6 +1651,7 @@
             scannedProducts: localStorage.getItem("scannedProducts") || "[]",
             remainingProducts: localStorage.getItem("remainingProducts") || "[]",
             remainingNotes: localStorage.getItem("remainingNotes") || "{}",
+            editedBarcodes: localStorage.getItem("editedBarcodes") || "[]",
             savedAt: Date.now()
           }
         };
@@ -1629,6 +1699,7 @@
         localStorage.setItem("scannedProducts", lastSession.scannedProducts || "[]");
         localStorage.setItem("remainingProducts", lastSession.remainingProducts || "[]");
         localStorage.setItem("remainingNotes", lastSession.remainingNotes || "{}");
+        localStorage.setItem("editedBarcodes", lastSession.editedBarcodes || "[]");
 
         console.log("Session restored from Firestore.");
         return true;
@@ -2117,6 +2188,7 @@
 
         // Apply column visibilities & DOM
         updateRemainingButtonVisibility();
+        updatePcViewButton();
         applySearchColumnVisibility();
         applyTimestampColumnVisibility();
 
@@ -2319,6 +2391,7 @@
           // Apply translations with the loaded settings
           AppSettings.applyTranslations();
           updateRemainingButtonVisibility();
+          updatePcViewButton();
           applyUserRestrictions();
 
           // Start assignment listener
@@ -2540,6 +2613,16 @@
             btn.classList.replace("btn-warning", "btn-secondary");
           }
         });
+
+      document.getElementById("togglePcViewBtn").addEventListener("click", async () => {
+        const nextPcView = !AppSettings.get().pcView;
+        await AppSettings.save({ pcView: nextPcView }, firestoreDb, currentUser?.uid);
+        updatePcViewButton();
+        document.getElementById("sidebar").classList.remove("open");
+        document.body.classList.remove("sidebar-open");
+      });
+      updatePcViewButton();
+
       document
         .getElementById("clearStorageButton")
         .addEventListener("click", clearLocalStorage);
@@ -3205,7 +3288,19 @@
      * Only used internally for matching — original values are preserved for display.
      */
     function normalizeBarcode(barcode) {
-      return String(barcode == null ? '' : barcode).trim().replace(/^0+/, '') || '0';
+      return String(barcode).trim().replace(/^0+/, '');
+    }
+
+    function getNormalizedBarcodeMappings() {
+      const mappings = new Map();
+      for (const [original, edited] of editedBarcodes.entries()) {
+        const normalizedOriginal = normalizeBarcode(original);
+        const normalizedEdited = normalizeBarcode(edited);
+        if (normalizedOriginal && normalizedEdited) {
+          mappings.set(normalizedOriginal, normalizedEdited);
+        }
+      }
+      return mappings;
     }
 
     const REQUIRED_COLUMNS = [
@@ -3535,6 +3630,41 @@
       }
     }
 
+    /**
+     * Returns the index of the barcode column in the current excelData headers.
+     * Falls back to column 1 (standard "Bar code" position) if not found.
+     */
+    function getBarcodeColumnIndex() {
+      if (!AppSettings.get().columnFilterEnabled && typeof excelData !== 'undefined' && excelData.length > 0) {
+        const hs = excelData[0].map(h => (h || "").toString().toLowerCase());
+        const idx = hs.findIndex(h => h.includes("barcode") || h.includes("bar code") || h.includes("باركود") || h.includes("upc") || h.includes("ean"));
+        return idx !== -1 ? idx : 1;
+      }
+      return 1; // When column filter is ON, Bar code is always at index 1
+    }
+
+    /**
+     * Finds a product in remainingProducts using EXACT normalized barcode matching.
+     * Returns the index of the matched product, or -1 if not found.
+     */
+    function findProductByExactBarcode(normalizedBarcode) {
+      const barcodeColIndex = getBarcodeColumnIndex();
+      return remainingProducts.findIndex((row) => {
+        const cellValue = row[barcodeColIndex];
+        if (cellValue === null || cellValue === undefined) return false;
+        return normalizeBarcode(cellValue) === normalizedBarcode;
+      });
+    }
+
+    /**
+     * Resolves a scanned barcode through barcode mappings.
+     * Returns the final barcode to use for product lookup.
+     */
+    function resolveBarcodeThroughMappings(normalizedInputBarcode) {
+      const mapping = getNormalizedBarcodeMappings();
+      return mapping.get(normalizedInputBarcode) || normalizedInputBarcode;
+    }
+
     function handleBarcodeSearch(event, forceSource = null) {
       if (isReadOnlyMode()) {
         if (event && event.target) event.target.value = "";
@@ -3542,18 +3672,18 @@
         return;
       }
 
-      let barcode = event.target.value.toString().trim();
+      const scannedBarcode = event.target.value.toString().trim();
 
-      if (barcode === "") return;
+      if (scannedBarcode === "") return;
 
       // Clear any previous "not found" alert
       hideBarcodeNotFoundAlert();
 
-      console.log("Entered barcode:", barcode);
+      console.log("Entered barcode:", scannedBarcode);
 
       if (inputMode === "search" && !forceSource) {
         let found = false;
-        const normalizedSearch = barcode.toLowerCase();
+        const normalizedSearch = scannedBarcode.toLowerCase();
 
         // Search scanned table first
         for (let [key, row] of scannedBarcodes.entries()) {
@@ -3590,30 +3720,24 @@
         return;
       }
 
-      // Check if there is an edited mapping for this barcode (exact match first, then normalized)
-      if (editedBarcodes.has(barcode)) {
-        const mapped = editedBarcodes.get(barcode);
-        console.log("Using edited barcode mapping:", mapped);
-        barcode = mapped;
-      } else {
-        // Try normalized lookup for edited barcodes (handles leading-zero mismatch)
-        const normalizedInput = normalizeBarcode(barcode);
-        for (const [origKey, mappedVal] of editedBarcodes.entries()) {
-          if (normalizeBarcode(origKey) === normalizedInput) {
-            console.log("Using normalized edited barcode mapping:", origKey, "→", mappedVal);
-            barcode = mappedVal;
-            break;
-          }
-        }
-      }
+      // Normalize first, then resolve exact mapping.
+      const normalizedScanBarcode = normalizeBarcode(scannedBarcode);
+      const mappedBarcode = resolveBarcodeThroughMappings(normalizedScanBarcode);
 
-      // Normalize barcode for matching (strips leading zeros for comparison)
-      const normalizedScanBarcode = normalizeBarcode(barcode);
+      // Debug logging
+      console.log({
+        scannedBarcode,
+        normalizedBarcode: normalizedScanBarcode,
+        mappedBarcode,
+        matchedProduct: null,
+        productIndex: -1,
+        alreadyScanned: scannedBarcodes.has(mappedBarcode)
+      });
 
-      // Check if the barcode is already scanned (using normalized key)
-      if (scannedBarcodes.has(normalizedScanBarcode)) {
+      // Check if the barcode is already scanned (using mapped normalized key)
+      if (scannedBarcodes.has(mappedBarcode)) {
         clearNotFoundRows();
-        const row = scannedBarcodes.get(normalizedScanBarcode);
+        const row = scannedBarcodes.get(mappedBarcode);
 
         // Move to the bottom of the table without duplicating data
         const tableBody = document.getElementById("productTableBody");
@@ -3657,28 +3781,28 @@
           speakQuantity(msg);
         }
       } else {
-        // Search for the barcode in the remaining products
-        const rowIndex = remainingProducts.findIndex((row) =>
-          row.some((cell) => {
-            if (cell === null || cell === undefined) return false;
-            const cellParts = cell.toString().trim().split("-").map((c) => c.trim());
-            // Try exact match first, then normalized match (handles leading-zero differences)
-            return cellParts.includes(barcode.toString().trim()) ||
-                   cellParts.some(part => normalizeBarcode(part) === normalizedScanBarcode);
-          })
-        );
+        // Search for the barcode in the remaining products using EXACT normalized matching
+        const rowIndex = findProductByExactBarcode(mappedBarcode);
 
-        console.log("Row index found:", rowIndex);
+        // Debug logging
+        console.log({
+          scannedBarcode,
+          normalizedBarcode: normalizedScanBarcode,
+          mappedBarcode,
+          matchedProductIndex: rowIndex,
+          matchedProduct: rowIndex >= 0 ? remainingProducts[rowIndex] : null,
+          productIndex: rowIndex
+        });
 
         if (rowIndex >= 0) {
           clearNotFoundRows();
           const productRow = remainingProducts[rowIndex];
-          addRowToScannedTable(productRow, barcode, true, forceSource || 'scan');
+          addRowToScannedTable(productRow, mappedBarcode, true, forceSource || 'scan');
           remainingProducts.splice(rowIndex, 1);
           showRemainingProducts();
         } else {
           showBarcodeNotFoundAlert();
-          addNotFoundRow(barcode);
+          addNotFoundRow(scannedBarcode);
           speakBarcodeNotFound();
           const notFoundActive = document.body.classList.contains("fixed-input-bar")
             ? document.getElementById("fixedBarcodeInput")
@@ -3751,7 +3875,7 @@
         }
       });
 
-      if (!timestamp) timestamp = getFormattedTimestamp();
+      timestamp = formatTimestampForDisplay(timestamp);
       tr.dataset.timestamp = timestamp;
       tr.dataset.source = source;
 
@@ -3836,6 +3960,30 @@
 
       saveProgress();
       updateStatistics();
+    }
+
+    function removeExactRemainingProductRow(selectedRow) {
+      const byReferenceIndex = remainingProducts.indexOf(selectedRow);
+      if (byReferenceIndex >= 0) {
+        return {
+          product: remainingProducts.splice(byReferenceIndex, 1)[0],
+          index: byReferenceIndex
+        };
+      }
+
+      // Fallback without barcode search: use full normalized row signature.
+      const selectedSignature = JSON.stringify(normalizeRow(selectedRow));
+      const signatureIndex = remainingProducts.findIndex(productRow =>
+        JSON.stringify(normalizeRow(productRow)) === selectedSignature
+      );
+      if (signatureIndex >= 0) {
+        return {
+          product: remainingProducts.splice(signatureIndex, 1)[0],
+          index: signatureIndex
+        };
+      }
+
+      return null;
     }
 
     function toggleRemainingProducts() {
@@ -3987,29 +4135,28 @@
         if (isReadOnly) moveToScannedButton.disabled = true;
         moveToScannedButton.addEventListener("click", () => {
           if (isReadOnlyMode()) return;
-          // When column filter is ON: Bar code is always at index 1
-          // When column filter is OFF: dynamically find the barcode column from headers
-          let barcodeColIndex = 1;
-          if (!AppSettings.get().columnFilterEnabled && typeof excelData !== 'undefined' && excelData.length > 0) {
-            const hs = excelData[0].map(h => (h || "").toString().toLowerCase());
-            barcodeColIndex = hs.findIndex(h => h.includes("barcode") || h.includes("bar code") || h.includes("باركود") || h.includes("upc") || h.includes("ean"));
-            if (barcodeColIndex === -1) barcodeColIndex = 0;
-          }
 
-          let primaryBarcode = String(row[barcodeColIndex] || row[1] || row[0] || "").split("-")[0].trim();
-          if (primaryBarcode) {
-            const input = document.getElementById("barcodeInput");
-            if (input) {
-              const oldVal = input.value;
-              input.value = primaryBarcode;
-              // Mock a keypress event if needed, but we can just call handleBarcodeSearch directly
-              // We'll pass a mock event representing the Enter key and force 'move' source
-              handleBarcodeSearch({ target: input, key: "Enter" }, 'move');
-              // We can restore the input later if desired, handleBarcodeSearch clears it
-            } else {
-              // Fallback just in case
-              processBarcode(primaryBarcode, 'move');
-            }
+          // DIRECT MOVE: use selected row object only (no scan/barcode lookup).
+          const barcodeColIndex = getBarcodeColumnIndex();
+          const primaryBarcode = String(row[barcodeColIndex] || row[1] || row[0] || "").trim();
+          const normalizedBarcode = normalizeBarcode(primaryBarcode);
+          const movedResult = removeExactRemainingProductRow(row);
+
+          console.log({
+            moveAction: 'direct',
+            primaryBarcode,
+            normalizedBarcode,
+            productIndex: movedResult ? movedResult.index : -1,
+            rowData: row,
+            matchedProduct: movedResult ? movedResult.product : null
+          });
+
+          if (movedResult) {
+            addRowToScannedTable(movedResult.product, normalizedBarcode, true, 'move');
+            showRemainingProducts();
+          } else {
+            console.error('Move failed: selected row not found in remainingProducts', { primaryBarcode, normalizedBarcode });
+            alert('Error: Could not move selected product. Please refresh and try again.');
           }
         });
         tdAction.appendChild(moveToScannedButton);
@@ -4065,7 +4212,7 @@
         }
       }
 
-      const savedScannedProducts = JSON.parse(localStorage.getItem("scannedProducts")) || [];
+      const savedScannedProductsRaw = JSON.parse(localStorage.getItem("scannedProducts")) || [];
       remainingNotes = JSON.parse(localStorage.getItem("remainingNotes")) || {};
 
       // Migrate legacy string notes to object format { t: text, s: status }
@@ -4079,8 +4226,21 @@
       const productTableBody = document.getElementById("productTableBody");
       if (productTableBody) productTableBody.innerHTML = "";
 
+      // Deduplicate scanned rows by normalized barcode to avoid duplicate restored state.
+      const restoredScannedProducts = [];
+      const restoredBarcodeSet = new Set();
+      savedScannedProductsRaw.forEach((item) => {
+        const normalizedSavedBarcode = normalizeBarcode(item.barcode);
+        if (!normalizedSavedBarcode || restoredBarcodeSet.has(normalizedSavedBarcode)) return;
+        restoredBarcodeSet.add(normalizedSavedBarcode);
+        restoredScannedProducts.push({
+          ...item,
+          barcode: normalizedSavedBarcode
+        });
+      });
+
       // Restore scanned rows WITHOUT triggering saveProgress() or updateStatistics() on each row
-      savedScannedProducts.forEach(({ barcode, data: scannedRowData, receivedQty, source, timestamp }) => {
+      restoredScannedProducts.forEach(({ barcode, data: scannedRowData, receivedQty, source, timestamp }) => {
         addRowToScannedTable(scannedRowData, barcode, false, source || 'scan', timestamp, true, receivedQty || ""); // true = skipSave
       });
       reindexScannedTable();
@@ -4089,7 +4249,7 @@
 
       // Dynamically derive remainingProducts from master list directly to completely avoid state fragmentation
       if (excelData && excelData.length > 0) {
-        const scannedSet = new Set(savedScannedProducts.map(sp => JSON.stringify(normalizeRow(sp.data))));
+        const scannedSet = new Set(restoredScannedProducts.map(sp => JSON.stringify(normalizeRow(sp.data))));
         remainingProducts = excelData.slice(1).map(normalizeRow).filter(row => !scannedSet.has(JSON.stringify(row)));
       } else {
         remainingProducts = [];
@@ -4817,18 +4977,21 @@
           originalProductsLength = mergedRemainingProducts.length;
         }
 
-        // Drain the remaining products dynamically using precise logic
+        // Drain the remaining products dynamically using EXACT normalized barcode matching
+        // Determine barcode column from base excel data headers
+        let mergeBarcodeColIndex = 1;
+        if (baseExcelData.length > 0) {
+          const mergeHeaders = baseExcelData[0].map(h => (h || "").toString().toLowerCase());
+          const mergeIdx = mergeHeaders.findIndex(h => h.includes("barcode") || h.includes("bar code") || h.includes("باركود") || h.includes("upc") || h.includes("ean"));
+          if (mergeIdx !== -1) mergeBarcodeColIndex = mergeIdx;
+        }
         finalScannedArray.forEach(({ barcode }) => {
-          const searchBarcode = String(barcode).trim();
-          const normalizedSearch = normalizeBarcode(searchBarcode);
-          const rowIndex = mergedRemainingProducts.findIndex((row) =>
-            row.some((cell) => {
-              if (cell === null || cell === undefined) return false;
-              const cellParts = String(cell).split("-").map((c) => c.trim());
-              return cellParts.includes(searchBarcode) ||
-                     cellParts.some(part => normalizeBarcode(part) === normalizedSearch);
-            })
-          );
+          const normalizedSearch = normalizeBarcode(String(barcode).trim());
+          const rowIndex = mergedRemainingProducts.findIndex((row) => {
+            const cellValue = row[mergeBarcodeColIndex];
+            if (cellValue === null || cellValue === undefined) return false;
+            return normalizeBarcode(cellValue) === normalizedSearch;
+          });
 
           if (rowIndex >= 0) {
             mergedRemainingProducts.splice(rowIndex, 1);
@@ -4844,12 +5007,11 @@
             mergedRemainingProducts = baseExcelData.slice(1).map(row =>
               row.map(cell => (cell !== null && cell !== undefined) ? String(cell).trim() : "")
             ).filter(row => {
-              const hasScannedMatch = row.some((cell) => {
-                if (cell === null || cell === undefined) return false;
-                const cellParts = String(cell).split("-").map((c) => c.trim());
-                return cellParts.some(part => uniqueBarcodes.has(part) || uniqueBarcodes.has(normalizeBarcode(part)));
-              });
-              return !hasScannedMatch;
+              // Use EXACT normalized barcode matching on the barcode column only
+              const cellValue = row[mergeBarcodeColIndex];
+              if (cellValue === null || cellValue === undefined) return true;
+              const normalizedCell = normalizeBarcode(cellValue);
+              return !uniqueBarcodes.has(normalizedCell);
             });
           }
         }
