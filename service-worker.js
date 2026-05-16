@@ -1,10 +1,15 @@
-const CACHE_NAME = "product-inventory-cache-v8";
+const CACHE_NAME = "product-inventory-cache-v9";
 const APP_PREFIX = "product-inventory-";
 
 // Include all icons and critical assets
 const urlsToCache = [
   "./",
+  "./shell.html",
   "./index.html",
+  "./admin.html",
+  "./tracker.html",
+  "./settings.html",
+  "./app-settings.js",
   "./manifest.json",
   "./icons/logo-72.png",
   "./icons/logo-96.png",
@@ -85,7 +90,7 @@ self.addEventListener("fetch", (event) => {
         .catch(() => {
           return caches.match(event.request)
             .then(response => {
-              return response || caches.match('./mainVersion.html');
+              return response || caches.match('./shell.html') || caches.match('./index.html');
             });
         })
     );

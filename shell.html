@@ -103,26 +103,40 @@
     const TABS = ['inventory', 'admin', 'tracker', 'settings'];
     let currentTab = 'inventory';
 
+    function setActiveTab(tab) {
+      if (!TABS.includes(tab)) tab = 'inventory';
+      TABS.forEach((t) => {
+        const frame = document.getElementById('frame-' + t);
+        if (!frame) return;
+        frame.classList.toggle('active', t === tab);
+      });
+      currentTab = tab;
+    }
+
     // ── Tab Switcher ────────────────────────────────────────────────────────────
-    function switchTab(tab) {
+    function switchTab(tab, pushHistory = true) {
       if (!TABS.includes(tab)) return;
       if (tab === currentTab) return;
 
-      document.getElementById('frame-' + currentTab).classList.remove('active');
-      document.getElementById('frame-' + tab).classList.add('active');
-      currentTab = tab;
+      setActiveTab(tab);
 
       // Update URL hash so browser back/forward works
-      history.pushState({ tab }, '', '#' + tab);
+      if (pushHistory) {
+        history.pushState({ tab }, '', '#' + tab);
+      } else if (location.hash !== '#' + tab) {
+        history.replaceState({ tab }, '', '#' + tab);
+      }
     }
 
     // ── Browser back/forward support ────────────────────────────────────────────
     window.addEventListener('popstate', e => {
       const tab = (e.state && e.state.tab) || getHashTab();
-      if (!TABS.includes(tab)) return;
-      document.getElementById('frame-' + currentTab).classList.remove('active');
-      document.getElementById('frame-' + tab).classList.add('active');
-      currentTab = tab;
+      switchTab(tab, false);
+    });
+
+    // Firefox mobile may emit hashchange without a useful popstate payload.
+    window.addEventListener('hashchange', () => {
+      switchTab(getHashTab(), false);
     });
 
     function getHashTab() {
@@ -132,11 +146,7 @@
 
     // ── Restore from URL hash on load ───────────────────────────────────────────
     const initialTab = getHashTab();
-    if (initialTab !== 'inventory') {
-      document.getElementById('frame-inventory').classList.remove('active');
-      document.getElementById('frame-' + initialTab).classList.add('active');
-      currentTab = initialTab;
-    }
+    setActiveTab(initialTab);
     history.replaceState({ tab: currentTab }, '', '#' + currentTab);
 
     // ── postMessage listener — iframes communicate with the shell ───────────────

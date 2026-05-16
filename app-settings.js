@@ -31,7 +31,8 @@
     searchColumnVisible: true,
     timestampColumnVisible: true,
     compactView: false,
-    scannedCompactMode: false
+    scannedCompactMode: false,
+    pcView: false                 // Desktop-style layout (wider viewport + table layout)
   };
 
   /* ── CSS value maps ──────────────────────────────────────────────────── */
@@ -45,6 +46,22 @@
     Object.assign(_settings, stored);
   } catch (_) {}
 
+  const MOBILE_VIEWPORT = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+  const PC_VIEWPORT = 'width=1280, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes';
+
+  function _applyViewport(pcViewEnabled) {
+    const vp = document.querySelector('meta[name="viewport"]');
+    if (!vp) return;
+    if (pcViewEnabled) {
+      if (!vp.dataset.mobileViewport) {
+        vp.dataset.mobileViewport = vp.getAttribute('content') || MOBILE_VIEWPORT;
+      }
+      vp.setAttribute('content', PC_VIEWPORT);
+    } else {
+      vp.setAttribute('content', vp.dataset.mobileViewport || MOBILE_VIEWPORT);
+    }
+  }
+
   /* ── Apply CSS variables & direction immediately ─────────────────────── */
   function _apply(s) {
     const root = document.documentElement;
@@ -53,15 +70,20 @@
     root.style.setProperty('--app-scale',          s.scale                 || 1);
     root.dir  = s.language === 'ar' ? 'rtl' : 'ltr';
     root.lang = s.language || 'ar';
-    // Apply fit-table-to-screen class as soon as DOM is available
-    if (document.body) {
+    root.classList.toggle('pc-view-root', !!s.pcView);
+    _applyViewport(!!s.pcView);
+
+    function applyBodyClasses() {
       document.body.classList.toggle('fit-table-screen', !!s.fitTableToScreen);
       document.body.classList.toggle('scanned-compact-mode', !!s.scannedCompactMode);
+      document.body.classList.toggle('pc-view', !!s.pcView);
+    }
+
+    // Apply layout classes as soon as DOM is available
+    if (document.body) {
+      applyBodyClasses();
     } else {
-      document.addEventListener('DOMContentLoaded', function () {
-        document.body.classList.toggle('fit-table-screen', !!s.fitTableToScreen);
-        document.body.classList.toggle('scanned-compact-mode', !!s.scannedCompactMode);
-      }, { once: true });
+      document.addEventListener('DOMContentLoaded', applyBodyClasses, { once: true });
     }
   }
 
@@ -309,7 +331,11 @@
       "Enter driver name": "أدخل اسم السائق",
       "Please select a driver.": "يرجى اختيار سائق.",
       "Deactivate this driver? They will be hidden from dropdowns.": "تعطيل هذا السائق؟ سيُخفى من القوائم.",
-      "Driver added.": "تمت إضافة السائق."
+      "Driver added.": "تمت إضافة السائق.",
+      "PC View: On": "عرض الكمبيوتر: تشغيل",
+      "PC View: Off": "عرض الكمبيوتر: إيقاف",
+      "PC View": "عرض الكمبيوتر",
+      "Switch to desktop-style layout (wider tables, PC viewport)": "التبديل إلى تخطيط سطح المكتب (جداول أوسع، عرض الكمبيوتر)"
     },
 
     translationObserver: null,
