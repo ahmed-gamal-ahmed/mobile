@@ -21,6 +21,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
   <script src="app-settings.js"></script>
+  <link rel="stylesheet" href="desktop-view.css" />
 
   <style>
     html {
@@ -610,6 +611,17 @@
             </div>
           </div>
 
+          <!-- Desktop View Mode -->
+          <div class="setting-row">
+            <div>
+              <div class="setting-label"><i class="bi bi-pc-display-horizontal me-1 text-primary"></i>Desktop View Mode</div>
+              <div class="setting-description">Force desktop-style layout on mobile: wide tables, pinned sidebar, horizontal scroll. Does not zoom the page.</div>
+            </div>
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" id="settingsDesktopViewMode" role="switch">
+            </div>
+          </div>
+
           <!-- Fit Table to Screen -->
           <div class="setting-row">
             <div>
@@ -700,6 +712,8 @@
       document.getElementById("settingsNotesColumn").checked = !!s.remainingNotesColumnVisible;
       document.getElementById("settingsSearchColumn").checked = s.searchColumnVisible !== false;
       document.getElementById("settingsTimestampColumn").checked = s.timestampColumnVisible !== false;
+
+      document.getElementById("settingsDesktopViewMode").checked = !!(s.desktopViewMode ?? s.pcView);
 
       // Fit Table to Screen
       document.getElementById("settingsFitTableToScreen").checked = !!s.fitTableToScreen;
@@ -811,6 +825,13 @@
     });
     document.getElementById("settingsTimestampColumn").addEventListener("change", (e) => {
       updateSettingAndSave("timestampColumnVisible", e.target.checked);
+    });
+
+    document.getElementById("settingsDesktopViewMode").addEventListener("change", async (e) => {
+      const on = e.target.checked;
+      await AppSettings.save({ desktopViewMode: on, pcView: on }, db, _currentUserUid);
+      syncUI();
+      showSavedToast();
     });
 
     // 🔥 Wire up: Fit Table to Screen 🔥

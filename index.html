@@ -29,6 +29,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
   <script src="app-settings.js"></script>
+  <link rel="stylesheet" href="desktop-view.css" />
 
   <style>
     body {
@@ -286,32 +287,7 @@
       }
     }
 
-    /* ── PC View (desktop-style layout on mobile) ─────────────────── */
-    body.pc-view .responsive-container {
-      max-width: 100%;
-    }
-
-    body.pc-view .table-responsive .table {
-      min-width: 0 !important;
-    }
-
-    body.pc-view .table td,
-    body.pc-view .table th {
-      white-space: normal;
-    }
-
-    body.pc-view button,
-    body.pc-view .btn,
-    body.pc-view input[type="button"],
-    body.pc-view input[type="submit"] {
-      min-height: 38px;
-      min-width: auto;
-    }
-
-    body.pc-view #openSidebarButton {
-      padding: 10px 12px;
-      font-size: 18px;
-    }
+    /* Desktop View Mode — see desktop-view.css */
 
     /* ── Fit Table to Screen mode (Legacy) ────────────────────────── */
     body.fit-table-screen .table-responsive {
@@ -506,31 +482,46 @@
       display: block;
     }
 
-    /* Hide ALL columns except the quantity column (col-2) for the scanned table */
-    body.scanned-compact-mode #productTableBody td:not(.col-2),
-    body.scanned-compact-mode #tableHeaders th:not(.col-2) {
+    /* Compact mode: show only description (col-0) and quantity (col-2) */
+    body.scanned-compact-mode #productTableBody td:not(.col-0):not(.col-2),
+    body.scanned-compact-mode #tableHeaders th:not(.col-0):not(.col-2),
+    body.scanned-compact-mode #remainingTableBody td:not(.col-0):not(.col-2),
+    body.scanned-compact-mode #remainingTableHeaders th:not(.col-0):not(.col-2) {
       display: none !important;
     }
 
+    body.scanned-compact-mode #productTableBody .col-0,
+    body.scanned-compact-mode #tableHeaders .col-0,
+    body.scanned-compact-mode #remainingTableBody .col-0,
+    body.scanned-compact-mode #remainingTableHeaders .col-0 {
+      font-size: 1rem !important;
+      font-weight: 600 !important;
+      vertical-align: middle !important;
+      max-width: 55vw;
+      white-space: normal;
+      word-break: break-word;
+    }
+
     body.scanned-compact-mode #productTableBody .col-2,
-    body.scanned-compact-mode #tableHeaders .col-2 {
-      font-size: 15vw !important;
+    body.scanned-compact-mode #tableHeaders .col-2,
+    body.scanned-compact-mode #remainingTableBody .col-2,
+    body.scanned-compact-mode #remainingTableHeaders .col-2 {
+      font-size: 2.5rem !important;
       font-weight: 900 !important;
       text-align: center !important;
       vertical-align: middle !important;
-      padding: 3rem 1rem !important;
+      padding: 1rem 0.5rem !important;
       color: #0d6efd !important;
-      width: 100vw !important;
-      display: table-cell !important;
+      white-space: nowrap;
     }
-    
-    body.scanned-compact-mode #scanSection .table-responsive {
-      border: none !important;
-      box-shadow: none !important;
+
+    body.scanned-compact-mode #scanSection .table-responsive,
+    body.scanned-compact-mode #remainingProductsSection .table-responsive {
       overflow-x: hidden !important;
     }
-    
-    body.scanned-compact-mode #scanSection .table {
+
+    body.scanned-compact-mode #scanSection .table,
+    body.scanned-compact-mode #remainingProductsSection .table {
       width: 100% !important;
       min-width: unset !important;
     }
@@ -629,15 +620,23 @@
     </div>
 
     <div class="mb-3">
-      <button id="toggleCompactScannedBtn" class="btn btn-secondary w-100" data-bs-toggle="tooltip" title="Show Only Quantity in Tables">
-        <i class="bi bi-arrows-collapse"></i> Scanned: Quantity Only
+      <button id="toggleCompactScannedBtn" class="btn btn-secondary w-100" data-bs-toggle="tooltip"
+        title="Show only Description and Quantity columns in scanned and remaining tables">
+        <i class="bi bi-arrows-collapse"></i> <span id="toggleCompactScannedBtnLabel">Desc + Qty Only: Off</span>
       </button>
     </div>
 
     <div class="mb-3">
-      <button id="togglePcViewBtn" class="btn btn-outline-light w-100" data-bs-toggle="tooltip"
-        title="Switch to desktop-style layout (wider tables, PC viewport)">
-        <i class="bi bi-display"></i> <span id="togglePcViewBtnLabel">PC View: Off</span>
+      <button id="toggleDesktopViewBtn" class="btn btn-outline-light w-100" data-bs-toggle="tooltip"
+        title="Force desktop-style layout on mobile (wide tables, pinned sidebar, horizontal scroll). Not page zoom.">
+        <i class="bi bi-pc-display-horizontal" id="toggleDesktopViewBtnIcon"></i>
+        <span id="toggleDesktopViewBtnLabel">Desktop View Mode: Off</span>
+      </button>
+    </div>
+    <div class="mb-3">
+      <button id="desktopViewFullscreenBtn" class="btn btn-outline-light w-100 d-none" data-bs-toggle="tooltip"
+        title="Enter fullscreen (tables)">
+        <i class="bi bi-fullscreen"></i> <span id="desktopViewFullscreenBtnLabel">Enter fullscreen (tables)</span>
       </button>
     </div>
 
@@ -727,7 +726,10 @@
       <span id="forceAssignmentBannerText"></span>
       <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
-    <h1 class="text-center mb-4" id="pageHeader">Product Inventory</h1>
+    <h1 class="text-center mb-2" id="pageHeader">Product Inventory</h1>
+    <p id="desktopViewIndicator" class="text-center mb-3 d-none desktop-view-indicator">
+      <span class="badge bg-primary"><i class="bi bi-pc-display-horizontal me-1"></i> Desktop layout active</span>
+    </p>
 
     <!-- Dashboard Statistics Cards -->
     <div class="d-flex flex-wrap gap-2 gap-md-3 mb-4" id="mainDashboardStats">
@@ -769,7 +771,7 @@
         </div>
       </div>
       <h3 class="text-center">Scanned Products</h3>
-      <div class="table-responsive"> <!-- Wrap tables in responsive container -->
+      <div class="table-responsive table-container"> <!-- Wrap tables in responsive container -->
         <table class="table table-bordered table-striped mt-3">
           <thead class="table-dark">
             <tr id="tableHeaders"></tr>
@@ -780,7 +782,7 @@
     </div>
     <div id="remainingProductsSection" class="mt-5">
       <h3 class="text-center">Remaining Products</h3>
-      <div class="table-responsive">
+      <div class="table-responsive table-container">
         <table class="table table-bordered table-striped mt-3">
           <thead class="table-dark">
             <tr id="remainingTableHeaders"></tr>
@@ -1329,18 +1331,70 @@
       button.style.display = isTabbedMode ? "none" : "";
     }
 
-    function updatePcViewButton() {
-      const btn = document.getElementById("togglePcViewBtn");
-      const label = document.getElementById("togglePcViewBtnLabel");
+    function isDesktopViewModeEnabled() {
+      const s = AppSettings.get();
+      return !!(s.desktopViewMode ?? s.pcView);
+    }
+
+    function applyDesktopViewLayout() {
+      const on = isDesktopViewModeEnabled();
+      document.body.classList.toggle("desktop-view", on);
+      document.body.classList.toggle("pc-view", on);
+      document.body.classList.toggle("desktop-view-sidebar-pinned", on);
+
+      const sidebar = document.getElementById("sidebar");
+      if (sidebar) {
+        if (on) {
+          sidebar.classList.add("open");
+          document.body.classList.remove("sidebar-open");
+        } else if (!document.body.classList.contains("sidebar-open")) {
+          sidebar.classList.remove("open");
+        }
+      }
+
+      const fsBtn = document.getElementById("desktopViewFullscreenBtn");
+      if (fsBtn) fsBtn.classList.toggle("d-none", !on);
+
+      const indicator = document.getElementById("desktopViewIndicator");
+      if (indicator) indicator.classList.toggle("d-none", !on);
+    }
+
+    function updateDesktopViewButton() {
+      const btn = document.getElementById("toggleDesktopViewBtn");
+      const label = document.getElementById("toggleDesktopViewBtnLabel");
+      const icon = document.getElementById("toggleDesktopViewBtnIcon");
       if (!btn || !label) return;
 
       const dict = window.AppSettings.getDictionary();
-      const on = !!AppSettings.get().pcView;
+      const on = isDesktopViewModeEnabled();
       label.textContent = on
-        ? (dict["PC View: On"] || "PC View: On")
-        : (dict["PC View: Off"] || "PC View: Off");
+        ? (dict["Desktop View Mode: On"] || "Desktop View Mode: On")
+        : (dict["Desktop View Mode: Off"] || "Desktop View Mode: Off");
       btn.classList.toggle("btn-light", on);
       btn.classList.toggle("btn-outline-light", !on);
+      if (icon) {
+        icon.className = on ? "bi bi-phone" : "bi bi-pc-display-horizontal";
+      }
+      applyDesktopViewLayout();
+    }
+
+    function updatePcViewButton() {
+      updateDesktopViewButton();
+    }
+
+    function updateCompactScannedButton() {
+      const btn = document.getElementById("toggleCompactScannedBtn");
+      const label = document.getElementById("toggleCompactScannedBtnLabel");
+      if (!btn || !label) return;
+
+      const dict = window.AppSettings.getDictionary();
+      const on = !!AppSettings.get().scannedCompactMode;
+      label.textContent = on
+        ? (dict["Desc + Qty Only: On"] || "Desc + Qty Only: On")
+        : (dict["Desc + Qty Only: Off"] || "Desc + Qty Only: Off");
+      btn.classList.toggle("btn-warning", on);
+      btn.classList.toggle("btn-secondary", !on);
+      document.body.classList.toggle("scanned-compact-mode", on);
     }
 
     function applySourceColumnVisibility() {
@@ -2188,7 +2242,8 @@
 
         // Apply column visibilities & DOM
         updateRemainingButtonVisibility();
-        updatePcViewButton();
+        updateDesktopViewButton();
+        updateCompactScannedButton();
         applySearchColumnVisibility();
         applyTimestampColumnVisibility();
 
@@ -2229,11 +2284,7 @@
           applyFixedInputBar(false);
         }
         
-        if (s.scannedCompactMode) {
-          document.body.classList.add("scanned-compact-mode");
-        } else {
-          document.body.classList.remove("scanned-compact-mode");
-        }
+        updateCompactScannedButton();
 
         if (s.tabbedScanningMode) {
           document.body.classList.add("tabbed-scanning-mode");
@@ -2391,7 +2442,8 @@
           // Apply translations with the loaded settings
           AppSettings.applyTranslations();
           updateRemainingButtonVisibility();
-          updatePcViewButton();
+          updateDesktopViewButton();
+          updateCompactScannedButton();
           applyUserRestrictions();
 
           // Start assignment listener
@@ -2600,28 +2652,58 @@
         .getElementById("toggleRemainingButton")
         .addEventListener("click", toggleRemainingProducts);
 
-      document
-        .getElementById("toggleCompactScannedBtn")
-        .addEventListener("click", () => {
-          const isCompact = document.body.classList.toggle("scanned-compact-mode");
-          const btn = document.getElementById("toggleCompactScannedBtn");
-          if (isCompact) {
-            btn.innerHTML = '<i class="bi bi-arrows-expand"></i> Scanned: Show All';
-            btn.classList.replace("btn-secondary", "btn-warning");
-          } else {
-            btn.innerHTML = '<i class="bi bi-arrows-collapse"></i> Scanned: Quantity Only';
-            btn.classList.replace("btn-warning", "btn-secondary");
+      document.getElementById("toggleCompactScannedBtn").addEventListener("click", async () => {
+        const nextCompact = !AppSettings.get().scannedCompactMode;
+        await AppSettings.save({ scannedCompactMode: nextCompact }, firestoreDb, currentUser?.uid);
+        updateCompactScannedButton();
+      });
+      updateCompactScannedButton();
+
+      document.getElementById("toggleDesktopViewBtn").addEventListener("click", async () => {
+        const nextDesktop = !isDesktopViewModeEnabled();
+        await AppSettings.save(
+          { desktopViewMode: nextDesktop, pcView: nextDesktop },
+          firestoreDb,
+          currentUser?.uid
+        );
+        updateDesktopViewButton();
+      });
+      updateDesktopViewButton();
+
+      const desktopViewFullscreenBtn = document.getElementById("desktopViewFullscreenBtn");
+      if (desktopViewFullscreenBtn) {
+        desktopViewFullscreenBtn.addEventListener("click", async () => {
+          const dict = window.AppSettings.getDictionary();
+          try {
+            if (!document.fullscreenElement) {
+              await document.documentElement.requestFullscreen();
+              document.getElementById("desktopViewFullscreenBtnLabel").textContent =
+                dict["Exit fullscreen"] || "Exit fullscreen";
+              desktopViewFullscreenBtn.querySelector("i").className = "bi bi-fullscreen-exit";
+            } else {
+              await document.exitFullscreen();
+              document.getElementById("desktopViewFullscreenBtnLabel").textContent =
+                dict["Enter fullscreen (tables)"] || "Enter fullscreen (tables)";
+              desktopViewFullscreenBtn.querySelector("i").className = "bi bi-fullscreen";
+            }
+          } catch (err) {
+            console.warn("Fullscreen not available:", err);
           }
         });
-
-      document.getElementById("togglePcViewBtn").addEventListener("click", async () => {
-        const nextPcView = !AppSettings.get().pcView;
-        await AppSettings.save({ pcView: nextPcView }, firestoreDb, currentUser?.uid);
-        updatePcViewButton();
-        document.getElementById("sidebar").classList.remove("open");
-        document.body.classList.remove("sidebar-open");
-      });
-      updatePcViewButton();
+        document.addEventListener("fullscreenchange", () => {
+          const dict = window.AppSettings.getDictionary();
+          const label = document.getElementById("desktopViewFullscreenBtnLabel");
+          const icon = desktopViewFullscreenBtn.querySelector("i");
+          if (!label || !icon) return;
+          if (document.fullscreenElement) {
+            label.textContent = dict["Exit fullscreen"] || "Exit fullscreen";
+            icon.className = "bi bi-fullscreen-exit";
+          } else {
+            label.textContent = dict["Enter fullscreen (tables)"] || "Enter fullscreen (tables)";
+            icon.className = "bi bi-fullscreen";
+          }
+        });
+      }
 
       document
         .getElementById("clearStorageButton")
@@ -3951,7 +4033,7 @@
     }
 
     function moveToRemainingTable(row, dataRow, barcode) {
-      remainingProducts.push(dataRow);
+      remainingProducts.unshift(dataRow);
       showRemainingProducts();
 
       scannedBarcodes.delete(normalizeBarcode(barcode));

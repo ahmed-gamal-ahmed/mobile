@@ -32,7 +32,8 @@
     timestampColumnVisible: true,
     compactView: false,
     scannedCompactMode: false,
-    pcView: false                 // Desktop-style layout (wider viewport + table layout)
+    desktopViewMode: false,       // Desktop-style layout on mobile (Chrome "Desktop site"-like)
+    pcView: false                 // Legacy alias — synced with desktopViewMode
   };
 
   /* ── CSS value maps ──────────────────────────────────────────────────── */
@@ -46,40 +47,101 @@
     Object.assign(_settings, stored);
   } catch (_) {}
 
-  const MOBILE_VIEWPORT = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-  const PC_VIEWPORT = 'width=1280, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes';
+  /** Migrate legacy keys and standalone desktopViewMode flag */
+  function _normalizeDesktopViewSettings(s) {
+    if (s.desktopViewMode === undefined) {
+      const legacyFlag = localStorage.getItem('desktopViewMode');
+      if (legacyFlag === 'true' || legacyFlag === 'false') {
+        s.desktopViewMode = legacyFlag === 'true';
+      } else if (s.pcView !== undefined) {
+        s.desktopViewMode = !!s.pcView;
+      } else {
+        s.desktopViewMode = false;
+      }
+    }
+    s.desktopViewMode = !!s.desktopViewMode;
+    s.pcView = s.desktopViewMode;
+    return s;
+  }
 
-  function _applyViewport(pcViewEnabled) {
+  _normalizeDesktopViewSettings(_settings);
+
+  const MOBILE_VIEWPORT = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+  const DESKTOP_VIEWPORT = 'width=1400, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes';
+
+  function _isDesktopViewEnabled(s) {
+    return !!(s && s.desktopViewMode);
+  }
+
+  function _persistDesktopViewFlag(enabled) {
+    try {
+      localStorage.setItem('desktopViewMode', enabled ? 'true' : 'false');
+    } catch (_) {}
+  }
+
+  function _applyViewport(desktopEnabled) {
     const vp = document.querySelector('meta[name="viewport"]');
     if (!vp) return;
-    if (pcViewEnabled) {
+    if (desktopEnabled) {
       if (!vp.dataset.mobileViewport) {
         vp.dataset.mobileViewport = vp.getAttribute('content') || MOBILE_VIEWPORT;
       }
-      vp.setAttribute('content', PC_VIEWPORT);
+      vp.setAttribute('content', DESKTOP_VIEWPORT);
     } else {
       vp.setAttribute('content', vp.dataset.mobileViewport || MOBILE_VIEWPORT);
     }
   }
 
+  function _applyDesktopViewDom(s) {
+    const on = _isDesktopViewEnabled(s);
+    const root = document.documentElement;
+    root.classList.toggle('desktop-view-root', on);
+    root.classList.toggle('pc-view-root', on);
+
+    if (!document.body) return;
+
+    document.body.classList.toggle('desktop-view', on);
+    document.body.classList.toggle('pc-view', on);
+    document.body.classList.toggle('desktop-view-sidebar-pinned', on);
+
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) {
+      if (on) {
+        sidebar.classList.add('open');
+      } else if (!document.body.classList.contains('sidebar-open')) {
+        sidebar.classList.remove('open');
+      }
+    }
+
+    if (on) {
+      document.body.classList.remove('sidebar-open');
+    }
+
+    const fsBtn = document.getElementById('desktopViewFullscreenBtn');
+    if (fsBtn) {
+      fsBtn.classList.toggle('d-none', !on);
+    }
+  }
+
   /* ── Apply CSS variables & direction immediately ─────────────────────── */
   function _apply(s) {
+    _normalizeDesktopViewSettings(s);
+    _persistDesktopViewFlag(s.desktopViewMode);
+
     const root = document.documentElement;
     root.style.setProperty('--app-font-size',      FS_MAP[s.fontSize]      || '15px');
     root.style.setProperty('--app-table-density',  TD_MAP[s.tableDensity]  || '0.5rem');
     root.style.setProperty('--app-scale',          s.scale                 || 1);
     root.dir  = s.language === 'ar' ? 'rtl' : 'ltr';
     root.lang = s.language || 'ar';
-    root.classList.toggle('pc-view-root', !!s.pcView);
-    _applyViewport(!!s.pcView);
+    _applyViewport(_isDesktopViewEnabled(s));
 
     function applyBodyClasses() {
       document.body.classList.toggle('fit-table-screen', !!s.fitTableToScreen);
       document.body.classList.toggle('scanned-compact-mode', !!s.scannedCompactMode);
-      document.body.classList.toggle('pc-view', !!s.pcView);
+      _applyDesktopViewDom(s);
     }
 
-    // Apply layout classes as soon as DOM is available
     if (document.body) {
       applyBodyClasses();
     } else {
@@ -104,6 +166,7 @@
      */
     save: async function (newSettings, db, uid) {
       Object.assign(_settings, newSettings);
+      _normalizeDesktopViewSettings(_settings);
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(_settings));
       _apply(_settings);
       // Dispatch event so the local window also reacts (storage event only fires for OTHER windows)
@@ -126,6 +189,7 @@
         const snap = await ref.get();
         if (snap.exists) {
           Object.assign(_settings, snap.data());
+          _normalizeDesktopViewSettings(_settings);
           localStorage.setItem(SETTINGS_KEY, JSON.stringify(_settings));
           _apply(_settings);
         } else {
@@ -335,7 +399,17 @@
       "PC View: On": "عرض الكمبيوتر: تشغيل",
       "PC View: Off": "عرض الكمبيوتر: إيقاف",
       "PC View": "عرض الكمبيوتر",
-      "Switch to desktop-style layout (wider tables, PC viewport)": "التبديل إلى تخطيط سطح المكتب (جداول أوسع، عرض الكمبيوتر)"
+      "Switch to desktop-style layout (wider tables, PC viewport)": "التبديل إلى تخطيط سطح المكتب (جداول أوسع، عرض الكمبيوتر)",
+      "Desktop View Mode": "وضع عرض سطح المكتب",
+      "Desktop View Mode: On": "وضع عرض سطح المكتب: تشغيل",
+      "Desktop View Mode: Off": "وضع عرض سطح المكتب: إيقاف",
+      "Desktop layout active": "تخطيط سطح المكتب مفعّل",
+      "Force desktop-style layout on mobile (wide tables, pinned sidebar, horizontal scroll). Not page zoom.": "فرض تخطيط سطح المكتب على الجوال (جداول عريضة، قائمة جانبية ثابتة، تمرير أفقي). ليس تكبير الصفحة.",
+      "Enter fullscreen (tables)": "ملء الشاشة (الجداول)",
+      "Exit fullscreen": "الخروج من ملء الشاشة",
+      "Desc + Qty Only: On": "الوصف والكمية فقط: تشغيل",
+      "Desc + Qty Only: Off": "الوصف والكمية فقط: إيقاف",
+      "Show only Description and Quantity columns in scanned and remaining tables": "عرض عمود الوصف والكمية فقط في جداول الممسوح والمتبقي"
     },
 
     translationObserver: null,
