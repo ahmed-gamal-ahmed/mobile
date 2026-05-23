@@ -1336,22 +1336,31 @@
       return !!(s.desktopViewMode ?? s.pcView);
     }
 
-    function applyDesktopViewLayout() {
-      const on = isDesktopViewModeEnabled();
-      document.body.classList.toggle("desktop-view", on);
-      document.body.classList.toggle("pc-view", on);
-      document.body.classList.toggle("desktop-view-sidebar-pinned", on);
+    function openAppSidebar() {
+      if (isDesktopViewModeEnabled() && window.AppSettings?.setDesktopViewSidebarCollapsed) {
+        AppSettings.setDesktopViewSidebarCollapsed(false);
+        return;
+      }
+      updateRemainingButtonVisibility();
+      document.getElementById("sidebar").classList.add("open");
+      document.body.classList.add("sidebar-open");
+    }
 
-      const sidebar = document.getElementById("sidebar");
-      if (sidebar) {
-        if (on) {
-          sidebar.classList.add("open");
-          document.body.classList.remove("sidebar-open");
-        } else if (!document.body.classList.contains("sidebar-open")) {
-          sidebar.classList.remove("open");
-        }
+    function closeAppSidebar() {
+      if (isDesktopViewModeEnabled() && window.AppSettings?.setDesktopViewSidebarCollapsed) {
+        AppSettings.setDesktopViewSidebarCollapsed(true);
+        return;
+      }
+      document.getElementById("sidebar").classList.remove("open");
+      document.body.classList.remove("sidebar-open");
+    }
+
+    function applyDesktopViewLayout() {
+      if (window.AppSettings && typeof AppSettings.refreshDesktopViewLayout === "function") {
+        AppSettings.refreshDesktopViewLayout();
       }
 
+      const on = isDesktopViewModeEnabled();
       const fsBtn = document.getElementById("desktopViewFullscreenBtn");
       if (fsBtn) fsBtn.classList.toggle("d-none", !on);
 
@@ -2666,6 +2675,9 @@
           firestoreDb,
           currentUser?.uid
         );
+        if (nextDesktop && AppSettings.setDesktopViewSidebarCollapsed) {
+          AppSettings.setDesktopViewSidebarCollapsed(false);
+        }
         updateDesktopViewButton();
       });
       updateDesktopViewButton();
@@ -3178,12 +3190,15 @@
 
       // Close/open the sidebar using the ESC key
       document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape") {
-          const sidebar = document.getElementById("sidebar");
-          const body = document.body;
-          sidebar.classList.toggle("open");
-          body.classList.toggle("sidebar-open");
+        if (event.key !== "Escape") return;
+        if (isDesktopViewModeEnabled()) {
+          const collapsed = AppSettings.isDesktopViewSidebarCollapsed?.() ?? false;
+          AppSettings.setDesktopViewSidebarCollapsed(!collapsed);
+          return;
         }
+        const sidebar = document.getElementById("sidebar");
+        sidebar.classList.toggle("open");
+        document.body.classList.toggle("sidebar-open");
       });
 
       // Initialize Firebase / Firestore and load barcode mappings
@@ -3226,27 +3241,37 @@
       applyTimestampColumnVisibility();
 
       // Mobile-optimized sidebar toggle
-      document.getElementById("openSidebarButton").addEventListener("click", () => {
-        updateRemainingButtonVisibility();
-        document.getElementById("sidebar").classList.add("open");
-        document.body.classList.add("sidebar-open");
+      document.getElementById("openSidebarButton").addEventListener("click", (e) => {
+        e.stopPropagation();
+        openAppSidebar();
       });
 
-      document.getElementById("closeSidebarButton").addEventListener("click", () => {
-        document.getElementById("sidebar").classList.remove("open");
-        document.body.classList.remove("sidebar-open");
+      document.getElementById("closeSidebarButton").addEventListener("click", (e) => {
+        e.stopPropagation();
+        closeAppSidebar();
       });
 
       // AppSettings handles settings loading during auth resolution now
 
-      // Close sidebar when clicking the overlay (for mobile)
+      // Close sidebar when clicking the overlay (for mobile / desktop view)
       document.addEventListener("click", (event) => {
         const sidebar = document.getElementById("sidebar");
+        if (!sidebar) return;
+
+        if (isDesktopViewModeEnabled()) {
+          const collapsed = AppSettings.isDesktopViewSidebarCollapsed?.() ?? false;
+          if (!collapsed &&
+            !sidebar.contains(event.target) &&
+            event.target.id !== "openSidebarButton") {
+            closeAppSidebar();
+          }
+          return;
+        }
+
         if (document.body.classList.contains("sidebar-open") &&
           !sidebar.contains(event.target) &&
           event.target.id !== "openSidebarButton") {
-          sidebar.classList.remove("open");
-          document.body.classList.remove("sidebar-open");
+          closeAppSidebar();
         }
       });
     }
@@ -4459,15 +4484,14 @@
 
     // Action column is now always visible via CSS
 
-    // Sidebar open/close functionality
-    document.getElementById("openSidebarButton").addEventListener("click", () => {
-      updateRemainingButtonVisibility();
-      document.getElementById("sidebar").classList.add("open");
-      document.body.classList.add("sidebar-open");
+    // Sidebar open/close (handlers also bound in DOMContentLoaded; keep for early script load)
+    document.getElementById("openSidebarButton").addEventListener("click", (e) => {
+      e.stopPropagation();
+      openAppSidebar();
     });
-    document.getElementById("closeSidebarButton").addEventListener("click", () => {
-      document.getElementById("sidebar").classList.remove("open");
-      document.body.classList.remove("sidebar-open");
+    document.getElementById("closeSidebarButton").addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeAppSidebar();
     });
 
     // Session Export/Import Logic

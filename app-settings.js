@@ -67,7 +67,11 @@
   _normalizeDesktopViewSettings(_settings);
 
   const MOBILE_VIEWPORT = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-  const DESKTOP_VIEWPORT = 'width=1400, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes';
+  /** device-width keeps tables adaptive; layout is desktop-style via CSS, not viewport zoom */
+  const DESKTOP_VIEWPORT = 'width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes';
+
+  const DV_TIER_NARROW = 768;
+  const DV_TIER_WIDE = 1024;
 
   function _isDesktopViewEnabled(s) {
     return !!(s && s.desktopViewMode);
@@ -92,11 +96,75 @@
     }
   }
 
+  function _physicalScreenWidth() {
+    if (typeof window.visualViewport !== 'undefined' && window.visualViewport.width > 0) {
+      return Math.round(window.visualViewport.width);
+    }
+    if (window.screen && window.screen.width) {
+      return window.screen.width;
+    }
+    return window.innerWidth || 0;
+  }
+
+  function _applyDesktopViewAdaptiveScale() {
+    const root = document.documentElement;
+    const on = root.classList.contains('desktop-view-root');
+    if (!on) {
+      root.classList.remove('dv-tier-narrow', 'dv-tier-medium', 'dv-tier-wide');
+      root.style.removeProperty('--dv-screen-px');
+      return;
+    }
+    const w = _physicalScreenWidth();
+    root.style.setProperty('--dv-screen-px', String(w));
+    root.classList.toggle('dv-tier-narrow', w < DV_TIER_NARROW);
+    root.classList.toggle('dv-tier-medium', w >= DV_TIER_NARROW && w < DV_TIER_WIDE);
+    root.classList.toggle('dv-tier-wide', w >= DV_TIER_WIDE);
+  }
+
+  let _dvResizeTimer;
+  function _scheduleDesktopViewAdaptiveScale() {
+    clearTimeout(_dvResizeTimer);
+    _dvResizeTimer = setTimeout(_applyDesktopViewAdaptiveScale, 100);
+  }
+
+  if (!window.__dvAdaptiveScaleBound) {
+    window.__dvAdaptiveScaleBound = true;
+    window.addEventListener('resize', _scheduleDesktopViewAdaptiveScale);
+    window.addEventListener('orientationchange', _scheduleDesktopViewAdaptiveScale);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', _scheduleDesktopViewAdaptiveScale);
+    }
+  }
+
+  function _isDesktopViewSidebarCollapsed() {
+    try {
+      return sessionStorage.getItem('desktopViewSidebarCollapsed') === 'true';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function _setDesktopViewSidebarCollapsed(collapsed) {
+    if (!document.body) return;
+    try {
+      sessionStorage.setItem('desktopViewSidebarCollapsed', collapsed ? 'true' : 'false');
+    } catch (_) {}
+    document.body.classList.toggle('desktop-view-sidebar-collapsed', collapsed);
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) {
+      sidebar.classList.toggle('open', !collapsed);
+    }
+    if (collapsed) {
+      document.body.classList.remove('sidebar-open');
+    }
+  }
+
   function _applyDesktopViewDom(s) {
     const on = _isDesktopViewEnabled(s);
     const root = document.documentElement;
     root.classList.toggle('desktop-view-root', on);
     root.classList.toggle('pc-view-root', on);
+    _applyDesktopViewAdaptiveScale();
 
     if (!document.body) return;
 
@@ -105,16 +173,19 @@
     document.body.classList.toggle('desktop-view-sidebar-pinned', on);
 
     const sidebar = document.getElementById('sidebar');
-    if (sidebar) {
-      if (on) {
-        sidebar.classList.add('open');
-      } else if (!document.body.classList.contains('sidebar-open')) {
-        sidebar.classList.remove('open');
-      }
-    }
 
     if (on) {
+      const collapsed = _isDesktopViewSidebarCollapsed();
+      document.body.classList.toggle('desktop-view-sidebar-collapsed', collapsed);
       document.body.classList.remove('sidebar-open');
+      if (sidebar) {
+        sidebar.classList.toggle('open', !collapsed);
+      }
+    } else {
+      document.body.classList.remove('desktop-view-sidebar-collapsed');
+      if (sidebar && !document.body.classList.contains('sidebar-open')) {
+        sidebar.classList.remove('open');
+      }
     }
 
     const fsBtn = document.getElementById('desktopViewFullscreenBtn');
@@ -156,6 +227,21 @@
 
     /** Returns a copy of current settings */
     get: function () { return Object.assign({}, _settings); },
+
+    /** Re-apply desktop-view DOM classes, sidebar, and adaptive table scale */
+    refreshDesktopViewLayout: function () {
+      _applyDesktopViewDom(_settings);
+    },
+
+    /** Open or collapse the sidebar in Desktop View Mode */
+    setDesktopViewSidebarCollapsed: function (collapsed) {
+      if (!_isDesktopViewEnabled(_settings)) return;
+      _setDesktopViewSidebarCollapsed(!!collapsed);
+    },
+
+    isDesktopViewSidebarCollapsed: function () {
+      return _isDesktopViewSidebarCollapsed();
+    },
 
     /** Defaults for external use */
     DEFAULTS: DEFAULTS,

@@ -1,10 +1,11 @@
 /**
- * Desktop View Mode — layout switch (not page zoom).
+ * Desktop View Mode — compact adaptive PC-style tables on any screen.
  * Activated via body.desktop-view from app-settings.js
+ * Scale tokens (--dv-*) are set from physical screen width in app-settings.js
  */
 
 html.desktop-view-root {
-  overflow-x: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -13,32 +14,83 @@ html.desktop-view-root body.desktop-view {
   transition: background-color 0.25s ease;
 }
 
+/* ── Adaptive scale tokens (defaults; overridden per screen tier in JS) ── */
+html.desktop-view-root {
+  --dv-font-table: clamp(10px, 0.75rem + 0.15vw, 14px);
+  --dv-font-header: clamp(9px, 0.7rem + 0.12vw, 12px);
+  --dv-font-qty: clamp(11px, 0.85rem + 0.2vw, 15px);
+  --dv-font-btn: clamp(9px, 0.65rem + 0.1vw, 11px);
+  --dv-pad-y: 4px;
+  --dv-pad-x: 6px;
+  --dv-line-height: 1.1;
+  --dv-table-min: 880px;
+  --dv-btn-pad-y: 2px;
+  --dv-btn-pad-x: 6px;
+  --dv-input-width: 3rem;
+}
+
+html.dv-tier-narrow.desktop-view-root {
+  --dv-font-table: 10px;
+  --dv-font-header: 9px;
+  --dv-font-qty: 11px;
+  --dv-font-btn: 9px;
+  --dv-pad-y: 3px;
+  --dv-pad-x: 4px;
+  --dv-line-height: 1.08;
+  --dv-table-min: 720px;
+  --dv-btn-pad-y: 1px;
+  --dv-btn-pad-x: 4px;
+  --dv-input-width: 2.5rem;
+}
+
+html.dv-tier-medium.desktop-view-root {
+  --dv-font-table: 11px;
+  --dv-font-header: 10px;
+  --dv-font-qty: 12px;
+  --dv-font-btn: 10px;
+  --dv-pad-y: 4px;
+  --dv-pad-x: 5px;
+  --dv-line-height: 1.1;
+  --dv-table-min: 960px;
+  --dv-input-width: 3rem;
+}
+
+html.dv-tier-wide.desktop-view-root {
+  --dv-font-table: clamp(12px, 0.35vw + 10px, 14px);
+  --dv-font-header: clamp(11px, 0.3vw + 9px, 12px);
+  --dv-font-qty: clamp(13px, 0.4vw + 11px, 15px);
+  --dv-font-btn: 11px;
+  --dv-pad-y: 5px;
+  --dv-pad-x: 8px;
+  --dv-line-height: 1.15;
+  --dv-table-min: 1100px;
+  --dv-input-width: 3.5rem;
+}
+
 body.desktop-view {
-  min-width: 1400px;
-  overflow-x: auto;
+  min-width: 0;
+  width: 100%;
+  overflow-x: hidden;
   overflow-y: auto;
-  padding-top: 16px;
+  padding-top: 12px;
 }
 
 body.desktop-view #appLoadingScreen,
 body.desktop-view #loginOverlay {
-  min-width: 100vw;
+  min-width: 100%;
 }
 
-/* Pinned sidebar (desktop-style navigation) */
+/* ── Sidebar: open by default; user can collapse (all screen sizes) ─────── */
 body.desktop-view #sidebar {
   left: 0 !important;
-  width: 280px;
-  max-width: 280px;
+  width: 260px;
+  max-width: min(85vw, 260px);
   box-shadow: 2px 0 12px rgba(0, 0, 0, 0.15);
   z-index: 1040;
+  transition: left 0.3s ease, right 0.3s ease;
 }
 
-body.desktop-view #sidebar.open {
-  left: 0 !important;
-}
-
-body.desktop-view.desktop-view-sidebar-pinned:before {
+body.desktop-view.desktop-view-sidebar-pinned:not(.desktop-view-sidebar-collapsed):before {
   display: none !important;
 }
 
@@ -46,17 +98,12 @@ body.desktop-view.desktop-view-sidebar-pinned {
   overflow: auto !important;
 }
 
-body.desktop-view #openSidebarButton,
-body.desktop-view #closeSidebarButton {
-  display: none !important;
-}
-
 body.desktop-view #mainAppContainer,
 body.desktop-view .responsive-container {
-  margin-left: 280px;
+  margin-left: 260px;
   max-width: none;
-  width: calc(100% - 280px);
-  transition: margin-left 0.3s ease, width 0.3s ease;
+  width: calc(100% - 260px);
+  transition: margin-left 0.3s ease, width 0.3s ease, margin-right 0.3s ease;
 }
 
 html[dir="rtl"] body.desktop-view #sidebar {
@@ -67,158 +114,256 @@ html[dir="rtl"] body.desktop-view #sidebar {
 html[dir="rtl"] body.desktop-view #mainAppContainer,
 html[dir="rtl"] body.desktop-view .responsive-container {
   margin-left: 0;
-  margin-right: 280px;
-  width: calc(100% - 280px);
+  margin-right: 260px;
+  width: calc(100% - 260px);
 }
 
-/* Status row: keep horizontal on narrow physical screens */
+/* Collapsed: sidebar off-screen, content full width */
+body.desktop-view.desktop-view-sidebar-collapsed #sidebar {
+  left: -100% !important;
+}
+
+html[dir="rtl"] body.desktop-view.desktop-view-sidebar-collapsed #sidebar {
+  right: -100% !important;
+  left: auto !important;
+}
+
+body.desktop-view.desktop-view-sidebar-collapsed #mainAppContainer,
+body.desktop-view.desktop-view-sidebar-collapsed .responsive-container {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  width: 100% !important;
+}
+
+/* Close (×) inside sidebar — visible whenever sidebar is open */
+body.desktop-view:not(.desktop-view-sidebar-collapsed) #closeSidebarButton {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+body.desktop-view.desktop-view-sidebar-collapsed #closeSidebarButton {
+  display: none !important;
+}
+
+/* Menu (☰) when sidebar is collapsed */
+body.desktop-view.desktop-view-sidebar-collapsed #openSidebarButton:not(.d-none) {
+  display: block !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+body.desktop-view:not(.desktop-view-sidebar-collapsed) #openSidebarButton {
+  display: none !important;
+}
+
+/* Phones/tablets: sidebar overlays content; tap backdrop to close */
+@media (max-device-width: 1023px) {
+  body.desktop-view #mainAppContainer,
+  body.desktop-view .responsive-container {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+  }
+
+  body.desktop-view:not(.desktop-view-sidebar-collapsed).desktop-view-sidebar-pinned:before {
+    content: "" !important;
+    display: block !important;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 1035;
+    pointer-events: auto;
+  }
+
+  body.desktop-view.desktop-view-sidebar-collapsed.desktop-view-sidebar-pinned:before {
+    display: none !important;
+  }
+}
+
+/* Status row */
 body.desktop-view .d-flex.flex-wrap {
   flex-wrap: nowrap !important;
 }
 
 body.desktop-view .status-card {
   min-width: 0;
+  font-size: var(--dv-font-table);
 }
 
-/* Tables: PC layout + horizontal scroll */
+/* ── Table container: fit viewport, scroll only when needed ─────────── */
 body.desktop-view .table-container,
 body.desktop-view .table-responsive {
   overflow-x: auto !important;
+  overflow-y: visible;
   -webkit-overflow-scrolling: touch;
   width: 100%;
   max-width: 100%;
+  contain: inline-size;
 }
 
-body.desktop-view .table-responsive .table {
-  min-width: 1100px;
+body.desktop-view .table-responsive .table,
+body.desktop-view .table-container .table {
+  table-layout: auto !important;
   width: max-content;
   max-width: none;
-  table-layout: auto !important;
-  font-size: 0.875rem;
+  min-width: var(--dv-table-min);
+  font-size: var(--dv-font-table);
+  line-height: var(--dv-line-height);
   margin-bottom: 0;
 }
 
-body.desktop-view .table-responsive .table thead th {
+/* Sticky header */
+body.desktop-view .table-responsive .table thead th,
+body.desktop-view .table-container .table thead th {
   position: sticky;
   top: 0;
   z-index: 3;
+  background-color: #212529;
+  color: #fff;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08);
   white-space: nowrap;
-  font-size: 0.8rem;
-  line-height: 1.25;
-  padding: 0.5rem 0.65rem !important;
-}
-
-body.desktop-view .table td,
-body.desktop-view .table th {
-  white-space: nowrap;
-  word-break: normal;
-  overflow-wrap: normal;
-  padding: 0.45rem 0.65rem !important;
-  font-size: 0.875rem;
-  line-height: 1.35;
+  font-size: var(--dv-font-header);
+  font-weight: 600;
+  line-height: var(--dv-line-height);
+  padding: var(--dv-pad-y) var(--dv-pad-x) !important;
   vertical-align: middle;
 }
 
+/* Compact cells + ellipsis (prevent giant rows) */
+body.desktop-view .table td,
+body.desktop-view .table th {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: normal;
+  overflow-wrap: normal;
+  padding: var(--dv-pad-y) var(--dv-pad-x) !important;
+  font-size: var(--dv-font-table);
+  line-height: var(--dv-line-height);
+  vertical-align: middle;
+  max-width: 28ch;
+}
+
+/* Description: wrap only when needed, capped width */
 body.desktop-view .table td.description-col,
 body.desktop-view .table .col-0 {
   white-space: normal;
-  min-width: 180px;
-  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  min-width: 6rem;
+  max-width: 14rem;
+  max-height: calc(var(--dv-line-height) * 2em + var(--dv-pad-y) * 2);
 }
 
+/* Quantity / highlight — readable but not oversized */
 body.desktop-view .table .highlight-column,
 body.desktop-view .table .col-2 {
-  font-size: 1rem !important;
+  font-size: var(--dv-font-qty) !important;
   font-weight: 700;
   text-align: center;
+  white-space: nowrap;
+  min-width: 2.5rem;
+  max-width: 6rem;
 }
 
 body.desktop-view .table .serial-column,
 body.desktop-view .table thead th:first-child {
-  width: 2.5rem;
+  width: 2rem;
+  min-width: 2rem;
+  max-width: 2.5rem;
   text-align: center;
+  padding-left: 2px !important;
+  padding-right: 2px !important;
+}
+
+/* Barcode / key data columns */
+body.desktop-view .table td[data-col="barcode"],
+body.desktop-view .table .barcode-column,
+body.desktop-view .table th.barcode-column {
+  min-width: 5rem;
+  max-width: 12rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
 body.desktop-view .table .timestamp-column-scanned,
 body.desktop-view .table th.timestamp-column-scanned {
-  min-width: 5.5rem;
+  min-width: 4.5rem;
+  max-width: 8rem;
 }
 
 body.desktop-view .table .source-column-scanned,
 body.desktop-view .table th.source-column-scanned {
-  min-width: 4.5rem;
+  min-width: 3.5rem;
+  max-width: 6rem;
 }
 
 body.desktop-view .table .action-column,
 body.desktop-view .table th.action-column {
-  min-width: 4.5rem;
+  min-width: 3.25rem;
+  max-width: 5rem;
+  overflow: visible;
+  white-space: nowrap;
 }
 
 body.desktop-view .table .search-column-remaining,
 body.desktop-view .table th.search-column-remaining {
-  min-width: 3rem;
+  min-width: 2.25rem;
+  max-width: 3rem;
   text-align: center;
 }
 
 body.desktop-view .table .notes-column-remaining,
 body.desktop-view .table th.notes-column-remaining {
-  min-width: 8rem;
+  min-width: 5rem;
+  max-width: 10rem;
+  white-space: normal;
+  -webkit-line-clamp: 1;
 }
 
+/* Inputs & compact controls in rows */
 body.desktop-view .table .form-control-sm,
 body.desktop-view .table .form-select-sm {
-  font-size: 0.8rem;
+  font-size: var(--dv-font-table);
+  line-height: var(--dv-line-height);
+  padding: 1px 4px;
   min-height: auto;
+  height: auto;
 }
 
+body.desktop-view .table .btn,
 body.desktop-view .table .btn-sm {
-  font-size: 0.75rem;
-  padding: 0.2rem 0.45rem;
+  font-size: var(--dv-font-btn);
+  padding: var(--dv-btn-pad-y) var(--dv-btn-pad-x);
   min-height: auto;
+  line-height: var(--dv-line-height);
+  white-space: nowrap;
 }
 
 body.desktop-view .table .badge {
-  font-size: 0.72rem;
+  font-size: calc(var(--dv-font-btn) - 1px);
+  padding: 0.1em 0.35em;
+  line-height: 1.1;
 }
 
 body.desktop-view .table .badge .bi {
   display: inline;
+  font-size: 0.95em;
 }
 
 body.desktop-view .received-qty-input {
-  width: 3.5rem;
-  font-size: 0.8rem;
+  width: var(--dv-input-width);
+  max-width: 100%;
+  font-size: var(--dv-font-table);
+  padding: 1px 3px;
 }
 
-/* Disable mobile-only table squish / column hiding */
-@media (max-width: 767px) {
-  body.desktop-view:not(.fit-table-screen) .table-responsive .table {
-    min-width: 1100px !important;
-  }
-
-  body.desktop-view:not(.fit-table-screen) .table td,
-  body.desktop-view:not(.fit-table-screen) .table th {
-    white-space: nowrap !important;
-    font-size: 0.875rem !important;
-  }
-
-  body.desktop-view.fit-table-screen .table {
-    table-layout: auto !important;
-    width: max-content !important;
-    min-width: 1100px !important;
-  }
-
-  body.desktop-view.fit-table-screen .table td:not(:first-child):not(:last-child):nth-child(n+5),
-  body.desktop-view.fit-table-screen .table th:not(:first-child):not(:last-child):nth-child(n+5) {
-    display: table-cell !important;
-  }
-
-  body.desktop-view #sidebar {
-    width: 280px !important;
-  }
-}
-
-/* Touch targets outside tables */
+/* Touch targets outside tables only */
 body.desktop-view button,
 body.desktop-view .btn,
 body.desktop-view input[type="button"],
@@ -230,20 +375,86 @@ body.desktop-view input[type="submit"] {
 body.desktop-view .table button,
 body.desktop-view .table .btn {
   min-height: auto;
+  min-width: auto;
 }
 
-/* Compact desc+qty mode still respects desktop table scroll */
+/* Fit-table-screen inside desktop view: still compact, allow wrap in cells */
+body.desktop-view.fit-table-screen .table-responsive,
+body.desktop-view.fit-table-screen .table-container {
+  overflow-x: auto !important;
+}
+
+body.desktop-view.fit-table-screen .table {
+  table-layout: fixed !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+body.desktop-view.fit-table-screen .table td,
+body.desktop-view.fit-table-screen .table th {
+  white-space: normal !important;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  text-overflow: clip;
+  max-width: none;
+}
+
+@media (max-device-width: 767px) {
+  body.desktop-view.fit-table-screen .table td:not(:first-child):not(:last-child):nth-child(n+5),
+  body.desktop-view.fit-table-screen .table th:not(:first-child):not(:last-child):nth-child(n+5) {
+    display: none;
+  }
+
+  body.desktop-view:not(.fit-table-screen) .table-responsive .table {
+    min-width: var(--dv-table-min) !important;
+  }
+}
+
+/* Legacy mobile rules (layout viewport) — keep columns visible in desktop view */
+@media (max-width: 767px) {
+  body.desktop-view:not(.fit-table-screen) .table td,
+  body.desktop-view:not(.fit-table-screen) .table th {
+    white-space: nowrap !important;
+  }
+
+  body.desktop-view.fit-table-screen .table {
+    table-layout: auto !important;
+    width: max-content !important;
+    min-width: var(--dv-table-min) !important;
+  }
+
+  body.desktop-view.fit-table-screen .table td:not(:first-child):not(:last-child):nth-child(n+5),
+  body.desktop-view.fit-table-screen .table th:not(:first-child):not(:last-child):nth-child(n+5) {
+    display: table-cell !important;
+  }
+}
+
+/* Compact desc+qty mode */
 body.desktop-view.scanned-compact-mode #scanSection .table,
 body.desktop-view.scanned-compact-mode #remainingProductsSection .table {
-  min-width: 480px;
+  min-width: 420px;
   width: 100%;
 }
 
-/* Indicator badge (optional) */
+body.desktop-view.scanned-compact-mode #scanSection .table td,
+body.desktop-view.scanned-compact-mode #remainingProductsSection .table td {
+  max-width: none;
+}
+
+/* Indicator badge */
 body.desktop-view .desktop-view-indicator {
   display: inline-flex !important;
+  font-size: var(--dv-font-table);
 }
 
 .desktop-view-indicator {
   display: none !important;
+}
+
+/* Standalone / display-mode PWA: slightly tighter on small installed windows */
+@media (display-mode: standalone) and (max-device-width: 767px) {
+  html.desktop-view-root {
+    --dv-pad-y: 2px;
+    --dv-pad-x: 3px;
+  }
 }
