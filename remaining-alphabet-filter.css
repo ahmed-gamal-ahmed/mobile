@@ -1,0 +1,365 @@
+/**
+ * A–Z Browse Mode — sidebar + remaining table layout (inventory page only).
+ */
+
+:root {
+  --alphabet-filter-width: 42px;
+  --alphabet-filter-rows: 28;
+  --talabat-orange: #f55905;
+}
+
+/* ── Fixed A–Z rail: 28 equal rows, full height, nothing clipped ─────────── */
+.remaining-alphabet-filter {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  height: 100dvh;
+  max-height: 100dvh;
+  width: var(--alphabet-filter-width);
+  z-index: 1025;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.remaining-alphabet-filter-inner {
+  flex: 1;
+  display: grid;
+  grid-template-rows: repeat(var(--alphabet-filter-rows), minmax(0, 1fr));
+  align-items: stretch;
+  gap: 0;
+  padding: 3px 2px;
+  margin: 0;
+  min-height: 0;
+  height: 100%;
+  background: linear-gradient(180deg, #ffffff 0%, #f4f6f8 100%);
+  border: 1px solid #dee2e6;
+  border-right: none;
+  border-radius: 8px 0 0 8px;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+  overflow: visible;
+  box-sizing: border-box;
+}
+
+.alphabet-filter-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 0;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  color: #495057;
+  font-family: inherit;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color 0.12s ease, color 0.12s ease;
+  overflow: visible;
+}
+
+.alphabet-filter-btn:hover:not(:disabled) {
+  background: rgba(40, 167, 69, 0.15);
+  color: #198754;
+}
+
+.alphabet-filter-btn.is-active {
+  background: linear-gradient(135deg, #28a745, #20c997);
+  color: #fff;
+  font-weight: 700;
+}
+
+.alphabet-filter-btn.is-empty:not(.is-active) {
+  opacity: 0.4;
+}
+
+.alphabet-filter-btn:disabled {
+  cursor: default;
+  opacity: 0.28;
+}
+
+.alphabet-filter-letter {
+  font-size: clamp(0.5rem, calc((100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) / 42), 0.72rem);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.alphabet-filter-btn[data-letter="All"] .alphabet-filter-letter {
+  font-size: clamp(0.46rem, calc((100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) / 48), 0.62rem);
+  font-weight: 800;
+}
+
+.alphabet-filter-count {
+  font-size: clamp(0.36rem, calc((100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) / 56), 0.48rem);
+  font-weight: 600;
+  line-height: 1;
+  opacity: 0.85;
+}
+
+.alphabet-filter-btn.is-active .alphabet-filter-count {
+  opacity: 1;
+}
+
+/* Reserve space — browse mode only */
+body.alphabet-browse-mode.remaining-alphabet-filter-active #mainAppContainer,
+body.alphabet-browse-mode.remaining-alphabet-filter-active .responsive-container {
+  padding-right: calc(var(--alphabet-filter-width) + 6px);
+}
+
+body.alphabet-browse-mode.desktop-view.remaining-alphabet-filter-active #mainAppContainer,
+body.alphabet-browse-mode.desktop-view.remaining-alphabet-filter-active .responsive-container {
+  padding-right: calc(var(--alphabet-filter-width) + 8px);
+}
+
+html[dir="rtl"] body.alphabet-browse-mode.remaining-alphabet-filter-active #mainAppContainer,
+html[dir="rtl"] body.alphabet-browse-mode.remaining-alphabet-filter-active .responsive-container {
+  padding-right: 0;
+  padding-left: calc(var(--alphabet-filter-width) + 6px);
+}
+
+html[dir="rtl"] .remaining-alphabet-filter {
+  right: auto;
+  left: 0;
+}
+
+html[dir="rtl"] .remaining-alphabet-filter-inner {
+  border-right: 1px solid #dee2e6;
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Hidden rows — Remaining + Scanned tables */
+body.alphabet-browse-mode #remainingTableBody tr.alphabet-filter-hidden,
+body.alphabet-browse-mode #productTableBody tr.alphabet-filter-hidden {
+  display: none !important;
+}
+
+/* Browse mode: remaining table — cols 0, 1, 2, notes, action */
+body.alphabet-browse-mode #remainingTableBody td:not(.col-0):not(.col-1):not(.col-2):not(.notes-column-remaining):not(.action-column),
+body.alphabet-browse-mode #remainingTableHeaders th:not(.col-0):not(.col-1):not(.col-2):not(.notes-column-remaining):not(.action-column) {
+  display: none !important;
+}
+
+body.alphabet-browse-mode #remainingTableHeaders th.notes-column-remaining,
+body.alphabet-browse-mode #remainingTableBody td.notes-column-remaining {
+  display: table-cell !important;
+  width: 14% !important;
+  min-width: 5.5rem !important;
+  max-width: none !important;
+  white-space: normal !important;
+  vertical-align: middle !important;
+  overflow: visible !important;
+}
+
+body.alphabet-browse-mode #remainingTableBody td.notes-column-remaining .form-control-sm,
+body.alphabet-browse-mode #remainingTableBody td.notes-column-remaining .form-select-sm {
+  font-size: 0.72rem;
+  padding: 2px 4px;
+  min-height: auto;
+}
+
+body.alphabet-browse-mode.scanned-compact-mode #remainingTableBody td.col-1,
+body.alphabet-browse-mode.scanned-compact-mode #remainingTableHeaders th.col-1 {
+  display: table-cell !important;
+}
+
+/* Horizontal scroll so Action column is always reachable */
+body.alphabet-browse-mode #remainingProductsSection .table-responsive {
+  overflow-x: auto !important;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+  max-width: 100%;
+}
+
+body.alphabet-browse-mode #remainingProductsSection .table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: min(100%, 520px);
+}
+
+/* Column widths: description gets most space, readable full text */
+body.alphabet-browse-mode #remainingTableHeaders th.col-0,
+body.alphabet-browse-mode #remainingTableBody td.col-0 {
+  width: 38% !important;
+  min-width: 10rem !important;
+  max-width: none !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  font-size: 0.92rem !important;
+  line-height: 1.35 !important;
+  vertical-align: middle !important;
+}
+
+body.alphabet-browse-mode #remainingTableHeaders th.col-1,
+body.alphabet-browse-mode #remainingTableBody td.col-1 {
+  width: 22% !important;
+  min-width: 4.5rem !important;
+  max-width: none !important;
+  white-space: nowrap !important;
+  font-size: 0.78rem !important;
+  font-variant-numeric: tabular-nums;
+}
+
+body.alphabet-browse-mode #remainingTableHeaders th.col-2,
+body.alphabet-browse-mode #remainingTableBody td.col-2 {
+  width: 12% !important;
+  min-width: 2.5rem !important;
+  font-weight: 700 !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+}
+
+body.alphabet-browse-mode #remainingTableHeaders th.action-column,
+body.alphabet-browse-mode #remainingTableBody td.action-column {
+  width: 14% !important;
+  min-width: 4.25rem !important;
+  max-width: none !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-align: center !important;
+}
+
+/* Override desktop-view ellipsis on remaining description in browse mode */
+body.alphabet-browse-mode.desktop-view #remainingTableBody td.col-0,
+body.alphabet-browse-mode.desktop-view #remainingTableHeaders th.col-0 {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  max-width: none !important;
+  -webkit-line-clamp: unset !important;
+  display: table-cell !important;
+}
+
+body.alphabet-browse-mode.desktop-view #remainingTableBody td.action-column,
+body.alphabet-browse-mode.desktop-view #remainingTableHeaders th.action-column {
+  overflow: visible !important;
+}
+
+/* Browse mode banner */
+.alphabet-browse-indicator {
+  display: none;
+}
+
+body.alphabet-browse-mode .alphabet-browse-indicator {
+  display: inline-flex !important;
+}
+
+/* Scanned table visible in browse mode — compact cols 0, 1, 2 like remaining */
+body.alphabet-browse-mode #scanSection > h3 {
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+
+body.alphabet-browse-mode #scanSection > .table-responsive {
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+  max-height: 28vh;
+  margin-bottom: 0.75rem;
+}
+
+body.alphabet-browse-mode #scanSection .table {
+  table-layout: fixed;
+  min-width: 420px;
+}
+
+/* Scanned table: description, barcode, qty, action */
+body.alphabet-browse-mode #productTableBody td:not(.col-0):not(.col-1):not(.col-2):not(.action-column),
+body.alphabet-browse-mode #tableHeaders th:not(.col-0):not(.col-1):not(.col-2):not(.action-column) {
+  display: none !important;
+}
+
+body.alphabet-browse-mode #tableHeaders th:first-child,
+body.alphabet-browse-mode #productTableBody td.serial-column {
+  display: none !important;
+}
+
+body.alphabet-browse-mode #scanSection #tableHeaders th.action-column,
+body.alphabet-browse-mode #scanSection #productTableBody td.action-column,
+body.alphabet-browse-mode #scanSection .action-column.d-none {
+  display: table-cell !important;
+  width: 14% !important;
+  min-width: 4.25rem !important;
+  white-space: nowrap !important;
+  text-align: center !important;
+  overflow: visible !important;
+}
+
+body.alphabet-browse-mode #scanSection #tableHeaders th.col-0,
+body.alphabet-browse-mode #scanSection #productTableBody td.col-0 {
+  width: 40% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  display: table-cell !important;
+  -webkit-box-orient: unset !important;
+  -webkit-line-clamp: unset !important;
+  vertical-align: middle !important;
+}
+
+body.alphabet-browse-mode #scanSection #productTableBody td.col-0.data-cell {
+  box-sizing: border-box;
+}
+
+body.alphabet-browse-mode #scanSection #tableHeaders th.col-1,
+body.alphabet-browse-mode #scanSection #productTableBody td.col-1 {
+  width: 24% !important;
+}
+
+body.alphabet-browse-mode #scanSection #tableHeaders th.col-2,
+body.alphabet-browse-mode #scanSection #productTableBody td.col-2 {
+  width: 12% !important;
+  min-width: 2.5rem !important;
+  max-width: none !important;
+  text-align: center !important;
+  font-weight: 700 !important;
+  white-space: nowrap !important;
+}
+
+/* Undo desktop-view webkit-box layout inside scanned table cells */
+body.alphabet-browse-mode.desktop-view #scanSection #productTableBody td.col-0,
+body.alphabet-browse-mode.desktop-view #scanSection #tableHeaders th.col-0 {
+  display: table-cell !important;
+  -webkit-box-orient: unset !important;
+  -webkit-line-clamp: unset !important;
+}
+
+body.alphabet-browse-mode #remainingProductsSection {
+  margin-top: 0.5rem !important;
+}
+
+body.alphabet-browse-mode.tabbed-scanning-mode.showing-remaining-tab #fixedInputBar {
+  display: none !important;
+}
+
+@media (max-device-width: 767px) {
+  :root {
+    --alphabet-filter-width: 38px;
+  }
+
+  body.alphabet-browse-mode #remainingProductsSection .table {
+    min-width: 580px;
+  }
+}
+
+@media (max-device-width: 380px) {
+  :root {
+    --alphabet-filter-width: 34px;
+  }
+}

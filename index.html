@@ -29,7 +29,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
   <script src="app-settings.js"></script>
+  <script src="remaining-alphabet-filter.js"></script>
   <link rel="stylesheet" href="desktop-view.css" />
+  <link rel="stylesheet" href="remaining-alphabet-filter.css" />
 
   <style>
     body {
@@ -634,6 +636,13 @@
       </button>
     </div>
     <div class="mb-3">
+      <button id="toggleAlphabetBrowseBtn" class="btn btn-outline-warning w-100" data-bs-toggle="tooltip"
+        title="A–Z letter browse for Remaining Products, enables PC layout, scan by last 4 barcode digits">
+        <i class="bi bi-sort-alpha-down" id="toggleAlphabetBrowseBtnIcon"></i>
+        <span id="toggleAlphabetBrowseBtnLabel">A-Z Browse Mode: Off</span>
+      </button>
+    </div>
+    <div class="mb-3">
       <button id="desktopViewFullscreenBtn" class="btn btn-outline-light w-100 d-none" data-bs-toggle="tooltip"
         title="Enter fullscreen (tables)">
         <i class="bi bi-fullscreen"></i> <span id="desktopViewFullscreenBtnLabel">Enter fullscreen (tables)</span>
@@ -729,6 +738,9 @@
     <h1 class="text-center mb-2" id="pageHeader">Product Inventory</h1>
     <p id="desktopViewIndicator" class="text-center mb-3 d-none desktop-view-indicator">
       <span class="badge bg-primary"><i class="bi bi-pc-display-horizontal me-1"></i> Desktop layout active</span>
+    </p>
+    <p id="alphabetBrowseIndicator" class="text-center mb-3 d-none alphabet-browse-indicator">
+      <span class="badge bg-warning text-dark"><i class="bi bi-sort-alpha-down me-1"></i> A–Z Browse Mode — scan last 4 digits</span>
     </p>
 
     <!-- Dashboard Statistics Cards -->
@@ -1158,6 +1170,7 @@
 
     let excelData = [];
     const scannedBarcodes = new Map();
+    let browseModeScannedProducts = [];
     let remainingProducts = [];
     let fileName = "Product Inventory"; // Default file name
     let currentGoogleWorkbook = null;
@@ -1329,6 +1342,116 @@
       if (!button) return;
       const isTabbedMode = !!AppSettings.get().tabbedScanningMode;
       button.style.display = isTabbedMode ? "none" : "";
+    }
+
+    function isAlphabetBrowseModeEnabled() {
+      return !!AppSettings.get().alphabetBrowseMode;
+    }
+
+    function isRemainingNotesColumnShown() {
+      return remainingNotesColumnVisible || isAlphabetBrowseModeEnabled();
+    }
+
+    function updateAlphabetBrowseButton() {
+      const btn = document.getElementById("toggleAlphabetBrowseBtn");
+      const label = document.getElementById("toggleAlphabetBrowseBtnLabel");
+      if (!btn || !label) return;
+      const dict = window.AppSettings.getDictionary();
+      const on = isAlphabetBrowseModeEnabled();
+      label.textContent = on
+        ? (dict["A-Z Browse Mode: On"] || "A-Z Browse Mode: On")
+        : (dict["A-Z Browse Mode: Off"] || "A-Z Browse Mode: Off");
+      btn.classList.toggle("btn-warning", on);
+      btn.classList.toggle("btn-outline-warning", !on);
+      const indicator = document.getElementById("alphabetBrowseIndicator");
+      if (indicator) indicator.classList.toggle("d-none", !on);
+      applyAlphabetBrowseModeUI();
+    }
+
+    function applyBrowseModeInputKeyboard(on) {
+      const inputs = [
+        document.getElementById("barcodeInput"),
+        document.getElementById("fixedBarcodeInput")
+      ];
+      inputs.forEach(function (el) {
+        if (!el) return;
+        if (on) {
+          if (!el.dataset.browsePrevType) {
+            el.dataset.browsePrevType = el.type || "text";
+          }
+          el.type = "tel";
+          el.setAttribute("inputmode", "numeric");
+          el.setAttribute("pattern", "[0-9]*");
+          el.setAttribute("maxlength", "24");
+          el.setAttribute("autocomplete", "off");
+        } else {
+          el.type = el.dataset.browsePrevType || "text";
+          el.removeAttribute("inputmode");
+          el.removeAttribute("pattern");
+          el.removeAttribute("maxlength");
+        }
+      });
+    }
+
+    function applyAlphabetBrowseModeUI() {
+      const on = isAlphabetBrowseModeEnabled();
+      const dict = window.AppSettings.getDictionary();
+      const remainingSection = document.getElementById("remainingProductsSection");
+      const scanSection = document.getElementById("scanSection");
+      const bottomNav = document.getElementById("bottomTabNav");
+      const barcodeInput = document.getElementById("barcodeInput");
+      const fixedInput = document.getElementById("fixedBarcodeInput");
+      const placeholder = on
+        ? (dict["Scan last 4 digits of barcode"] || "Last 4 digits of barcode")
+        : "Enter Barcode";
+
+      if (on) {
+        if (AppSettings.get().tabbedScanningMode && bottomNav) {
+          bottomNav.classList.remove("d-none");
+        } else {
+          if (scanSection) scanSection.classList.remove("d-none");
+          if (remainingSection) remainingSection.classList.remove("d-none");
+        }
+      } else if (AppSettings.get().tabbedScanningMode && bottomNav) {
+        bottomNav.classList.remove("d-none");
+      }
+
+      applyBrowseModeInputKeyboard(on);
+
+      if (barcodeInput) barcodeInput.placeholder = placeholder;
+      if (fixedInput) fixedInput.placeholder = placeholder;
+      const barcodeLabel = document.querySelector('label[for="barcodeInput"]');
+      if (barcodeLabel) {
+        barcodeLabel.textContent = on
+          ? (dict["Scan last 4 digits of barcode"] || "Last 4 digits of barcode")
+          : "Enter Barcode";
+      }
+
+      if (on) {
+        if (window.AppSettings?.setDesktopViewSidebarCollapsed) {
+          AppSettings.setDesktopViewSidebarCollapsed(true);
+        }
+        if (window.RemainingAlphabetFilter) {
+          RemainingAlphabetFilter.onBrowseModeChange(true);
+          if (excelData && excelData.length > 1) {
+            renderTableHeaders();
+            showRemainingProducts();
+            RemainingAlphabetFilter.refresh({ scrollToFirst: false });
+          }
+        }
+        setTimeout(() => {
+          const focusEl = document.body.classList.contains("fixed-input-bar")
+            ? fixedInput
+            : barcodeInput;
+          if (focusEl) focusEl.focus();
+        }, 200);
+      } else if (window.RemainingAlphabetFilter) {
+        RemainingAlphabetFilter.onBrowseModeChange(false);
+        if (excelData && excelData.length > 1) {
+          renderTableHeaders();
+          showRemainingProducts();
+        }
+      }
     }
 
     function isDesktopViewModeEnabled() {
@@ -1801,12 +1924,14 @@
       localStorage.removeItem("scannedProducts");
       localStorage.removeItem("remainingProducts");
       localStorage.removeItem("remainingNotes");
+      localStorage.removeItem("browseModeScannedProducts");
       localStorage.removeItem("excelData");
       localStorage.removeItem("fileName");
 
       // Reset in-memory state
       scannedBarcodes.clear();
       remainingProducts = [];
+      browseModeScannedProducts = [];
       remainingNotes = {};
       excelData = [];
       fileName = "Product Inventory";
@@ -1834,6 +1959,7 @@
       if (productTableBody) productTableBody.innerHTML = "";
       const remainingTableBody = document.getElementById("remainingTableBody");
       if (remainingTableBody) remainingTableBody.innerHTML = "";
+      if (window.RemainingAlphabetFilter) RemainingAlphabetFilter.reset();
 
       // Reset page header
       document.getElementById("pageHeader").textContent = "Product Inventory";
@@ -2030,12 +2156,14 @@
         localStorage.removeItem("scannedProducts");
         localStorage.removeItem("remainingProducts");
         localStorage.removeItem("remainingNotes");
+        localStorage.removeItem("browseModeScannedProducts");
         localStorage.removeItem("excelData");
         localStorage.removeItem("fileName");
 
         // Step 3: Clear in-memory state
         scannedBarcodes.clear();
         remainingProducts = [];
+        browseModeScannedProducts = [];
         remainingNotes = {};
         excelData = [];
         const productTableBody = document.getElementById("productTableBody");
@@ -2252,6 +2380,7 @@
         // Apply column visibilities & DOM
         updateRemainingButtonVisibility();
         updateDesktopViewButton();
+        updateAlphabetBrowseButton();
         updateCompactScannedButton();
         applySearchColumnVisibility();
         applyTimestampColumnVisibility();
@@ -2582,6 +2711,9 @@
             document.body.classList.remove("showing-remaining-tab");
             scanSection.classList.remove("d-none");
             remainingSection.classList.add("d-none");
+            if (isAlphabetBrowseModeEnabled() && window.RemainingAlphabetFilter) {
+              RemainingAlphabetFilter.ensureVisible();
+            }
 
             // Auto-focus the best input for scanning
             const activeInput = document.body.classList.contains("fixed-input-bar")
@@ -2598,6 +2730,10 @@
             document.body.classList.add("showing-remaining-tab");
             remainingSection.classList.remove("d-none");
             scanSection.classList.add("d-none");
+            if (isAlphabetBrowseModeEnabled() && window.RemainingAlphabetFilter) {
+              RemainingAlphabetFilter.ensureVisible();
+              RemainingAlphabetFilter.refresh({ scrollToFirst: false });
+            }
             optimizedScroll(document.body, { behavior: "smooth", block: "start" });
           });
         }
@@ -2670,17 +2806,48 @@
 
       document.getElementById("toggleDesktopViewBtn").addEventListener("click", async () => {
         const nextDesktop = !isDesktopViewModeEnabled();
-        await AppSettings.save(
-          { desktopViewMode: nextDesktop, pcView: nextDesktop },
-          firestoreDb,
-          currentUser?.uid
-        );
+        const patch = { desktopViewMode: nextDesktop, pcView: nextDesktop };
+        if (!nextDesktop && isAlphabetBrowseModeEnabled()) {
+          patch.alphabetBrowseMode = false;
+        }
+        await AppSettings.save(patch, firestoreDb, currentUser?.uid);
         if (nextDesktop && AppSettings.setDesktopViewSidebarCollapsed) {
           AppSettings.setDesktopViewSidebarCollapsed(false);
         }
         updateDesktopViewButton();
+        updateAlphabetBrowseButton();
       });
       updateDesktopViewButton();
+
+      document.getElementById("toggleAlphabetBrowseBtn").addEventListener("click", async () => {
+        const s = AppSettings.get();
+        const nextBrowse = !s.alphabetBrowseMode;
+        const patch = { alphabetBrowseMode: nextBrowse };
+
+        if (nextBrowse) {
+          try {
+            sessionStorage.setItem(
+              RemainingAlphabetFilter.BROWSE_DESKTOP_KEY,
+              s.desktopViewMode ? "true" : "false"
+            );
+          } catch (_) {}
+          patch.desktopViewMode = true;
+          patch.pcView = true;
+        } else {
+          try {
+            const saved = sessionStorage.getItem(RemainingAlphabetFilter.BROWSE_DESKTOP_KEY);
+            if (saved !== null) {
+              patch.desktopViewMode = saved === "true";
+              patch.pcView = saved === "true";
+            }
+          } catch (_) {}
+        }
+
+        await AppSettings.save(patch, firestoreDb, currentUser?.uid);
+        updateAlphabetBrowseButton();
+        updateDesktopViewButton();
+      });
+      updateAlphabetBrowseButton();
 
       const desktopViewFullscreenBtn = document.getElementById("desktopViewFullscreenBtn");
       if (desktopViewFullscreenBtn) {
@@ -3634,7 +3801,7 @@
       thAction.classList.add("action-column");
       tableHeaders.appendChild(thAction);
 
-      if (remainingNotesColumnVisible) {
+      if (isRemainingNotesColumnShown()) {
         const thNotes = document.createElement("th");
         thNotes.textContent = "Notes";
         thNotes.classList.add("notes-column-remaining");
@@ -3750,6 +3917,78 @@
       return 1; // When column filter is ON, Bar code is always at index 1
     }
 
+    function getLastFourBarcodeDigits(barcode) {
+      const digits = String(barcode == null ? "" : barcode).trim().replace(/\D/g, "");
+      return digits.length >= 4 ? digits.slice(-4) : digits;
+    }
+
+    function findScannedRowByLastFourDigits(fourDigits) {
+      const suffix = String(fourDigits).replace(/\D/g, "").slice(-4);
+      if (suffix.length !== 4) return null;
+
+      const barcodeColIndex = getBarcodeColumnIndex();
+      for (const [normalizedKey, row] of scannedBarcodes.entries()) {
+        const candidates = [
+          normalizedKey,
+          row.dataset.barcode
+        ];
+        const barcodeCell = row.querySelector("td.col-" + barcodeColIndex);
+        if (barcodeCell) {
+          candidates.push(barcodeCell.textContent);
+        }
+        for (let i = 0; i < candidates.length; i++) {
+          if (getLastFourBarcodeDigits(candidates[i]) === suffix) {
+            return {
+              row,
+              barcode: normalizeBarcode(row.dataset.barcode || normalizedKey)
+            };
+          }
+        }
+      }
+      return null;
+    }
+
+    /**
+     * A–Z Browse Mode: match remaining product by last 4 digits of barcode.
+     * Prefers rows visible under the current letter filter.
+     */
+    function findProductByLastFourDigits(fourDigits) {
+      const suffix = String(fourDigits).replace(/\D/g, "").slice(-4);
+      if (suffix.length !== 4) return { index: -1, matches: 0 };
+
+      const barcodeColIndex = getBarcodeColumnIndex();
+      const tryMatch = function (indices) {
+        const hits = [];
+        for (let i = 0; i < indices.length; i++) {
+          const idx = indices[i];
+          const row = remainingProducts[idx];
+          if (!row) continue;
+          if (getLastFourBarcodeDigits(row[barcodeColIndex]) === suffix) hits.push(idx);
+        }
+        return hits;
+      };
+
+      const tbody = document.getElementById("remainingTableBody");
+      if (tbody && isAlphabetBrowseModeEnabled()) {
+        const visibleIndices = [];
+        Array.from(tbody.rows).forEach((tr) => {
+          if (tr.classList.contains("alphabet-filter-hidden")) return;
+          const idx = parseInt(tr.dataset.remainingIndex, 10);
+          if (!isNaN(idx)) visibleIndices.push(idx);
+        });
+        if (visibleIndices.length) {
+          const visibleHits = tryMatch(visibleIndices);
+          if (visibleHits.length) {
+            return { index: visibleHits[0], matches: visibleHits.length };
+          }
+        }
+      }
+
+      const allIndices = remainingProducts.map((_, i) => i);
+      const allHits = tryMatch(allIndices);
+      return { index: allHits.length ? allHits[0] : -1, matches: allHits.length };
+    }
+
     /**
      * Finds a product in remainingProducts using EXACT normalized barcode matching.
      * Returns the index of the matched product, or -1 if not found.
@@ -3772,6 +4011,30 @@
       return mapping.get(normalizedInputBarcode) || normalizedInputBarcode;
     }
 
+    /**
+     * Migrate legacy browse-only scans (older builds) into the Scanned Products table.
+     */
+    function migrateBrowseModeScansToTable() {
+      if (!browseModeScannedProducts.length) return;
+      browseModeScannedProducts.forEach(function (item) {
+        const normalized = normalizeBarcode(item.barcode);
+        if (!normalized || scannedBarcodes.has(normalized)) return;
+        addRowToScannedTable(
+          item.data,
+          normalized,
+          false,
+          item.source || "browse-scan",
+          item.timestamp || null,
+          true
+        );
+      });
+      browseModeScannedProducts = [];
+      try {
+        localStorage.setItem("browseModeScannedProducts", "[]");
+      } catch (_) {}
+      reindexScannedTable();
+    }
+
     function handleBarcodeSearch(event, forceSource = null) {
       if (isReadOnlyMode()) {
         if (event && event.target) event.target.value = "";
@@ -3782,6 +4045,69 @@
       const scannedBarcode = event.target.value.toString().trim();
 
       if (scannedBarcode === "") return;
+
+      // A–Z Browse Mode: scan by last 4 barcode digits only
+      if (isAlphabetBrowseModeEnabled()) {
+        const digits = scannedBarcode.replace(/\D/g, "");
+        if (digits.length < 4) {
+          hideBarcodeNotFoundAlert();
+          showBarcodeNotFoundAlert();
+          speakBarcodeNotFound();
+          event.target.value = "";
+          event.target.focus();
+          return;
+        }
+        const lastFour = digits.slice(-4);
+
+        hideBarcodeNotFoundAlert();
+
+        const alreadyScanned = findScannedRowByLastFourDigits(lastFour);
+        if (alreadyScanned) {
+          clearNotFoundRows();
+          const tableBody = document.getElementById("productTableBody");
+          tableBody.appendChild(alreadyScanned.row);
+          reindexScannedTable();
+          alreadyScanned.row.classList.add("duplicate-row");
+          setTimeout(() => alreadyScanned.row.classList.remove("duplicate-row"), 3000);
+          const quantityCell = alreadyScanned.row.querySelector("td.col-2");
+          if (quantityCell) {
+            const voiceMode = getVoiceMode();
+            let msg = quantityCell.textContent;
+            if (voiceMode === "en") msg += " repeated";
+            else if (voiceMode === "ar") msg += " مكرر";
+            speakQuantity(msg);
+          }
+          event.target.value = "";
+          event.target.focus();
+          return;
+        }
+
+        const { index: rowIndex, matches } = findProductByLastFourDigits(lastFour);
+
+        if (rowIndex >= 0) {
+          clearNotFoundRows();
+          const productRow = remainingProducts.splice(rowIndex, 1)[0];
+          const barcodeColIndex = getBarcodeColumnIndex();
+          const fullBarcode = normalizeBarcode(productRow[barcodeColIndex]);
+          addRowToScannedTable(productRow, fullBarcode, true, "browse-scan");
+          showRemainingProducts();
+          if (window.RemainingAlphabetFilter) {
+            RemainingAlphabetFilter.ensureVisible();
+            RemainingAlphabetFilter.refresh({ scrollToFirst: false });
+          }
+          if (matches > 1) {
+            console.warn("Multiple products share last 4 digits; scanned first match.", digits);
+          }
+        } else {
+          showBarcodeNotFoundAlert();
+          addNotFoundRow(digits);
+          speakBarcodeNotFound();
+        }
+
+        event.target.value = "";
+        event.target.focus();
+        return;
+      }
 
       // Clear any previous "not found" alert
       hideBarcodeNotFoundAlert();
@@ -4031,13 +4357,25 @@
       applyActionColumnVisibility();
       applyTimestampColumnVisibility();
 
+      if (window.RemainingAlphabetFilter) {
+        RemainingAlphabetFilter.tagScannedRow(tr, row);
+        if (isAlphabetBrowseModeEnabled()) {
+          RemainingAlphabetFilter.refresh({ scrollToFirst: false });
+        }
+      }
+
       if (!skipSave) {
         reindexScannedTable();
       }
 
       // Replace with optimized scrolling using requestAnimationFrame
-      if (focusEnabled) {
+      if (focusEnabled && !isAlphabetBrowseModeEnabled()) {
         optimizedScroll(tr, { behavior: "smooth", block: "center" });
+        tr.classList.add("bg-success");
+        setTimeout(() => {
+          tr.classList.remove("bg-success");
+        }, 1000);
+      } else if (isAlphabetBrowseModeEnabled()) {
         tr.classList.add("bg-success");
         setTimeout(() => {
           tr.classList.remove("bg-success");
@@ -4067,6 +4405,10 @@
 
       saveProgress();
       updateStatistics();
+
+      if (window.RemainingAlphabetFilter && isAlphabetBrowseModeEnabled()) {
+        RemainingAlphabetFilter.refresh({ scrollToFirst: false });
+      }
     }
 
     function removeExactRemainingProductRow(selectedRow) {
@@ -4104,6 +4446,13 @@
         remainingSection.classList.add("d-none");
         button.innerHTML = '<i class="bi bi-eye"></i> Show Remaining Products';
       }
+      if (window.RemainingAlphabetFilter && isAlphabetBrowseModeEnabled()) {
+        RemainingAlphabetFilter.updateVisibility();
+        RemainingAlphabetFilter.ensureVisible();
+        if (!remainingSection.classList.contains("d-none")) {
+          RemainingAlphabetFilter.refresh({ scrollToFirst: false });
+        }
+      }
     }
 
     function getRowKey(row) {
@@ -4116,7 +4465,7 @@
       remainingTableBody.innerHTML = "";
       const isReadOnly = isReadOnlyMode();
 
-      remainingProducts.forEach((row) => {
+      remainingProducts.forEach((row, rowIndex) => {
         const tr = document.createElement("tr");
         row.forEach((cell, i) => {
           const td = document.createElement("td");
@@ -4130,7 +4479,7 @@
           tr.appendChild(td);
         });
 
-        if (remainingNotesColumnVisible) {
+        if (isRemainingNotesColumnShown()) {
           const tdNotes = document.createElement("td");
           tdNotes.classList.add("notes-column-remaining");
 
@@ -4259,8 +4608,12 @@
           });
 
           if (movedResult) {
-            addRowToScannedTable(movedResult.product, normalizedBarcode, true, 'move');
+            addRowToScannedTable(movedResult.product, normalizedBarcode, true, "move");
             showRemainingProducts();
+            if (window.RemainingAlphabetFilter && isAlphabetBrowseModeEnabled()) {
+              RemainingAlphabetFilter.ensureVisible();
+              RemainingAlphabetFilter.refresh({ scrollToFirst: false });
+            }
           } else {
             console.error('Move failed: selected row not found in remainingProducts', { primaryBarcode, normalizedBarcode });
             alert('Error: Could not move selected product. Please refresh and try again.');
@@ -4272,12 +4625,21 @@
         // Apply hidden columns to the new row
         applyHiddenColumns(tr);
 
+        if (window.RemainingAlphabetFilter) {
+          RemainingAlphabetFilter.tagRemainingRow(tr, row, rowIndex);
+        }
+
         remainingTableBody.appendChild(tr);
       });
 
       applySearchColumnVisibility();
       applyActionColumnVisibility();
       updateStatistics();
+
+      if (window.RemainingAlphabetFilter && isAlphabetBrowseModeEnabled()) {
+        RemainingAlphabetFilter.ensureVisible();
+        RemainingAlphabetFilter.refresh({ scrollToFirst: false });
+      }
     }
 
     function saveProgress() {
@@ -4302,6 +4664,7 @@
       });
 
       localStorage.setItem("scannedProducts", JSON.stringify(scannedRows));
+      localStorage.setItem("browseModeScannedProducts", JSON.stringify(browseModeScannedProducts));
       localStorage.setItem("remainingNotes", JSON.stringify(remainingNotes));
       localStorage.setItem("fileName", fileName);
     }
@@ -4320,6 +4683,7 @@
       }
 
       const savedScannedProductsRaw = JSON.parse(localStorage.getItem("scannedProducts")) || [];
+      browseModeScannedProducts = JSON.parse(localStorage.getItem("browseModeScannedProducts") || "[]");
       remainingNotes = JSON.parse(localStorage.getItem("remainingNotes")) || {};
 
       // Migrate legacy string notes to object format { t: text, s: status }
@@ -4350,13 +4714,17 @@
       restoredScannedProducts.forEach(({ barcode, data: scannedRowData, receivedQty, source, timestamp }) => {
         addRowToScannedTable(scannedRowData, barcode, false, source || 'scan', timestamp, true, receivedQty || ""); // true = skipSave
       });
+      migrateBrowseModeScansToTable();
       reindexScannedTable();
 
       applyTimestampColumnVisibility();
 
       // Dynamically derive remainingProducts from master list directly to completely avoid state fragmentation
       if (excelData && excelData.length > 0) {
-        const scannedSet = new Set(restoredScannedProducts.map(sp => JSON.stringify(normalizeRow(sp.data))));
+        const scannedSet = new Set([
+          ...restoredScannedProducts.map(sp => JSON.stringify(normalizeRow(sp.data))),
+          ...browseModeScannedProducts.map(sp => JSON.stringify(normalizeRow(sp.data)))
+        ]);
         remainingProducts = excelData.slice(1).map(normalizeRow).filter(row => !scannedSet.has(JSON.stringify(row)));
       } else {
         remainingProducts = [];
@@ -4376,6 +4744,7 @@
       );
       if (confirmation) {
         localStorage.removeItem("scannedProducts");
+        localStorage.removeItem("browseModeScannedProducts");
         localStorage.removeItem("remainingNotes");
         location.reload();
       }
