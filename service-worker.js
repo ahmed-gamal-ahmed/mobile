@@ -1,4 +1,4 @@
-const CACHE_NAME = "product-inventory-cache-v16";
+const CACHE_NAME = "product-inventory-cache-v19";
 const APP_PREFIX = "product-inventory-";
 
 // Include all icons and critical assets
@@ -10,6 +10,7 @@ const urlsToCache = [
   "./tracker.html",
   "./settings.html",
   "./app-settings.js",
+  "./product-inventory-db.js",
   "./desktop-view.css",
   "./remaining-alphabet-filter.css",
   "./remaining-alphabet-filter.js",

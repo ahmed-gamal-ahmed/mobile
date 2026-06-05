@@ -20,6 +20,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
   <script src="app-settings.js"></script>
+  <script src="product-inventory-db.js"></script>
   <link rel="stylesheet" href="desktop-view.css" />
 
   <style>
@@ -561,30 +562,22 @@
     }
 
     // ─── Load Operation → index.html (tracker mode) ───────────────────────────
-    function loadOperation(op) {
+    async function loadOperation(op) {
       if (!confirm(`Load "${op.operationName}" into the inventory app?`)) return;
 
-      const keysToPreserve = ["appSettings", "focusEnabled", "voiceMode", "searchColumnVisible",
-        "timestampColumnVisible", "remainingNotesColumnVisible", "ignoreFirstRows"];
-      const saved = {};
-      keysToPreserve.forEach(k => saved[k] = localStorage.getItem(k));
-      localStorage.clear();
-      keysToPreserve.forEach(k => { if (saved[k] !== null) localStorage.setItem(k, saved[k]); });
+      try {
+        await ProductInventoryDB.init();
+        await ProductInventoryDB.clearActiveSession();
+        await ProductInventoryDB.importOperation(op);
+      } catch (err) {
+        console.error("Failed to load operation into IndexedDB:", err);
+        alert("Failed to load operation. See console for details.");
+        return;
+      }
 
-      localStorage.setItem("excelData", op.excelData || "[]");
-      localStorage.setItem("fileName", op.operationName);
-      localStorage.setItem("remainingProducts", op.remainingProducts || "[]");
-      localStorage.setItem("remainingNotes", op.remainingNotes || "{}");
-      let sp = [];
-      try { sp = JSON.parse(op.scannedProducts || "[]"); sp.forEach(i => { i.source = i.source || "scan"; }); } catch (_) { }
-      localStorage.setItem("scannedProducts", JSON.stringify(sp));
-      if (op.editedBarcodes) localStorage.setItem("editedBarcodes", op.editedBarcodes);
-
-      // Tracker mode flag — forces search mode + shows remaining in index.html
       localStorage.setItem("trackerMode", "true");
 
       if (window.parent !== window) {
-        // Tell the shell to: (1) relay reload signal to inventory iframe, (2) switch to inventory tab
         window.parent.postMessage({ type: 'loadTrackerOperation' }, '*');
       } else {
         window.location.href = "index.html";
