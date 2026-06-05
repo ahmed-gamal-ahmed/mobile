@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -29,6 +29,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
   <script src="app-settings.js"></script>
+  <script src="product-inventory-db.js"></script>
   <script src="remaining-alphabet-filter.js"></script>
   <link rel="stylesheet" href="desktop-view.css" />
   <link rel="stylesheet" href="remaining-alphabet-filter.css" />
@@ -57,6 +58,16 @@
     .highlight-column {
       font-weight: bold;
       font-size: 1.2rem;
+    }
+
+    #saveStatusIndicator {
+      font-size: 0.85rem;
+      color: #6c757d;
+    }
+
+    #saveStatusIndicator.saving #saveStatusText {
+      color: #fd7e14;
+      font-weight: 600;
     }
 
     /* Sidebar styles updated for mobile */
@@ -596,6 +607,18 @@
           <span class="badge bg-success me-2">Scanned</span>
           <span id="statsScannedProducts">0</span>
         </div>
+        <div class="mb-1">
+          <span class="badge bg-secondary me-2">Total PCS</span>
+          <span id="statsTotalPcs">0</span>
+        </div>
+        <div class="mb-1">
+          <span class="badge bg-warning text-dark me-2">Remaining PCS</span>
+          <span id="statsRemainingPcs">0</span>
+        </div>
+        <div class="mb-1">
+          <span class="badge bg-success me-2">Scanned PCS</span>
+          <span id="statsScannedPcs">0</span>
+        </div>
       </div>
     </div>
 
@@ -676,10 +699,6 @@
     </div>
     <!-- Online Review Operations Section -->
     <div class="mb-3">
-      <label for="driverSelect" class="form-label fw-semibold small mb-1">Driver Name</label>
-      <select id="driverSelect" class="form-select mb-2"></select>
-      <input type="text" id="driverNameFallback" class="form-control mb-2 d-none"
-        placeholder="Enter driver name (offline)" />
       <button id="saveReviewOperationBtn" class="btn btn-primary w-100 mb-2" title="Save Review Operation">
         <i class="bi bi-cloud-upload"></i> Save Review Operation
       </button>
@@ -736,6 +755,9 @@
       <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
     <h1 class="text-center mb-2" id="pageHeader">Product Inventory</h1>
+    <p id="saveStatusIndicator" class="text-center mb-2">
+      <i class="bi bi-hdd-network me-1"></i><span id="saveStatusText">Last Saved: --:--:--</span>
+    </p>
     <p id="desktopViewIndicator" class="text-center mb-3 d-none desktop-view-indicator">
       <span class="badge bg-primary"><i class="bi bi-pc-display-horizontal me-1"></i> Desktop layout active</span>
     </p>
@@ -1173,6 +1195,11 @@
     let browseModeScannedProducts = [];
     let remainingProducts = [];
     let fileName = "Product Inventory"; // Default file name
+    let currentSessionId = null;
+    let storageInitialized = false;
+    let sessionRecoveredFromIDB = false;
+    let crashProtectionSetup = false;
+    let skipSaveOnUnload = false;
     let currentGoogleWorkbook = null;
     let currentLocalWorkbook = null;
     const PRIVATE_SHEETS_BASE_URL = "/api";
@@ -1252,11 +1279,40 @@
 
 
 
+    function parseQtyValue(val) {
+      if (val == null || val === "") return 0;
+      const n = parseFloat(String(val).replace(/,/g, "").trim());
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function sumQtyFromRows(rows) {
+      if (!Array.isArray(rows)) return 0;
+      return rows.reduce((sum, row) => sum + parseQtyValue(row[2]), 0);
+    }
+
+    function sumScannedQtyFromTable() {
+      let total = 0;
+      scannedBarcodes.forEach((row) => {
+        const dataCells = row.querySelectorAll("td.data-cell");
+        if (dataCells.length > 2) {
+          total += parseQtyValue(dataCells[2].textContent);
+        }
+      });
+      return total;
+    }
+
+    function formatPcsCount(n) {
+      return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.?0+$/, "");
+    }
+
     function updateStatistics() {
       const fileNameEl = document.getElementById("statsFileName");
       const totalEl = document.getElementById("statsTotalProducts");
       const remainingEl = document.getElementById("statsRemainingProducts");
       const scannedEl = document.getElementById("statsScannedProducts");
+      const totalPcsEl = document.getElementById("statsTotalPcs");
+      const remainingPcsEl = document.getElementById("statsRemainingPcs");
+      const scannedPcsEl = document.getElementById("statsScannedPcs");
 
       // Main Screen Elements
       const mainTotalEl = document.getElementById("mainStatsTotalProducts");
@@ -1284,6 +1340,14 @@
       totalEl.textContent = totalCount;
       remainingEl.textContent = remainingCount;
       scannedEl.textContent = scannedCount;
+
+      const totalPcs = hasProducts ? sumQtyFromRows(excelData.slice(1)) : 0;
+      const remainingPcs = hasProducts ? sumQtyFromRows(remainingProducts) : 0;
+      const scannedPcs = hasProducts ? sumScannedQtyFromTable() : 0;
+
+      if (totalPcsEl) totalPcsEl.textContent = formatPcsCount(totalPcs);
+      if (remainingPcsEl) remainingPcsEl.textContent = formatPcsCount(remainingPcs);
+      if (scannedPcsEl) scannedPcsEl.textContent = formatPcsCount(scannedPcs);
 
       // Update Main Screen
       if (mainTotalEl) mainTotalEl.textContent = totalCount;
@@ -1748,19 +1812,155 @@
       }, 1500);
     }
 
-    // Load edited barcodes from local storage (fallback)
-    function loadEditedBarcodesFromLocal() {
+    // Load edited barcodes from IndexedDB (fallback: legacy localStorage during migration)
+    async function loadEditedBarcodesFromLocal() {
+      try {
+        await ProductInventoryDB.init();
+        const mappings = await ProductInventoryDB.getBarcodeMappings();
+        if (mappings.length > 0) {
+          editedBarcodes = new Map(mappings);
+          return;
+        }
+      } catch (err) {
+        console.warn("IndexedDB barcode mappings load failed:", err);
+      }
       const savedEditedBarcodes =
-        JSON.parse(localStorage.getItem("editedBarcodes")) || [];
+        JSON.parse(localStorage.getItem("editedBarcodes") || "[]");
       editedBarcodes = new Map(savedEditedBarcodes);
     }
 
-    // Save edited barcodes to local storage (fallback cache)
+    // Save edited barcodes to IndexedDB immediately
     function saveEditedBarcodesToLocal() {
-      localStorage.setItem(
-        "editedBarcodes",
-        JSON.stringify([...editedBarcodes.entries()])
-      );
+      const entries = [...editedBarcodes.entries()];
+      ProductInventoryDB.saveBarcodeMappings(entries).catch((err) => {
+        console.error("Failed to save barcode mappings to IndexedDB:", err);
+      });
+      if (currentSessionId) {
+        saveProgress();
+      }
+    }
+
+    function getScannedProductsSnapshot() {
+      const tableBody = document.getElementById("productTableBody");
+      if (!tableBody) return [];
+
+      return Array.from(tableBody.rows).map((row) => {
+        const barcode = row.dataset.barcode;
+        const dataCells = row.querySelectorAll("td.data-cell");
+        const rowData = Array.from(dataCells).map((td) => td.textContent);
+        let receivedQty = "";
+        const rxInput = row.querySelector(".received-qty-input");
+        if (rxInput) receivedQty = rxInput.value;
+        return {
+          barcode,
+          data: rowData,
+          receivedQty,
+          source: row.dataset.source || "scan",
+          timestamp: row.dataset.timestamp || "",
+        };
+      });
+    }
+
+    function buildCurrentSessionPayload() {
+      if (!currentSessionId) {
+        currentSessionId = ProductInventoryDB.generateSessionId();
+      }
+
+      return {
+        sessionId: currentSessionId,
+        orderName: fileName,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        excelData,
+        scannedProducts: getScannedProductsSnapshot(),
+        remainingProducts,
+        browseModeScannedProducts,
+        remainingNotes,
+        barcodeMappings: [...editedBarcodes.entries()],
+        statistics: {
+          totalProducts: excelData.length > 1 ? excelData.length - 1 : 0,
+          scannedCount: scannedBarcodes.size,
+          remainingCount: remainingProducts.length,
+        },
+        settings: {
+          hiddenColumns: [...hiddenColumns],
+          searchColumnVisible,
+          timestampColumnVisible,
+          remainingNotesColumnVisible,
+        },
+        isActive: true,
+      };
+    }
+
+    function applySessionToMemory(session) {
+      if (!session) return false;
+
+      currentSessionId = session.sessionId;
+      fileName = session.orderName || session.fileName || "Product Inventory";
+      excelData = session.excelData || [];
+      remainingProducts = session.remainingProducts || [];
+      remainingNotes = session.remainingNotes || {};
+      browseModeScannedProducts = session.browseModeScannedProducts || [];
+
+      if (session.barcodeMappings && session.barcodeMappings.length > 0) {
+        editedBarcodes = new Map(session.barcodeMappings);
+      }
+
+      if (session.settings) {
+        if (Array.isArray(session.settings.hiddenColumns)) {
+          hiddenColumns = [...session.settings.hiddenColumns];
+        }
+        if (typeof session.settings.searchColumnVisible === "boolean") {
+          searchColumnVisible = session.settings.searchColumnVisible;
+        }
+        if (typeof session.settings.timestampColumnVisible === "boolean") {
+          timestampColumnVisible = session.settings.timestampColumnVisible;
+        }
+        if (typeof session.settings.remainingNotesColumnVisible === "boolean") {
+          remainingNotesColumnVisible = session.settings.remainingNotesColumnVisible;
+        }
+      }
+
+      return true;
+    }
+
+    async function initializeProductInventoryStorage() {
+      if (storageInitialized) return;
+      storageInitialized = true;
+
+      ProductInventoryDB.setSaveStatusCallback((status, timeStr) => {
+        const el = document.getElementById("saveStatusText");
+        const indicator = document.getElementById("saveStatusIndicator");
+        if (!el) return;
+        if (status === "saving") {
+          indicator?.classList.add("saving");
+          el.textContent = "Saving...";
+        } else {
+          indicator?.classList.remove("saving");
+          el.textContent = "Last Saved: " + (timeStr || "--:--:--");
+        }
+      });
+
+      await ProductInventoryDB.init();
+      await ProductInventoryDB.migrateFromLocalStorage();
+    }
+
+    function setupCrashProtection() {
+      if (crashProtectionSetup) return;
+      crashProtectionSetup = true;
+
+      const flushSave = () => {
+        if (skipSaveOnUnload || excelData.length === 0) return;
+        saveProgress(true);
+      };
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") flushSave();
+      });
+
+      window.addEventListener("pagehide", () => {
+        flushSave();
+      });
     }
 
     async function loadBarcodeMappingsFromFirestore() {
@@ -1830,14 +2030,16 @@
       if (!excelData || excelData.length === 0) return;
 
       try {
+        await saveProgress(true);
+        const sessionPayload = buildCurrentSessionPayload();
         const sessionData = {
           lastSession: {
             fileName: fileName || "Product Inventory",
-            excelData: localStorage.getItem("excelData") || "[]",
-            scannedProducts: localStorage.getItem("scannedProducts") || "[]",
-            remainingProducts: localStorage.getItem("remainingProducts") || "[]",
-            remainingNotes: localStorage.getItem("remainingNotes") || "{}",
-            editedBarcodes: localStorage.getItem("editedBarcodes") || "[]",
+            excelData: JSON.stringify(sessionPayload.excelData),
+            scannedProducts: JSON.stringify(sessionPayload.scannedProducts),
+            remainingProducts: JSON.stringify(sessionPayload.remainingProducts),
+            remainingNotes: JSON.stringify(sessionPayload.remainingNotes),
+            editedBarcodes: JSON.stringify(sessionPayload.barcodeMappings),
             savedAt: Date.now()
           }
         };
@@ -1853,10 +2055,44 @@
       }
     }
 
+    async function clearSessionFromFirestore() {
+      if (!firestoreDb || !currentUser) return;
+      try {
+        await firestoreDb.collection("users").doc(currentUser.uid).update({
+          lastSession: {
+            fileName: "Product Inventory",
+            excelData: "[]",
+            scannedProducts: "[]",
+            remainingProducts: "[]",
+            remainingNotes: "{}",
+            editedBarcodes: "[]",
+            savedAt: Date.now(),
+            cleared: true,
+          },
+        });
+        console.log("Firestore lastSession cleared.");
+      } catch (err) {
+        console.error("Failed to clear Firestore session:", err);
+      }
+    }
+
     async function restoreSessionFromFirestore() {
       if (!firestoreDb || !currentUser) return false;
 
       try {
+        await initializeProductInventoryStorage();
+
+        if (await ProductInventoryDB.isSessionCleared()) {
+          console.log("Session was explicitly cleared — skipping Firestore restore.");
+          return false;
+        }
+
+        const existingSession = await ProductInventoryDB.getActiveSession();
+        if (existingSession && existingSession.excelData && existingSession.excelData.length > 0) {
+          console.log("IndexedDB already has data — skipping Firestore restore.");
+          return false;
+        }
+
         const userDoc = await firestoreDb
           .collection("users")
           .doc(currentUser.uid)
@@ -1868,24 +2104,60 @@
         const lastSession = userData.lastSession;
 
         // No saved session exists
-        if (!lastSession || !lastSession.excelData || lastSession.excelData === "[]") return false;
+        if (!lastSession || lastSession.cleared === true) return false;
+        if (!lastSession.excelData || lastSession.excelData === "[]") return false;
 
-        // Check if localStorage already has data from this session
-        // If localStorage already has excelData, it means the user
-        // refreshed the page — don't overwrite with Firestore data
-        const localExcelData = localStorage.getItem("excelData");
-        if (localExcelData && localExcelData !== "[]") {
-          console.log("LocalStorage already has data — skipping Firestore restore.");
-          return false;
-        }
+        let parsedExcel = [];
+        let parsedScanned = [];
+        let parsedRemaining = [];
+        let parsedNotes = {};
+        let parsedMappings = [];
 
-        // Restore all session data to localStorage
-        localStorage.setItem("excelData", lastSession.excelData || "[]");
-        localStorage.setItem("fileName", lastSession.fileName || "Product Inventory");
-        localStorage.setItem("scannedProducts", lastSession.scannedProducts || "[]");
-        localStorage.setItem("remainingProducts", lastSession.remainingProducts || "[]");
-        localStorage.setItem("remainingNotes", lastSession.remainingNotes || "{}");
-        localStorage.setItem("editedBarcodes", lastSession.editedBarcodes || "[]");
+        try {
+          parsedExcel =
+            typeof lastSession.excelData === "string"
+              ? JSON.parse(lastSession.excelData)
+              : lastSession.excelData || [];
+        } catch (_) { /* ignore */ }
+        try {
+          parsedScanned =
+            typeof lastSession.scannedProducts === "string"
+              ? JSON.parse(lastSession.scannedProducts)
+              : lastSession.scannedProducts || [];
+        } catch (_) { /* ignore */ }
+        try {
+          parsedRemaining =
+            typeof lastSession.remainingProducts === "string"
+              ? JSON.parse(lastSession.remainingProducts)
+              : lastSession.remainingProducts || [];
+        } catch (_) { /* ignore */ }
+        try {
+          parsedNotes =
+            typeof lastSession.remainingNotes === "string"
+              ? JSON.parse(lastSession.remainingNotes)
+              : lastSession.remainingNotes || {};
+        } catch (_) { /* ignore */ }
+        try {
+          parsedMappings =
+            typeof lastSession.editedBarcodes === "string"
+              ? JSON.parse(lastSession.editedBarcodes)
+              : lastSession.editedBarcodes || [];
+        } catch (_) { /* ignore */ }
+
+        const sessionId = ProductInventoryDB.generateSessionId();
+        await ProductInventoryDB.saveSession({
+          sessionId,
+          orderName: lastSession.fileName || "Product Inventory",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          excelData: parsedExcel,
+          scannedProducts: parsedScanned,
+          remainingProducts: parsedRemaining,
+          remainingNotes: parsedNotes,
+          barcodeMappings: parsedMappings,
+          browseModeScannedProducts: [],
+          isActive: true,
+        });
 
         console.log("Session restored from Firestore.");
         return true;
@@ -1920,13 +2192,8 @@
       // Clear currentUser
       currentUser = null;
 
-      // Clear scan progress from localStorage
-      localStorage.removeItem("scannedProducts");
-      localStorage.removeItem("remainingProducts");
-      localStorage.removeItem("remainingNotes");
-      localStorage.removeItem("browseModeScannedProducts");
-      localStorage.removeItem("excelData");
-      localStorage.removeItem("fileName");
+      // Clear active session from IndexedDB
+      await ProductInventoryDB.clearActiveSession();
 
       // Reset in-memory state
       scannedBarcodes.clear();
@@ -1981,7 +2248,6 @@
     let appInitialized = false;
     let currentUser = null;
     /** @type {{id:string,name:string}[]} */
-    let driversIndexCache = [];
     let currentUserRestrictions = {
       hideTimestampColumn: false,
       hideSourceColumn: false,
@@ -2129,14 +2395,17 @@
         const snapshot = await firestoreDb
           .collection("savedOperations")
           .where("createdBy", "==", currentUser.uid)
-          .where("operationName", "==", fileName)
-          .orderBy("timestamp", "desc")
-          .limit(1)
+          .limit(50)
           .get();
 
-        if (snapshot.empty) return false;
+        const matching = snapshot.docs
+          .map((d) => d.data())
+          .filter((op) => op.operationName === fileName)
+          .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
-        const lastOp = snapshot.docs[0].data();
+        if (matching.length === 0) return false;
+
+        const lastOp = matching[0];
         const savedScannedCount = JSON.parse(lastOp.scannedProducts || "[]").length;
 
         // Both conditions: name matches AND scanned count matches
@@ -2152,13 +2421,8 @@
         // Step 1: Parse the assigned excelData
         const parsedExcelData = JSON.parse(data.excelData);
 
-        // Step 2: Clear ONLY scan progress from localStorage
-        localStorage.removeItem("scannedProducts");
-        localStorage.removeItem("remainingProducts");
-        localStorage.removeItem("remainingNotes");
-        localStorage.removeItem("browseModeScannedProducts");
-        localStorage.removeItem("excelData");
-        localStorage.removeItem("fileName");
+        // Step 2: Clear active session from IndexedDB
+        await ProductInventoryDB.clearActiveSession();
 
         // Step 3: Clear in-memory state
         scannedBarcodes.clear();
@@ -2172,7 +2436,7 @@
         // Step 4: Set new fileName
         fileName = data.fileName;
         document.getElementById("pageHeader").textContent = fileName;
-        localStorage.setItem("fileName", fileName);
+        currentSessionId = ProductInventoryDB.generateSessionId();
 
         // Step 5: Process and load the new data
         processImportedData(parsedExcelData);
@@ -2231,20 +2495,23 @@
 
     async function hasUnsavedWork() {
       if (scannedBarcodes.size === 0) return false;
+      if (!firestoreDb || !currentUser) return true;
       try {
         const snapshot = await firestoreDb
           .collection("savedOperations")
           .where("createdBy", "==", currentUser.uid)
-          .orderBy("timestamp", "desc")
-          .limit(1)
+          .limit(50)
           .get();
         if (snapshot.empty) return true;
-        const lastOp = snapshot.docs[0].data();
+        const sorted = snapshot.docs
+          .map((d) => d.data())
+          .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        const lastOp = sorted[0];
         const lastSavedCount = JSON.parse(lastOp.scannedProducts || "[]").length;
         return lastSavedCount !== scannedBarcodes.size;
       } catch (err) {
         console.error("hasUnsavedWork check failed:", err);
-        return false;
+        return true;
       }
     }
 
@@ -2265,80 +2532,13 @@
       });
     }
 
-    function getDriverPayloadForSave() {
-      const sel = document.getElementById("driverSelect");
-      const fb = document.getElementById("driverNameFallback");
-      if (fb && !fb.classList.contains("d-none")) {
-        const driverName = (fb.value || "").trim();
-        return { driverId: "", driverName: driverName, driver: driverName };
-      }
-      if (sel && sel.value) {
-        const opt = sel.options[sel.selectedIndex];
-        const driverId = (sel.value || "").trim();
-        const driverName = ((opt.dataset && opt.dataset.name) || opt.textContent || "").trim();
-        return { driverId: driverId, driverName: driverName, driver: driverName };
-      }
-      if (sel && !sel.classList.contains("d-none") && driversIndexCache.length > 0) {
-        return { driverId: "", driverName: "", driver: "" };
-      }
-      const fallbackName = currentUser && currentUser.displayName ? currentUser.displayName.trim() : "";
-      return { driverId: "", driverName: fallbackName, driver: fallbackName };
-    }
-
-    async function loadDriversForIndex() {
-      if (!firestoreDb) return;
-      try {
-        const snap = await firestoreDb.collection("drivers").get();
-        driversIndexCache = [];
-        snap.forEach((docSnap) => {
-          const d = docSnap.data();
-          if (d.active !== false) {
-            driversIndexCache.push({ id: docSnap.id, name: (d.name || "").toString() });
-          }
-        });
-        driversIndexCache.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
-      } catch (e) {
-        console.error("loadDriversForIndex:", e);
-        driversIndexCache = [];
-      }
-      populateDriverSelectUI();
-    }
-
-    function populateDriverSelectUI() {
-      const sel = document.getElementById("driverSelect");
-      const fb = document.getElementById("driverNameFallback");
-      if (!sel) return;
-      sel.innerHTML = "";
-      const opt0 = document.createElement("option");
-      opt0.value = "";
-      opt0.textContent = "— Select —";
-      sel.appendChild(opt0);
-      driversIndexCache.forEach((d) => {
-        const o = document.createElement("option");
-        o.value = d.id;
-        o.textContent = d.name;
-        o.dataset.name = d.name;
-        sel.appendChild(o);
-      });
-      if (driversIndexCache.length === 0) {
-        sel.classList.add("d-none");
-        if (fb) {
-          fb.classList.remove("d-none");
-          if (!(fb.value || "").trim() && currentUser) fb.value = currentUser.displayName || "";
-        }
-      } else {
-        sel.classList.remove("d-none");
-        if (fb) fb.classList.add("d-none");
-      }
-    }
-
     // Silent save — no prompts, no alerts
     async function triggerSaveOperation() {
       if (!firestoreDb || !currentUser) return;
       if (!excelData || excelData.length === 0) return;
 
-      const sessionDataStr = localStorage.getItem("scannedProducts") || "[]";
-      const dp = getDriverPayloadForSave();
+      await saveProgress(true);
+      const sessionPayload = buildCurrentSessionPayload();
       try {
         await firestoreDb.collection("savedOperations").add({
           operationName: fileName,
@@ -2349,11 +2549,11 @@
           auditors: [currentUser.displayName],
           createdBy: currentUser.uid,
           createdByName: currentUser.displayName,
-          driverId: dp.driverId || "",
-          driverName: dp.driverName || "",
-          driver: dp.driver || "",
+          driverId: "",
+          driverName: "",
+          driver: "",
           excelData: JSON.stringify(excelData),
-          scannedProducts: sessionDataStr,
+          scannedProducts: JSON.stringify(sessionPayload.scannedProducts),
           remainingProducts: JSON.stringify(remainingProducts),
           remainingNotes: JSON.stringify(remainingNotes),
           editedBarcodes: JSON.stringify(Array.from(editedBarcodes.entries()))
@@ -2525,11 +2725,6 @@
             role: (userData.role || "").toLowerCase()
           };
 
-          await loadDriversForIndex();
-          const fb = document.getElementById("driverNameFallback");
-          if (fb && !fb.classList.contains("d-none")) {
-            fb.value = currentUser.displayName || "";
-          }
           currentUserRestrictions = currentUser.role === "user"
             ? normalizeRestrictions(userData.restrictions)
             : normalizeRestrictions(null);
@@ -2587,13 +2782,19 @@
           // Start assignment listener
           startAssignmentListener();
 
-          // Restore session from Firestore if localStorage is empty
+          // Initialize IndexedDB and recover latest session
+          await initializeProductInventoryStorage();
+          setupCrashProtection();
+
           let wasRestored = false;
           if (currentUser.role !== "tracker") {
             wasRestored = await restoreSessionFromFirestore();
           }
 
-          // Run app initialization (loadProgress, updateStatistics etc.)
+          const idbRecovered = await loadProgress();
+          if (idbRecovered) wasRestored = true;
+
+          // Run app initialization (updateStatistics etc.)
           initializeApp();
 
           // Show restoration banner if data was restored
@@ -2601,21 +2802,16 @@
             const banner = document.getElementById("sessionRestoredBanner");
             const detailsSpan = document.getElementById("sessionRestoredDetails");
 
-            // Show file name and scanned count in banner
             try {
-              const restoredFileName = localStorage.getItem("fileName") || "Unknown file";
-              const restoredScanned = JSON.parse(
-                localStorage.getItem("scannedProducts") || "[]"
-              ).length;
+              const restoredScanned = scannedBarcodes.size;
               detailsSpan.textContent =
-                `File: "${restoredFileName}" — ${restoredScanned} scanned item(s).`;
+                `File: "${fileName}" — ${restoredScanned} scanned item(s).`;
             } catch (e) {
               detailsSpan.textContent = "";
             }
 
             banner.classList.remove("d-none");
 
-            // Auto-hide after 6 seconds
             setTimeout(() => {
               banner.classList.add("d-none");
             }, 6000);
@@ -3370,11 +3566,14 @@
 
       // Initialize Firebase / Firestore and load barcode mappings
       // initFirebase() already called at start of DOMContentLoaded
-      loadBarcodeMappingsFromFirestore();
-      subscribeToBarcodeMappings();
-
-      // Load previous progress if available
-      loadProgress();
+      initializeProductInventoryStorage().then(() => {
+        setupCrashProtection();
+        loadBarcodeMappingsFromFirestore();
+        subscribeToBarcodeMappings();
+        if (!sessionRecoveredFromIDB) {
+          loadProgress();
+        }
+      });
 
       // Handle trackerMode flag — set by tracker.html when loading an operation
       if (localStorage.getItem("trackerMode") === "true") {
@@ -3667,13 +3866,11 @@
       // --- CLEAR PREVIOUS SCANNED DATA ---
       scannedBarcodes.clear();
       remainingNotes = {};
+      browseModeScannedProducts = [];
       const productTableBody = document.getElementById("productTableBody");
       if (productTableBody) productTableBody.innerHTML = "";
-      localStorage.removeItem("scannedProducts");
-      localStorage.removeItem("remainingNotes");
+      currentSessionId = ProductInventoryDB.generateSessionId();
       // -----------------------------------
-
-      localStorage.setItem("excelData", JSON.stringify(excelData));
 
       renderTableHeaders();
       showRemainingProducts();
@@ -3853,6 +4050,7 @@
       } else {
         hiddenColumns.push(columnIndex);
       }
+      saveProgress();
     }
 
     function applyHiddenColumns(row) {
@@ -4029,9 +4227,7 @@
         );
       });
       browseModeScannedProducts = [];
-      try {
-        localStorage.setItem("browseModeScannedProducts", "[]");
-      } catch (_) {}
+      saveProgress();
       reindexScannedTable();
     }
 
@@ -4642,53 +4838,40 @@
       }
     }
 
-    function saveProgress() {
-      const tableBody = document.getElementById("productTableBody");
-      if (!tableBody) return;
+    function saveProgress(flushOnly) {
+      if (!excelData || excelData.length === 0) return Promise.resolve();
 
-      const scannedRows = Array.from(tableBody.rows).map(row => {
-        const barcode = row.dataset.barcode;
-
-        // Extract core spreadsheet data
-        const dataCells = row.querySelectorAll("td.data-cell");
-        const rowData = Array.from(dataCells).map(td => td.textContent);
-
-        // Extract Received Qty input string
-        let receivedQty = "";
-        const rxInput = row.querySelector(".received-qty-input");
-        if (rxInput) {
-          receivedQty = rxInput.value;
-        }
-
-        return { barcode, data: rowData, receivedQty, source: row.dataset.source || 'scan', timestamp: row.dataset.timestamp || "" };
+      const payload = buildCurrentSessionPayload();
+      const savePromise = ProductInventoryDB.saveSession(payload).catch((err) => {
+        console.error("saveProgress IndexedDB error:", err);
       });
 
-      localStorage.setItem("scannedProducts", JSON.stringify(scannedRows));
-      localStorage.setItem("browseModeScannedProducts", JSON.stringify(browseModeScannedProducts));
-      localStorage.setItem("remainingNotes", JSON.stringify(remainingNotes));
-      localStorage.setItem("fileName", fileName);
+      if (flushOnly) return savePromise;
+      return savePromise;
     }
 
-    function loadProgress() {
-      const savedExcelData = JSON.parse(localStorage.getItem("excelData")) || [];
-      const savedFileName = localStorage.getItem("fileName");
+    async function loadProgress(sessionData) {
+      await initializeProductInventoryStorage();
 
-      if (savedExcelData.length > 0) {
-        excelData = savedExcelData;
-        renderTableHeaders();
-        if (savedFileName) {
-          fileName = savedFileName;
-          document.getElementById("pageHeader").textContent = fileName;
-        }
+      let session = sessionData;
+      if (!session) {
+        session = await ProductInventoryDB.getActiveSession();
       }
 
-      const savedScannedProductsRaw = JSON.parse(localStorage.getItem("scannedProducts")) || [];
-      browseModeScannedProducts = JSON.parse(localStorage.getItem("browseModeScannedProducts") || "[]");
-      remainingNotes = JSON.parse(localStorage.getItem("remainingNotes")) || {};
+      if (!session || !session.excelData || session.excelData.length === 0) {
+        return false;
+      }
+
+      applySessionToMemory(session);
+
+      renderTableHeaders();
+      document.getElementById("pageHeader").textContent = fileName;
+
+      const savedScannedProductsRaw = session.scannedProducts || [];
 
       // Migrate legacy string notes to object format { t: text, s: status }
-      Object.keys(remainingNotes).forEach(key => {
-        if (typeof remainingNotes[key] === 'string') {
+      Object.keys(remainingNotes).forEach((key) => {
+        if (typeof remainingNotes[key] === "string") {
           remainingNotes[key] = { t: remainingNotes[key], s: "" };
         }
       });
@@ -4706,32 +4889,52 @@
         restoredBarcodeSet.add(normalizedSavedBarcode);
         restoredScannedProducts.push({
           ...item,
-          barcode: normalizedSavedBarcode
+          barcode: normalizedSavedBarcode,
         });
       });
 
       // Restore scanned rows WITHOUT triggering saveProgress() or updateStatistics() on each row
       restoredScannedProducts.forEach(({ barcode, data: scannedRowData, receivedQty, source, timestamp }) => {
-        addRowToScannedTable(scannedRowData, barcode, false, source || 'scan', timestamp, true, receivedQty || ""); // true = skipSave
+        addRowToScannedTable(scannedRowData, barcode, false, source || "scan", timestamp, true, receivedQty || "");
       });
       migrateBrowseModeScansToTable();
       reindexScannedTable();
 
       applyTimestampColumnVisibility();
+      applyHiddenColumns();
 
       // Dynamically derive remainingProducts from master list directly to completely avoid state fragmentation
       if (excelData && excelData.length > 0) {
         const scannedSet = new Set([
-          ...restoredScannedProducts.map(sp => JSON.stringify(normalizeRow(sp.data))),
-          ...browseModeScannedProducts.map(sp => JSON.stringify(normalizeRow(sp.data)))
+          ...restoredScannedProducts.map((sp) => JSON.stringify(normalizeRow(sp.data))),
+          ...browseModeScannedProducts.map((sp) => JSON.stringify(normalizeRow(sp.data))),
         ]);
-        remainingProducts = excelData.slice(1).map(normalizeRow).filter(row => !scannedSet.has(JSON.stringify(row)));
+        remainingProducts = excelData
+          .slice(1)
+          .map(normalizeRow)
+          .filter((row) => !scannedSet.has(JSON.stringify(row)));
       } else {
         remainingProducts = [];
       }
 
       showRemainingProducts();
       updateStatistics();
+
+      if (session.updatedAt) {
+        const restoredDate = new Date(session.updatedAt);
+        const pad = (n) => String(n).padStart(2, "0");
+        const timeStr =
+          pad(restoredDate.getHours()) +
+          ":" +
+          pad(restoredDate.getMinutes()) +
+          ":" +
+          pad(restoredDate.getSeconds());
+        const el = document.getElementById("saveStatusText");
+        if (el) el.textContent = "Last Saved: " + timeStr;
+      }
+
+      sessionRecoveredFromIDB = true;
+      return true;
     }
 
     async function clearLocalStorage() {
@@ -4742,11 +4945,43 @@
       const confirmation = confirm(
         "Are you sure you want to clear all scanned and remaining products?"
       );
-      if (confirmation) {
-        localStorage.removeItem("scannedProducts");
-        localStorage.removeItem("browseModeScannedProducts");
-        localStorage.removeItem("remainingNotes");
+      if (!confirmation) return;
+
+      skipSaveOnUnload = true;
+      try {
+        await initializeProductInventoryStorage();
+        const clearSessions = ProductInventoryDB.clearAllSessions || ProductInventoryDB.clearActiveSession;
+        if (typeof clearSessions !== "function") {
+          throw new Error("IndexedDB clear function is unavailable. Hard-refresh the page (Ctrl+Shift+R).");
+        }
+        await clearSessions.call(ProductInventoryDB);
+        if (typeof ProductInventoryDB.markSessionCleared === "function") {
+          await ProductInventoryDB.markSessionCleared();
+        }
+        await clearSessionFromFirestore();
+        if (typeof ProductInventoryDB.flushPendingWrites === "function") {
+          await ProductInventoryDB.flushPendingWrites();
+        }
+
+        scannedBarcodes.clear();
+        remainingProducts = [];
+        browseModeScannedProducts = [];
+        remainingNotes = {};
+        excelData = [];
+        currentSessionId = null;
+        fileName = "Product Inventory";
+
+        const productTableBody = document.getElementById("productTableBody");
+        if (productTableBody) productTableBody.innerHTML = "";
+        const remainingTableBody = document.getElementById("remainingTableBody");
+        if (remainingTableBody) remainingTableBody.innerHTML = "";
+        if (window.RemainingAlphabetFilter) RemainingAlphabetFilter.reset();
+
         location.reload();
+      } catch (err) {
+        skipSaveOnUnload = false;
+        console.error("Clear storage failed:", err);
+        alert("Failed to clear storage. See console for details.");
       }
     }
 
@@ -4845,8 +5080,11 @@
       XLSX.writeFile(wb, exportName);
     }
 
-    // Warn users when they try to refresh or leave the page
+    // Warn users when they try to refresh or leave the page (crash protection saves via setupCrashProtection)
     window.addEventListener("beforeunload", (event) => {
+      if (!skipSaveOnUnload && excelData.length > 0) {
+        saveProgress(true);
+      }
       event.preventDefault();
       event.returnValue = "";
     });
@@ -4869,12 +5107,14 @@
         fileName,
         excelData,
         remainingProducts,
-        scannedProducts: JSON.parse(localStorage.getItem("scannedProducts") || "[]"),
+        scannedProducts: getScannedProductsSnapshot(),
         remainingNotes,
         editedBarcodes: Array.from(editedBarcodes.entries()),
         settings: {
+          hiddenColumns: [...hiddenColumns],
           searchColumnVisible,
           remainingNotesColumnVisible,
+          timestampColumnVisible,
           actionColumnVisible,
           voiceMode: getVoiceMode(),
           focusEnabled
@@ -4901,7 +5141,7 @@
       if (!file) return;
 
       const reader = new FileReader();
-      reader.onload = function (evt) {
+      reader.onload = async function (evt) {
         try {
           const importedSession = JSON.parse(evt.target.result);
 
@@ -4910,31 +5150,12 @@
             throw new Error("Invalid session file format.");
           }
 
-          // Backup new settings system
-          const keysToPreserve = ["appSettings", "focusEnabled", "searchColumnVisible", "timestampColumnVisible", "remainingNotesColumnVisible", "ignoreFirstRows"];
-          const preservedSettings = {};
-          keysToPreserve.forEach(k => preservedSettings[k] = localStorage.getItem(k));
-
-          // Clear existing memory
-          localStorage.clear();
-
-          // Restore settings
-          keysToPreserve.forEach(k => {
-            if (preservedSettings[k] !== null) localStorage.setItem(k, preservedSettings[k]);
+          await initializeProductInventoryStorage();
+          await ProductInventoryDB.clearActiveSession();
+          await ProductInventoryDB.importSessionData({
+            ...importedSession,
+            editedBarcodes: importedSession.editedBarcodes || [],
           });
-
-          // Restore Core Memory
-          if (importedSession.excelData) localStorage.setItem("excelData", JSON.stringify(importedSession.excelData));
-          localStorage.setItem("fileName", importedSession.fileName || "Imported_Session");
-          localStorage.setItem("remainingProducts", JSON.stringify(importedSession.remainingProducts));
-          localStorage.setItem("scannedProducts", JSON.stringify(importedSession.scannedProducts));
-          localStorage.setItem("remainingNotes", JSON.stringify(importedSession.remainingNotes || {}));
-
-          // Restore Mappings
-          const importedMappings = new Map(importedSession.editedBarcodes || []);
-          localStorage.setItem("editedBarcodes", JSON.stringify(Array.from(importedMappings.entries())));
-
-
 
           alert("Session imported successfully! Reloading application...");
           location.reload();
@@ -4970,42 +5191,39 @@
 
       const operationName = fileName || "Unknown Operation";
       const auditorName = currentUser ? currentUser.displayName : "Auditor";
-      if (driversIndexCache.length > 0) {
-        const sel = document.getElementById("driverSelect");
-        if (sel && !sel.classList.contains("d-none") && !sel.value) {
-          alert("Please select a driver.");
-          return;
-        }
-      }
-      const dp = getDriverPayloadForSave();
-      const driverName = (dp.driverName || "").trim();
-      const driverId = (dp.driverId || "").trim();
 
       const btn = document.getElementById("saveReviewOperationBtn");
       const originalHtml = btn.innerHTML;
       btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
       btn.disabled = true;
 
-      const sessionDataStr = localStorage.getItem("scannedProducts") || "[]";
+      await saveProgress(true);
+      const sessionPayload = buildCurrentSessionPayload();
       try {
-        await firestoreDb.collection("savedOperations").add({
+        const docRef = await firestoreDb.collection("savedOperations").add({
           operationName,
           timestamp: Date.now(),
           totalProducts: excelData.length > 1 ? excelData.length - 1 : 0,
           scannedCount: scannedBarcodes.size,
           remainingCount: remainingProducts.length,
           auditors: [auditorName],
-          driverId: driverId || "",
-          driverName: driverName || "",
-          driver: driverName || "",
+          driverId: "",
+          driverName: "",
+          driver: "",
           createdBy: currentUser ? currentUser.uid : "unknown",
           createdByName: currentUser ? currentUser.displayName : "Unknown",
-          // Payload
           excelData: JSON.stringify(excelData),
-          scannedProducts: sessionDataStr,
+          scannedProducts: JSON.stringify(sessionPayload.scannedProducts),
           remainingProducts: JSON.stringify(remainingProducts),
           remainingNotes: JSON.stringify(remainingNotes),
           editedBarcodes: JSON.stringify(Array.from(editedBarcodes.entries()))
+        });
+        await ProductInventoryDB.saveSavedOperation({
+          id: docRef.id,
+          operationName,
+          timestamp: Date.now(),
+          scannedCount: scannedBarcodes.size,
+          remainingCount: remainingProducts.length,
         });
         alert("Review Operation saved online successfully.");
         await checkForceAssignmentAfterSave();
@@ -5157,31 +5375,9 @@
       if (!confirm(`Are you sure you want to load "${op.operationName}"? Current unsaved progress will be replaced.`)) return;
 
       try {
-        const keysToPreserve = ["appSettings", "focusEnabled", "searchColumnVisible", "timestampColumnVisible", "remainingNotesColumnVisible", "ignoreFirstRows"];
-        const preservedSettings = {};
-        keysToPreserve.forEach(k => preservedSettings[k] = localStorage.getItem(k));
-
-        localStorage.clear();
-
-        keysToPreserve.forEach(k => {
-          if (preservedSettings[k] !== null) localStorage.setItem(k, preservedSettings[k]);
-        });
-        localStorage.setItem("excelData", op.excelData || "[]");
-        localStorage.setItem("fileName", op.operationName);
-        localStorage.setItem("remainingProducts", op.remainingProducts || "[]");
-
-        let scannedPayload = [];
-        try {
-          scannedPayload = JSON.parse(op.scannedProducts || "[]");
-          scannedPayload.forEach(item => { item.source = item.source || 'scan'; });
-        } catch (e) { }
-        localStorage.setItem("scannedProducts", JSON.stringify(scannedPayload));
-
-        localStorage.setItem("remainingNotes", op.remainingNotes || "{}");
-
-        if (op.editedBarcodes) {
-          localStorage.setItem("editedBarcodes", op.editedBarcodes);
-        }
+        await initializeProductInventoryStorage();
+        await ProductInventoryDB.clearActiveSession();
+        await ProductInventoryDB.importOperation(op);
 
         alert("Operation loaded successfully! Reloading application...");
         location.reload();
@@ -5513,7 +5709,11 @@
         };
 
         if (firestoreDb) {
-          await firestoreDb.collection("savedOperations").add(newOp);
+          const docRef = await firestoreDb.collection("savedOperations").add(newOp);
+          await ProductInventoryDB.saveSavedOperation({
+            id: docRef.id,
+            ...newOp,
+          });
           alert("Merge successfully completed and saved.");
           // Clear selections
           document.querySelectorAll(".op-select-checkbox:checked").forEach(cb => cb.checked = false);
@@ -5766,13 +5966,12 @@
 
         fileName = pendingImportFileName;
         document.getElementById("pageHeader").textContent = fileName;
-        localStorage.setItem("fileName", fileName);
+        currentSessionId = ProductInventoryDB.generateSessionId();
 
         const finalData = pendingImportRawData._processed;
 
         excelData = finalData.map(normalizeRow);
         remainingProducts = [...excelData.slice(1)];
-        localStorage.setItem("excelData", JSON.stringify(excelData));
 
         renderTableHeaders();
         showRemainingProducts();
@@ -5802,9 +6001,8 @@
     window.addEventListener('message', (e) => {
       if (!e.data || typeof e.data !== 'object') return;
 
-      // Tracker loaded an operation into localStorage — reload data & activate tracker mode
+      // Tracker loaded an operation into IndexedDB — reload data & activate tracker mode
       if (e.data.type === 'loadTrackerOperation') {
-        // Re-load all data from localStorage (updated by tracker.html before sending this message)
         loadProgress();
         // Activate search mode + show remaining (same as the on-load trackerMode block)
         inputMode = 'search';

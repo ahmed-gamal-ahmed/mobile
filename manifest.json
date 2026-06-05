@@ -57,22 +57,6 @@
       "purpose": "any maskable"
     }
   ],
-  "screenshots": [
-    {
-      "src": "./screenshots/mobile.png",
-      "sizes": "320x640",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Mobile view of Product Inventory"
-    },
-    {
-      "src": "./screenshots/desktop.png",
-      "sizes": "1280x800",
-      "type": "image/png",
-      "form_factor": "wide", 
-      "label": "Desktop view of Product Inventory"
-    }
-  ],
   "categories": ["utilities", "productivity"],
   "prefer_related_applications": false
 }

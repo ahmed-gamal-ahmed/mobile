@@ -23,6 +23,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
   <script src="app-settings.js"></script>
+  <script src="product-inventory-db.js"></script>
   <link rel="stylesheet" href="desktop-view.css" />
 
   <style>
@@ -1615,21 +1616,17 @@
       return allOperations.filter(op => ids.includes(op.id));
     }
 
-    function opsLoadOperation(op) {
+    async function opsLoadOperation(op) {
       if (!confirm(`Load "${op.operationName}" into the main app? Current unsaved progress will be replaced.`)) return;
-      const keysToPreserve = ["appSettings", "focusEnabled", "voiceMode", "searchColumnVisible", "timestampColumnVisible", "remainingNotesColumnVisible", "ignoreFirstRows"];
-      const saved = {};
-      keysToPreserve.forEach(k => saved[k] = localStorage.getItem(k));
-      localStorage.clear();
-      keysToPreserve.forEach(k => { if (saved[k] !== null) localStorage.setItem(k, saved[k]); });
-      localStorage.setItem("excelData", op.excelData || "[]");
-      localStorage.setItem("fileName", op.operationName);
-      localStorage.setItem("remainingProducts", op.remainingProducts || "[]");
-      let sp = []; try { sp = JSON.parse(op.scannedProducts || "[]"); sp.forEach(i => { i.source = i.source || "scan"; }); } catch (_) { }
-      localStorage.setItem("scannedProducts", JSON.stringify(sp));
-      localStorage.setItem("remainingNotes", op.remainingNotes || "{}");
-      if (op.editedBarcodes) localStorage.setItem("editedBarcodes", op.editedBarcodes);
-      window.location.href = "index.html";
+      try {
+        await ProductInventoryDB.init();
+        await ProductInventoryDB.clearActiveSession();
+        await ProductInventoryDB.importOperation(op);
+        window.location.href = "index.html";
+      } catch (err) {
+        console.error("Failed to load operation into IndexedDB:", err);
+        showOpsAlert("Failed to load operation: " + err.message, "danger");
+      }
     }
 
     async function opsDeleteSingle(op) {
