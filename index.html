@@ -144,6 +144,15 @@
       padding: 10px;
     }
 
+    /* Double-tap move mode — remaining rows */
+    body.double-tap-move-mode #remainingTableBody tr {
+      cursor: pointer;
+    }
+
+    body.double-tap-move-mode #remainingTableBody tr:active {
+      background-color: rgba(40, 167, 69, 0.2) !important;
+    }
+
     #openSidebarButton {
       position: fixed;
       top: 20px;
@@ -641,6 +650,13 @@
       <button id="toggleRemainingButton" class="btn btn-primary w-100" data-bs-toggle="tooltip"
         title="Show/Hide Remaining Products">
         <i class="bi bi-arrow-repeat"></i> Remaining Products
+      </button>
+    </div>
+
+    <div class="mb-3">
+      <button id="toggleDoubleTapMoveBtn" class="btn btn-outline-light w-100" data-bs-toggle="tooltip"
+        title="Double-tap a row in Remaining Products to move it to Scanned">
+        <i class="bi bi-hand-index-thumb"></i> <span id="toggleDoubleTapMoveBtnLabel">Double-Tap Move: Off</span>
       </button>
     </div>
 
@@ -1206,6 +1222,7 @@
     const PRIVATE_SHEETS_CACHE_TTL_MS = 5 * 60 * 1000;
     let privateSheetsCacheIndex = { ts: 0, names: [] };
     let focusEnabled = AppSettings.get().focusEnabled; // State variable to track focus mode
+    let doubleTapMoveEnabled = !!AppSettings.get().doubleTapMoveEnabled;
     let hiddenColumns = []; // Track hidden columns
     let remainingNotesColumnVisible = AppSettings.get().remainingNotesColumnVisible;
     let remainingNotes = {}; // row key (barcode) -> note text for remaining table only
@@ -1399,6 +1416,24 @@
       button.innerHTML = focusEnabled
         ? '<i class="bi bi-bullseye"></i> Focus on Added: On'
         : '<i class="bi bi-bullseye"></i> Focus on Added: Off';
+    }
+
+    function isDoubleTapMoveEnabled() {
+      return !!doubleTapMoveEnabled;
+    }
+
+    function updateDoubleTapMoveButton() {
+      const btn = document.getElementById("toggleDoubleTapMoveBtn");
+      const label = document.getElementById("toggleDoubleTapMoveBtnLabel");
+      if (!btn || !label) return;
+      const dict = window.AppSettings.getDictionary();
+      const on = isDoubleTapMoveEnabled();
+      label.textContent = on
+        ? (dict["Double-Tap Move: On"] || "Double-Tap Move: On")
+        : (dict["Double-Tap Move: Off"] || "Double-Tap Move: Off");
+      btn.classList.toggle("btn-success", on);
+      btn.classList.toggle("btn-outline-light", !on);
+      document.body.classList.toggle("double-tap-move-mode", on);
     }
 
     function updateRemainingButtonVisibility() {
@@ -2572,6 +2607,7 @@
         
         // Update local variables
         focusEnabled = s.focusEnabled;
+        doubleTapMoveEnabled = !!s.doubleTapMoveEnabled;
         remainingNotesColumnVisible = !!s.remainingNotesColumnVisible;
         searchColumnVisible = s.searchColumnVisible !== false;
         timestampColumnVisible = s.timestampColumnVisible !== false;
@@ -2582,6 +2618,7 @@
         updateDesktopViewButton();
         updateAlphabetBrowseButton();
         updateCompactScannedButton();
+        updateDoubleTapMoveButton();
         applySearchColumnVisibility();
         applyTimestampColumnVisibility();
 
@@ -2767,6 +2804,7 @@
           
           // Sync local state variables from loaded settings
           focusEnabled = AppSettings.get().focusEnabled;
+          doubleTapMoveEnabled = !!AppSettings.get().doubleTapMoveEnabled;
           remainingNotesColumnVisible = AppSettings.get().remainingNotesColumnVisible;
           searchColumnVisible = AppSettings.get().searchColumnVisible;
           timestampColumnVisible = AppSettings.get().timestampColumnVisible;
@@ -2777,6 +2815,7 @@
           updateRemainingButtonVisibility();
           updateDesktopViewButton();
           updateCompactScannedButton();
+          updateDoubleTapMoveButton();
           applyUserRestrictions();
 
           // Start assignment listener
@@ -2992,6 +3031,13 @@
       document
         .getElementById("toggleRemainingButton")
         .addEventListener("click", toggleRemainingProducts);
+
+      document.getElementById("toggleDoubleTapMoveBtn").addEventListener("click", async () => {
+        doubleTapMoveEnabled = !doubleTapMoveEnabled;
+        await AppSettings.save({ doubleTapMoveEnabled }, firestoreDb, currentUser?.uid);
+        updateDoubleTapMoveButton();
+      });
+      updateDoubleTapMoveButton();
 
       document.getElementById("toggleCompactScannedBtn").addEventListener("click", async () => {
         const nextCompact = !AppSettings.get().scannedCompactMode;
@@ -4607,6 +4653,57 @@
       }
     }
 
+    function moveRemainingProductToScanned(selectedRow) {
+      if (isReadOnlyMode()) return false;
+
+      const barcodeColIndex = getBarcodeColumnIndex();
+      const primaryBarcode = String(
+        selectedRow[barcodeColIndex] || selectedRow[1] || selectedRow[0] || ""
+      ).trim();
+      const normalizedBarcode = normalizeBarcode(primaryBarcode);
+      const movedResult = removeExactRemainingProductRow(selectedRow);
+
+      if (!movedResult) return false;
+
+      addRowToScannedTable(movedResult.product, normalizedBarcode, true, "move");
+      showRemainingProducts();
+      if (window.RemainingAlphabetFilter && isAlphabetBrowseModeEnabled()) {
+        RemainingAlphabetFilter.ensureVisible();
+        RemainingAlphabetFilter.refresh({ scrollToFirst: false });
+      }
+      return true;
+    }
+
+    function attachDoubleTapMoveToRow(tr, row) {
+      let lastTapTime = 0;
+
+      const attemptMove = (e) => {
+        if (!isDoubleTapMoveEnabled() || isReadOnlyMode()) return;
+        if (e.target.closest("button, input, select, textarea, a")) return;
+        if (!moveRemainingProductToScanned(row)) {
+          console.error("Double-tap move failed: row not found in remainingProducts", row);
+          alert("Error: Could not move selected product. Please refresh and try again.");
+        }
+      };
+
+      tr.addEventListener("dblclick", attemptMove);
+      tr.addEventListener(
+        "touchend",
+        (e) => {
+          if (!isDoubleTapMoveEnabled() || isReadOnlyMode()) return;
+          if (e.target.closest("button, input, select, textarea, a")) return;
+          const now = Date.now();
+          if (now - lastTapTime < 350) {
+            lastTapTime = 0;
+            attemptMove(e);
+          } else {
+            lastTapTime = now;
+          }
+        },
+        { passive: false }
+      );
+    }
+
     function removeExactRemainingProductRow(selectedRow) {
       const byReferenceIndex = remainingProducts.indexOf(selectedRow);
       if (byReferenceIndex >= 0) {
@@ -4787,32 +4884,15 @@
         if (isReadOnly) moveToScannedButton.disabled = true;
         moveToScannedButton.addEventListener("click", () => {
           if (isReadOnlyMode()) return;
-
-          // DIRECT MOVE: use selected row object only (no scan/barcode lookup).
-          const barcodeColIndex = getBarcodeColumnIndex();
-          const primaryBarcode = String(row[barcodeColIndex] || row[1] || row[0] || "").trim();
-          const normalizedBarcode = normalizeBarcode(primaryBarcode);
-          const movedResult = removeExactRemainingProductRow(row);
-
-          console.log({
-            moveAction: 'direct',
-            primaryBarcode,
-            normalizedBarcode,
-            productIndex: movedResult ? movedResult.index : -1,
-            rowData: row,
-            matchedProduct: movedResult ? movedResult.product : null
-          });
-
-          if (movedResult) {
-            addRowToScannedTable(movedResult.product, normalizedBarcode, true, "move");
-            showRemainingProducts();
-            if (window.RemainingAlphabetFilter && isAlphabetBrowseModeEnabled()) {
-              RemainingAlphabetFilter.ensureVisible();
-              RemainingAlphabetFilter.refresh({ scrollToFirst: false });
-            }
-          } else {
-            console.error('Move failed: selected row not found in remainingProducts', { primaryBarcode, normalizedBarcode });
-            alert('Error: Could not move selected product. Please refresh and try again.');
+          if (!moveRemainingProductToScanned(row)) {
+            const barcodeColIndex = getBarcodeColumnIndex();
+            const primaryBarcode = String(row[barcodeColIndex] || row[1] || row[0] || "").trim();
+            console.error("Move failed: selected row not found in remainingProducts", {
+              primaryBarcode,
+              normalizedBarcode: normalizeBarcode(primaryBarcode),
+              rowData: row,
+            });
+            alert("Error: Could not move selected product. Please refresh and try again.");
           }
         });
         tdAction.appendChild(moveToScannedButton);
@@ -4824,6 +4904,8 @@
         if (window.RemainingAlphabetFilter) {
           RemainingAlphabetFilter.tagRemainingRow(tr, row, rowIndex);
         }
+
+        attachDoubleTapMoveToRow(tr, row);
 
         remainingTableBody.appendChild(tr);
       });
