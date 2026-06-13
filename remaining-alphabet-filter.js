@@ -9,8 +9,9 @@
   const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
   const FILTER_KEYS = ['All'].concat(LETTERS, ['#']);
   const BROWSE_DESKTOP_KEY = 'alphabetBrowseSavedDesktop';
+  const MAX_FILTER_DEPTH = 2;
 
-  /** @type {string[]} letters at positions 0, 1, 2… in the product name */
+  /** @type {string[]} letters at positions 0, 1… in the product name (max 2 steps) */
   let filterPrefix = [];
   let browseModeActive = false;
   let sidebarEl = null;
@@ -157,7 +158,8 @@
   function updateCountLabels(counts) {
     if (!innerEl) return;
     const depth = filterPrefix.length;
-    const depthLabel = depth === 0 ? '1st' : depth === 1 ? '2nd' : (depth + 1) + 'th';
+    const depthLabel = depth === 0 ? '1st' : '2nd';
+    const atMaxDepth = filterPrefix.length >= MAX_FILTER_DEPTH;
 
     innerEl.querySelectorAll('.alphabet-filter-btn').forEach(function (btn) {
       const key = btn.dataset.letter;
@@ -170,13 +172,17 @@
         btn.title = filterPrefix.length > 0
           ? 'Clear filter (' + counts.All + ' shown)'
           : 'All (' + count + ')';
+      } else if (atMaxDepth) {
+        btn.title = count > 0
+          ? 'Max 2 steps — tap All to reset (' + count + ')'
+          : 'Max 2 steps reached';
       } else {
         btn.title = count > 0
           ? depthLabel + ' char ' + key + ' (' + count + ')'
           : depthLabel + ' char ' + key + ' (0)';
       }
       btn.classList.toggle('is-empty', count === 0 && key !== 'All');
-      btn.disabled = key !== 'All' && count === 0;
+      btn.disabled = key !== 'All' && (count === 0 || atMaxDepth);
     });
   }
 
@@ -263,12 +269,22 @@
 
     if (letter === 'All') {
       filterPrefix = [];
-    } else {
+    } else if (filterPrefix.length < MAX_FILTER_DEPTH) {
       filterPrefix = filterPrefix.concat([letter]);
+    } else {
+      return;
     }
 
     updateActiveButton();
     refresh({ scrollToFirst: !!scrollToFirst });
+  }
+
+  function clearFilter() {
+    filterPrefix = [];
+    if (!isBrowseModeActive()) return;
+    if (!initialized) init();
+    updateActiveButton();
+    refresh({ scrollToFirst: false });
   }
 
   function refresh(options) {
@@ -369,6 +385,7 @@
     init: init,
     refresh: refresh,
     reset: reset,
+    clearFilter: clearFilter,
     setFilter: setFilter,
     updateVisibility: updateVisibility,
     ensureVisible: ensureVisible,

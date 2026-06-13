@@ -1223,6 +1223,13 @@
     let privateSheetsCacheIndex = { ts: 0, names: [] };
     let focusEnabled = AppSettings.get().focusEnabled; // State variable to track focus mode
     let doubleTapMoveEnabled = !!AppSettings.get().doubleTapMoveEnabled;
+    const doubleTapMoveState = {
+      lastTr: null,
+      lastTime: 0,
+      lockUntil: 0,
+      lastTouchHandledAt: 0,
+      bound: false,
+    };
     let hiddenColumns = []; // Track hidden columns
     let remainingNotesColumnVisible = AppSettings.get().remainingNotesColumnVisible;
     let remainingNotes = {}; // row key (barcode) -> note text for remaining table only
@@ -3038,6 +3045,7 @@
         updateDoubleTapMoveButton();
       });
       updateDoubleTapMoveButton();
+      initDoubleTapMoveHandler();
 
       document.getElementById("toggleCompactScannedBtn").addEventListener("click", async () => {
         const nextCompact = !AppSettings.get().scannedCompactMode;
@@ -4334,8 +4342,7 @@
           addRowToScannedTable(productRow, fullBarcode, true, "browse-scan");
           showRemainingProducts();
           if (window.RemainingAlphabetFilter) {
-            RemainingAlphabetFilter.ensureVisible();
-            RemainingAlphabetFilter.refresh({ scrollToFirst: false });
+            RemainingAlphabetFilter.clearFilter();
           }
           if (matches > 1) {
             console.warn("Multiple products share last 4 digits; scanned first match.", digits);
@@ -4668,40 +4675,83 @@
       addRowToScannedTable(movedResult.product, normalizedBarcode, true, "move");
       showRemainingProducts();
       if (window.RemainingAlphabetFilter && isAlphabetBrowseModeEnabled()) {
-        RemainingAlphabetFilter.ensureVisible();
-        RemainingAlphabetFilter.refresh({ scrollToFirst: false });
+        RemainingAlphabetFilter.clearFilter();
       }
       return true;
     }
 
-    function attachDoubleTapMoveToRow(tr, row) {
-      let lastTapTime = 0;
+    function initDoubleTapMoveHandler() {
+      const tbody = document.getElementById("remainingTableBody");
+      if (!tbody || doubleTapMoveState.bound) return;
+      doubleTapMoveState.bound = true;
 
-      const attemptMove = (e) => {
+      const isInteractiveTarget = (target) =>
+        !!target.closest("button, input, select, textarea, a");
+
+      const getRowFromTr = (tr) => {
+        if (!tr) return null;
+        const idx = parseInt(tr.dataset.remainingIndex, 10);
+        if (isNaN(idx) || idx < 0 || idx >= remainingProducts.length) return null;
+        return remainingProducts[idx];
+      };
+
+      const handleDoubleTapOnRow = (tr, e) => {
         if (!isDoubleTapMoveEnabled() || isReadOnlyMode()) return;
-        if (e.target.closest("button, input, select, textarea, a")) return;
-        if (!moveRemainingProductToScanned(row)) {
-          console.error("Double-tap move failed: row not found in remainingProducts", row);
+        if (Date.now() < doubleTapMoveState.lockUntil) return;
+
+        const rowData = getRowFromTr(tr);
+        if (!rowData) return;
+
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+
+        doubleTapMoveState.lockUntil = Date.now() + 600;
+        doubleTapMoveState.lastTr = null;
+        doubleTapMoveState.lastTime = 0;
+
+        if (!moveRemainingProductToScanned(rowData)) {
+          console.error("Double-tap move failed: row not found in remainingProducts", rowData);
           alert("Error: Could not move selected product. Please refresh and try again.");
         }
       };
 
-      tr.addEventListener("dblclick", attemptMove);
-      tr.addEventListener(
+      tbody.addEventListener(
         "touchend",
         (e) => {
           if (!isDoubleTapMoveEnabled() || isReadOnlyMode()) return;
-          if (e.target.closest("button, input, select, textarea, a")) return;
+          if (isInteractiveTarget(e.target)) return;
+
+          const tr = e.target.closest("tr");
+          if (!tr || tr.parentElement !== tbody) return;
+
           const now = Date.now();
-          if (now - lastTapTime < 350) {
-            lastTapTime = 0;
-            attemptMove(e);
-          } else {
-            lastTapTime = now;
+          const isDoubleTap =
+            tr === doubleTapMoveState.lastTr && now - doubleTapMoveState.lastTime < 450;
+
+          if (isDoubleTap) {
+            doubleTapMoveState.lastTouchHandledAt = now;
+            handleDoubleTapOnRow(tr, e);
+            return;
           }
+
+          doubleTapMoveState.lastTr = tr;
+          doubleTapMoveState.lastTime = now;
         },
         { passive: false }
       );
+
+      tbody.addEventListener("dblclick", (e) => {
+        if (!isDoubleTapMoveEnabled() || isReadOnlyMode()) return;
+        if (Date.now() - doubleTapMoveState.lastTouchHandledAt < 700) return;
+        if (isInteractiveTarget(e.target)) return;
+
+        const tr = e.target.closest("tr");
+        if (!tr || tr.parentElement !== tbody) return;
+
+        handleDoubleTapOnRow(tr, e);
+      });
     }
 
     function removeExactRemainingProductRow(selectedRow) {
@@ -4904,8 +4954,6 @@
         if (window.RemainingAlphabetFilter) {
           RemainingAlphabetFilter.tagRemainingRow(tr, row, rowIndex);
         }
-
-        attachDoubleTapMoveToRow(tr, row);
 
         remainingTableBody.appendChild(tr);
       });
