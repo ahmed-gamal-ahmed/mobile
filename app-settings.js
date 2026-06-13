@@ -34,7 +34,8 @@
     scannedCompactMode: false,
     desktopViewMode: false,       // Desktop-style layout on mobile (Chrome "Desktop site"-like)
     pcView: false,                // Legacy alias — synced with desktopViewMode
-    alphabetBrowseMode: false     // A–Z browse: PC layout + letter filter + last-4 scan
+    alphabetBrowseMode: false,    // A–Z browse: PC layout + letter filter + last-4 scan
+    doubleTapMoveEnabled: false   // Double-tap remaining row to move to scanned
   };
 
   /* ── CSS value maps ──────────────────────────────────────────────────── */
@@ -212,6 +213,7 @@
       document.body.classList.toggle('fit-table-screen', !!s.fitTableToScreen);
       document.body.classList.toggle('scanned-compact-mode', !!s.scannedCompactMode);
       document.body.classList.toggle('alphabet-browse-mode', !!s.alphabetBrowseMode);
+      document.body.classList.toggle('double-tap-move-mode', !!s.doubleTapMoveEnabled);
       _applyDesktopViewDom(s);
       if (window.RemainingAlphabetFilter && typeof RemainingAlphabetFilter.onBrowseModeChange === 'function') {
         RemainingAlphabetFilter.onBrowseModeChange(!!s.alphabetBrowseMode);
@@ -497,6 +499,8 @@
       "A-Z Browse Mode": "وضع تصفح A-Z",
       "A-Z Browse Mode: On": "وضع تصفح A-Z: تشغيل",
       "A-Z Browse Mode: Off": "وضع تصفح A-Z: إيقاف",
+      "Double-Tap Move: On": "النقر المزدوج للنقل: تشغيل",
+      "Double-Tap Move: Off": "النقر المزدوج للنقل: إيقاف",
       "Scan last 4 digits of barcode": "امسح آخر 4 أرقام من الباركود",
       "Desktop layout active": "تخطيط سطح المكتب مفعّل",
       "Force desktop-style layout on mobile (wide tables, pinned sidebar, horizontal scroll). Not page zoom.": "فرض تخطيط سطح المكتب على الجوال (جداول عريضة، قائمة جانبية ثابتة، تمرير أفقي). ليس تكبير الصفحة.",

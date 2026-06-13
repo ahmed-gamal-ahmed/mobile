@@ -26,6 +26,24 @@
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+.alphabet-filter-prefix {
+  flex-shrink: 0;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: #198754;
+  text-align: center;
+  padding: 4px 2px;
+  max-height: 4.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: rgba(40, 167, 69, 0.12);
+  border-bottom: 1px solid #dee2e6;
+}
+
 .remaining-alphabet-filter-inner {
   flex: 1;
   display: grid;
